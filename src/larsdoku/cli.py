@@ -1135,7 +1135,7 @@ def solve_selective(bd81, max_level=99, only_techniques=None,
         # ── STALLED — try Zone Oracle / Rule Oracle if enabled ──
         if _use_zone_oracle:
             try:
-                from wsrf_zone import zone_predict
+                from .wsrf_zone import zone_predict
                 zresult = zone_predict(bb)
                 if zresult:
                     best_pos, zdigit, n_likely, zdetail = zresult
@@ -1388,7 +1388,7 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
 
     Returns dict compatible with solve_selective output.
     """
-    from siro_boost import predict_technique_dispatch, siro_predict
+    from .siro_boost import predict_technique_dispatch, siro_predict
 
     bb = BitBoard.from_string(bd81)
     solution_str = solve_backtrack(bd81)
@@ -2854,7 +2854,7 @@ def _start_server(port):
                     n_clues = max(8, min(16, data.get('clues', 11)))
                     t0 = time.perf_counter()
 
-                    from sub17_solve import (generate_random_mask, solve_forward,
+                    from .sub17_solve import (generate_random_mask, solve_forward,
                                             validate_sudoku as val_sudoku)
                     import random as _rng
 
@@ -3210,7 +3210,7 @@ presets:
 
     # ── Sparse Puzzle Challenge mode ──
     if getattr(args, 'sparse', None) is not None:
-        from sub17_solve import (generate_random_mask, solve_forward,
+        from .sub17_solve import (generate_random_mask, solve_forward,
                                 validate_sudoku as val_sudoku)
         import random as _sparse_rng
 
@@ -3304,7 +3304,7 @@ presets:
 
     # ── SIRO-Only analysis mode ──
     if args.siro_only is not None or getattr(args, 'siro_only', None) is not None:
-        from wsrf_zone import siro_cascade
+        from .wsrf_zone import siro_cascade
         puzzle_str = args.siro_only or (args.puzzle if args.puzzle else None)
         if not puzzle_str:
             print('Error: --siro-only needs a puzzle. Use: --siro-only PUZZLE or PUZZLE --siro-only')
@@ -3552,7 +3552,7 @@ presets:
 
     # ── Forge-Larstech mode: hunt for forged puzzles that need WSRF techniques ──
     if args.forge_larstech is not None:
-        from mask_forge import parse_mask, forge_unique_randomized
+        from .mask_forge import parse_mask, forge_unique_randomized
 
         mask_str = args.forge_larstech
         max_attempts = args.forge_larstech_attempts
@@ -3624,7 +3624,7 @@ presets:
 
     # ── Forge-Solve mode: forge unique puzzles from mask, then solve ──
     if args.forge_solve is not None:
-        from mask_forge import parse_mask, forge_unique
+        from .mask_forge import parse_mask, forge_unique
         import itertools
 
         mask_str = args.forge_solve
@@ -3949,7 +3949,7 @@ presets:
 
     # ── Board SIRO — Global illumination ──
     if args.board_siro:
-        from siro_boost import siro_predict_global, siro_predict
+        from .siro_boost import siro_predict_global, siro_predict
         # Already imported at module level from engine
 
         solution_str = solve_backtrack(bd81)
@@ -4370,7 +4370,7 @@ presets:
     # Zone135: auto-compute oracle zone sums from backtracker solution
     z135_oracle = None
     if args.zone135:
-        from engine import solve_backtrack_pure
+        from .engine import solve_backtrack_pure
         z135_sol = solve_backtrack_pure(bd81)
         if z135_sol:
             z135_oracle = compute_zone_sums_from_solution(z135_sol)

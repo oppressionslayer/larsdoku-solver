@@ -826,7 +826,7 @@ def solve_siro_boosted(bd81, solution=None, verbose=False):
             continue
         
         # SIRO-Boosted Forcing Chain
-        from bitwise_engine import detect_forcing_chain_bitwise
+        from .bitwise_engine import detect_forcing_chain_bitwise
         fc_hits = detect_forcing_chain_bitwise(bb)
         for pos, val, detail in fc_hits:
             if bb.board[pos] == 0 and solution[pos] == val:
@@ -870,7 +870,7 @@ def solve_siro_boosted(bd81, solution=None, verbose=False):
             continue
         
         # FPF (last resort — could add SIRO boost but it's already fast)
-        from bitwise_engine import detect_fpf_bitwise
+        from .bitwise_engine import detect_fpf_bitwise
         fpf_hits = detect_fpf_bitwise(bb)
         for pos, val, detail in fpf_hits:
             if bb.board[pos] == 0 and solution[pos] == val:

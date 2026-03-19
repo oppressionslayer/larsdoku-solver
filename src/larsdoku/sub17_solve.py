@@ -233,7 +233,7 @@ def solve_forward(bd81, verbose=False):
 
     No backtracking. No tree search. Just analysis + commit.
     """
-    from cli import solve_selective
+    from .cli import solve_selective
 
     # Phase 1: Full technique engine
     result = solve_selective(bd81)
