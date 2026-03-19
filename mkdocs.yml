@@ -1,0 +1,60 @@
+site_name: Larsdoku
+site_description: Pure logic Sudoku solver — 100% on Top1465, zero guessing
+site_author: Lars (oppressionslayer)
+site_url: https://oppressionslayer.github.io/larsdoku/
+
+repo_name: oppressionslayer/larsdoku
+repo_url: https://github.com/oppressionslayer/larsdoku
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: amber
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: amber
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CLI Reference: cli.md
+  - Python API: api.md
+  - Techniques: techniques.md
+  - Benchmarks: benchmarks.md
+  - Simple Wili & Zone 135: simple-wili.md
+  - Puzzle Collections: puzzles.md
