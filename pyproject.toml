@@ -33,9 +33,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/oppressionslayer/larsdoku"
+Homepage = "https://github.com/oppressionslayer/larsdoku-solver"
 Documentation = "https://larsdoku-docs.netlify.app"
-Repository = "https://github.com/oppressionslayer/larsdoku"
+Repository = "https://github.com/oppressionslayer/larsdoku-solver"
 
 [project.scripts]
 larsdoku = "larsdoku.cli:main"
