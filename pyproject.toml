@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "larsdoku"
-version = "1.0.0"
+version = "1.0.2"
 description = "Pure logic Sudoku solver — 35 techniques, zero backtracking, 100% on Top1465"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
@@ -24,7 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Games/Entertainment :: Puzzles",
+    "Topic :: Games/Entertainment :: Board Games",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 dependencies = [
