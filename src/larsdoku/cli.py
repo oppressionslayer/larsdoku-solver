@@ -3196,10 +3196,18 @@ presets:
                        help='Number of forged puzzles to solve (default 5)')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
+    parser.add_argument('--parse', action='store_true',
+                       help='Parse a forum grid from stdin (pipe or paste). Outputs bd81 string.')
     parser.add_argument('--forge-larstech', type=str, metavar='MASK',
                        help='Forge puzzles from a mask until one requires WSRF/Lars techniques (FPC, FPCE, D2B, etc.)')
     parser.add_argument('--forge-larstech-attempts', type=int, default=50, metavar='N',
                        help='Max seeds to try in --forge-larstech (default 50)')
+    parser.add_argument('--board-forge', nargs='?', const='MC', metavar='POSITION',
+                       help='Build a board from zone geometry (positions: TL,TC,TR,ML,MC,MR,BL,BC,BR). Default: MC (centers)')
+    parser.add_argument('--board-forge-clues', type=int, default=22, metavar='N',
+                       help='Target clue count for --board-forge unique mode (default 22)')
+    parser.add_argument('--board-forge-count', type=int, default=1, metavar='N',
+                       help='Number of boards to forge (default 1)')
 
     args = parser.parse_args()
 
@@ -3539,6 +3547,177 @@ presets:
         return
 
     # ── Test mask mode ──
+    # ── Board Forge mode: build boards from zone geometry ──
+    if args.board_forge is not None:
+        from .board_forge import forge_board, forge_unique_board, POSITIONS
+
+        pos_name = args.board_forge.upper()
+        target_clues = args.board_forge_clues
+        count = args.board_forge_count
+
+        # Parse position(s) — can be comma-separated like MC,TL
+        pos_list = [p.strip() for p in pos_name.split(',')]
+        for p in pos_list:
+            if p not in POSITIONS:
+                print(f'  Error: unknown position "{p}". Valid: {", ".join(POSITIONS.keys())}')
+                sys.exit(1)
+
+        print(f'\n{"═" * 60}')
+        print(f'  BOARD FORGE — Zone Geometry Builder')
+        print(f'  Position{"s" if len(pos_list) > 1 else ""}: {", ".join(pos_list)} | Target: {target_clues} clues | Count: {count}')
+        print(f'{"═" * 60}')
+
+        import random as _bf_rng
+        rng = _bf_rng.Random()
+        solved = 0
+
+        for i in range(count):
+            # Place digits 1-9 at zone position(s) across all 9 boxes
+            from .board_forge import get_cells_for_position
+            digits_by_cell = {}
+            for name in pos_list:
+                cells = get_cells_for_position(name)
+                perm = list(range(1, 10))
+                rng.shuffle(perm)
+                for cell, digit in zip(cells, perm):
+                    digits_by_cell[cell] = digit
+
+            base = ['0'] * 81
+            for cell, digit in digits_by_cell.items():
+                base[cell] = str(digit)
+            base_str = ''.join(base)
+            base_n = sum(1 for c in base_str if c != '0')
+
+            # Get full solution via backtracker
+            solution = solve_backtrack(base_str)
+            if not solution:
+                print(f'\n  [{i+1}] No solution from zone placement — retrying')
+                continue
+
+            # Add ALL clues from solution, then minimize back to target
+            fat = list(solution)  # start with full solution
+            for cell in digits_by_cell:
+                fat[cell] = str(digits_by_cell[cell])  # ensure zone base is marked
+            fat_str = ''.join(fat)
+
+            # Minimize: remove clues one at a time, keep if still unique
+            removable = [j for j in range(81) if j not in digits_by_cell]
+            rng.shuffle(removable)
+            puzzle_list = list(fat_str)
+            for pos in removable:
+                if sum(1 for c in puzzle_list if c != '0') <= target_clues:
+                    break
+                saved = puzzle_list[pos]
+                puzzle_list[pos] = '0'
+                if not has_unique_solution(''.join(puzzle_list)):
+                    puzzle_list[pos] = saved  # put it back
+            puzzle = ''.join(puzzle_list)
+
+            is_unique = has_unique_solution(puzzle)
+            n_clues = sum(1 for c in puzzle if c != '0')
+
+            # Solve it
+            r = solve_selective(puzzle, verbose=False)
+            techs = r.get('technique_counts', {})
+            success = r.get('success', False)
+            if success:
+                solved += 1
+
+            top = sorted(techs.items(), key=lambda x: -x[1])[:4]
+            tech_str = ', '.join(f'{t}={c}' for t, c in top) if top else 'none'
+            status = 'SOLVED' if success else 'STALLED'
+            unique_tag = ' unique' if is_unique else ' multi'
+
+            print(f'\n  [{i+1}] {status} | {n_clues} clues ({base_n} from zones){unique_tag}')
+            print(f'  Puzzle: {puzzle}')
+            print(f'  Techs:  {tech_str}')
+
+            if count == 1 and success:
+                board_str = r.get('board', '')
+                if board_str:
+                    print(format_board(board_str, puzzle))
+
+        if count > 1:
+            print(f'\n{"═" * 60}')
+            print(f'  RESULTS: {solved}/{count} solved')
+        print()
+        return
+
+    # ── Parse mode: convert forum grid from stdin to bd81 ──
+    if args.parse:
+        import re
+        lines = []
+        print('  Paste forum grid, then press Ctrl+D (or Ctrl+Z on Windows):')
+        try:
+            while True:
+                lines.append(input())
+        except EOFError:
+            pass
+
+        # Collect data lines (skip separators)
+        data_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # Skip pure separator lines
+            if re.match(r'^[\s+\-*=─│┼┤├┐┘┌└|]+$', stripped):
+                continue
+            # Must have at least one digit or dot to be a data line
+            if not re.search(r'[\d.]', stripped):
+                continue
+            data_lines.append(stripped)
+
+        if not data_lines:
+            print('  Error: no data lines found')
+            sys.exit(1)
+
+        # Detect format: check if dots are used (compact dot-format)
+        all_text = '\n'.join(data_lines)
+        has_dots = '.' in all_text and all_text.count('.') >= 5
+
+        cells = []
+        if has_dots:
+            # Dot-format: each digit or dot is one cell, ignore everything else
+            for line in data_lines:
+                for ch in line:
+                    if ch == '.':
+                        cells.append(0)
+                    elif ch.isdigit() and ch != '0':
+                        cells.append(int(ch))
+                    elif ch == '0':
+                        cells.append(0)
+        else:
+            # Candidate-format: space-separated tokens, pipes as separators
+            for line in data_lines:
+                cleaned = line.replace('|', ' ').replace('+', ' ').replace('*', ' ')
+                # Remove annotation letters (a-z)
+                cleaned = re.sub(r'[a-z]', '', cleaned)
+                # Remove elimination dashes
+                cleaned = re.sub(r'-', '', cleaned)
+                tokens = cleaned.split()
+                for tok in tokens:
+                    if not tok or not any(c.isdigit() for c in tok):
+                        continue
+                    digits_only = re.sub(r'[^0-9]', '', tok)
+                    if not digits_only:
+                        continue
+                    if len(digits_only) == 1:
+                        cells.append(int(digits_only))
+                    else:
+                        cells.append(0)  # candidates = unsolved
+
+        if len(cells) != 81:
+            print(f'  Error: parsed {len(cells)} cells, expected 81')
+            if cells:
+                print(f'  Got {len(cells)} cells, format={"dot" if is_dot_format else "candidate"}')
+            sys.exit(1)
+
+        bd81 = ''.join(str(c) for c in cells)
+        n_clues = sum(1 for c in bd81 if c != '0')
+        print(f'  bd81 ({n_clues} clues): {bd81}')
+        return
+
     # ── To-Mask mode: convert puzzle string to mask ──
     if args.to_mask is not None:
         puzzle = args.to_mask.strip()
