@@ -4,6 +4,10 @@
 
 **Documentation: [larsdoku-docs.netlify.app](https://larsdoku-docs.netlify.app/)**
 
+Warning use expert tab, this is a work in progress, porting python to javascript is hard!
+
+**Web App: [larsdoku.netlify.app](https://larsdoku.netlify.app/)**
+
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle**.
 
 ```
