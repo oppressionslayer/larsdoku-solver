@@ -1,0 +1,26 @@
+# Block EVERYTHING by default
+*
+
+# Only allow these explicitly
+!.gitignore
+!README.md
+!LICENSE
+!pyproject.toml
+!mkdocs.yml
+
+# Allow docs
+!docs/
+!docs/**/*.md
+
+# Allow source
+!src/
+!src/larsdoku/
+!src/larsdoku/*.py
+
+# Allow tests
+!tests/
+!tests/*.py
+
+# Allow benchmarks
+!benchmarks/
+!benchmarks/*.py
