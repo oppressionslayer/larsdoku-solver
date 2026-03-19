@@ -41,6 +41,56 @@ larsdoku "1000070900300200080096005000053009000100800026000040003000000100400000
 
 # Detailed round-by-round solve log
 larsdoku "100000002090400050006000700050903000000070000000850040700000600030009080002000001" --detail --board
+
+# Trace the full solution path to a specific cell
+larsdoku "000004006000201090001070800060000020350000008000000370009080500040302000700100000" --cell R7C4 --path --preset expert
+```
+
+```
+  ✦ Sudoku Expert Approved Techniques ✦
+
+  R7C4 = 4 via lastRemaining (step 8)
+  Candidates: [4, 6, 7]
+  Full solve: 58 steps, COMPLETE
+  Time: 697.2ms
+
+  Verify: All techniques are Sudoku Expert Approved ✓
+  No backtracking or trial-and-error was used at any point.
+  Every placement was derived by deterministic logic alone.
+
+  Techniques used:
+    ALS_XZ                10  L5
+    ALS_XYWing             5  L5
+    ForcingChain           3  L5
+    crossHatch             3  L1
+    lastRemaining          2  L1
+    KrakenFish             1  L6
+
+  Solution path (8 placements, 16 elimination rounds):
+       ~elim~  [ALS_XZ L5] 1 eliminations
+     #  1  R1C4=8  [lastRemaining L1]
+     #  2  R3C8=5  [ForcingChain L5]
+       ~elim~  [ALS_XZ L5] 1 eliminations
+     #  3  R9C6=5  [crossHatch L1]
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XYWing L5] 1 eliminations
+       ~elim~  [ALS_XYWing L5] 1 eliminations
+       ~elim~  [KrakenFish L6] 1 eliminations
+     #  4  R1C8=1  [ForcingChain L5]
+     #  5  R7C8=3  [ForcingChain L5]
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XZ L5] 1 eliminations
+     #  6  R4C6=3  [crossHatch L1]
+     #  7  R6C6=8  [crossHatch L1]
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XYWing L5] 1 eliminations
+       ~elim~  [ALS_XYWing L5] 1 eliminations
+       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XYWing L5] 1 eliminations
+   → #  8  R7C4=4  [lastRemaining L1]
 ```
 
 ---
