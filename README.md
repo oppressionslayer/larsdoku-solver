@@ -41,7 +41,7 @@ larsdoku "8000000000036000000700902000500070000000457000001000300010000680085000
 
 # Pure logic only (no oracle fallback)
 larsdoku "4...3.......6..8..........1....5..9..8....6...7.2........1.27..5.3....4.9........" --board --no-oracle
-
+GNU AFFERO GENERAL PUBLIC LICENSE
 # Step-by-step trace
 larsdoku "100007090030020008009600500005300900010080002600004000300000010040000007007000300" --steps
 
@@ -76,7 +76,7 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
        ~elim~  [ALS_XZ L5] 1 eliminations
      #  1  R1C4=8  [lastRemaining L1]
      #  2  R3C8=5  [ForcingChain L5]
-       ~elim~  [ALS_XZ L5] 1 eliminations
+       ~elim~  [ALS_XZ L5] 1 eliminationsGNU AFFERO GENERAL PUBLIC LICENSE
      #  3  R9C6=5  [crossHatch L1]
        ~elim~  [ALS_XZ L5] 1 eliminations
        ~elim~  [ALS_XYWing L5] 1 eliminations
@@ -187,7 +187,7 @@ Larsdoku implements **35 detectors** across 7 levels of escalation:
 - **FPF (Full Pipeline Forcing)** — WSRF invention. Branch on each candidate, run entire pipeline per branch
 
 ---
-
+GNU AFFERO GENERAL PUBLIC LICENSE
 ## CLI Reference
 
 ```bash
@@ -381,7 +381,7 @@ The result: puzzles that stall at L6 in pure-logic mode **solve cleanly with Aut
 
 ## License
 
-GNU AFFERO GENERAL PUBLIC LICENSE. See [LICENSE](LICENSE) for details.
+AGPL3. See [LICENSE](LICENSE) for details.
 
 ---
 
