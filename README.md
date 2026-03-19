@@ -32,7 +32,7 @@ print(result['n_steps'])           # 63
 print(result['technique_counts'])  # {'crossHatch': 42, 'nakedSingle': 9, ...}
 print(result['board'])             # solved 81-char string
 ```
-
+GNU AFFERO GENERAL PUBLIC LICENSE
 ### Command Line
 
 ```bash
@@ -66,7 +66,7 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
 
   Techniques used:
     ALS_XZ                10  L5
-    ALS_XYWing             5  L5
+    ALS_XYWing             5  L5GNU AFFERO GENERAL PUBLIC LICENSE
     ForcingChain           3  L5
     crossHatch             3  L1
     lastRemaining          2  L1
@@ -83,7 +83,7 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
        ~elim~  [ALS_XYWing L5] 1 eliminations
        ~elim~  [KrakenFish L6] 1 eliminations
      #  4  R1C8=1  [ForcingChain L5]
-     #  5  R7C8=3  [ForcingChain L5]
+     #  5  R7C8=3  [ForcingChain L5]GNU AFFERO GENERAL PUBLIC LICENSE
        ~elim~  [ALS_XZ L5] 1 eliminations
        ~elim~  [ALS_XZ L5] 1 eliminations
      #  6  R4C6=3  [crossHatch L1]
@@ -109,7 +109,7 @@ Tested against every major Sudoku benchmark collection:
 |---|---|---|---|---|
 | **Top1465** (Stertenbrink) | 1,465 | **100%** | 0.019s | 28s |
 | **Expert 669** (shuffled) | 669 | **100%** | 0.036s | 24s |
-| **Famous 10** (hardest known) | 10 | **70%** | 0.50s | 5s |
+| **Famous 10** (hardest known) | 10 | **70%** | 0.50s | 5s GNU AFFERO GENERAL PUBLIC LICENSE|
 
 Run benchmarks yourself:
 
@@ -150,7 +150,7 @@ Larsdoku implements **35 detectors** across 7 levels of escalation:
 - **Hidden Single** (crossHatch / lastRemaining) — digit possible in only one cell
 
 ### L2 — Linear Algebra
-- **GF(2) Block Lanczos** — Gaussian elimination over GF(2) to find forced digits via parity constraints
+- **GF(2) Block Lanczos** — Gaussian elimination over GF(2) GNU AFFERO GENERAL PUBLIC LICENSEto find forced digits via parity constraints
 - **GF(2) Extended** — probing, conjugate analysis, and band/stack decomposition
 
 ### L3 — Fish
@@ -238,7 +238,7 @@ Puzzles are 81-character strings, row by row, left to right. Use `0` or `.` for 
 
 Larsdoku ships with three puzzle collections for testing and benchmarking:
 
-```python
+```pythonGNU AFFERO GENERAL PUBLIC LICENSE
 from larsdoku.puzzles import FAMOUS_10, EXPERT_669, TOP1465
 ```
 
@@ -381,7 +381,7 @@ The result: puzzles that stall at L6 in pure-logic mode **solve cleanly with Aut
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+GNU AFFERO GENERAL PUBLIC LICENSE. See [LICENSE](LICENSE) for details.
 
 ---
 
