@@ -4,16 +4,26 @@
 
 **Documentation: [larsdoku-docs.netlify.app](https://larsdoku-docs.netlify.app/)**
 
-Warning use expert tab, this is a work in progress, porting python to javascript is hard!
-
-**Web App: [larsdoku.netlify.app](https://larsdoku.netlify.app/)**
-
-**New techniques `--preset larstech` from:** [wsrf-sudoku-solved-series](https://github.com/oppressionslayer/wsrf-sudoku-solved-series)
-
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle**.
 
 ```
 pip install larsdoku
+```
+
+### Troubleshooting
+
+If `larsdoku` fails on startup with a Numba cache error (`no locator available`):
+
+```bash
+export NUMBA_CACHE_DIR="$HOME/.cache/numba"
+mkdir -p "$NUMBA_CACHE_DIR"
+larsdoku "<puzzle>" --board
+```
+
+Or as a one-liner:
+
+```bash
+NUMBA_CACHE_DIR="$HOME/.cache/numba" larsdoku "<puzzle>" --board
 ```
 
 ---
@@ -32,7 +42,7 @@ print(result['n_steps'])           # 63
 print(result['technique_counts'])  # {'crossHatch': 42, 'nakedSingle': 9, ...}
 print(result['board'])             # solved 81-char string
 ```
-GNU AFFERO GENERAL PUBLIC LICENSE
+
 ### Command Line
 
 ```bash
@@ -41,7 +51,7 @@ larsdoku "8000000000036000000700902000500070000000457000001000300010000680085000
 
 # Pure logic only (no oracle fallback)
 larsdoku "4...3.......6..8..........1....5..9..8....6...7.2........1.27..5.3....4.9........" --board --no-oracle
-GNU AFFERO GENERAL PUBLIC LICENSE
+
 # Step-by-step trace
 larsdoku "100007090030020008009600500005300900010080002600004000300000010040000007007000300" --steps
 
@@ -66,7 +76,7 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
 
   Techniques used:
     ALS_XZ                10  L5
-    ALS_XYWing             5  L5GNU AFFERO GENERAL PUBLIC LICENSE
+    ALS_XYWing             5  L5
     ForcingChain           3  L5
     crossHatch             3  L1
     lastRemaining          2  L1
@@ -76,14 +86,14 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
        ~elim~  [ALS_XZ L5] 1 eliminations
      #  1  R1C4=8  [lastRemaining L1]
      #  2  R3C8=5  [ForcingChain L5]
-       ~elim~  [ALS_XZ L5] 1 eliminationsGNU AFFERO GENERAL PUBLIC LICENSE
+       ~elim~  [ALS_XZ L5] 1 eliminations
      #  3  R9C6=5  [crossHatch L1]
        ~elim~  [ALS_XZ L5] 1 eliminations
        ~elim~  [ALS_XYWing L5] 1 eliminations
        ~elim~  [ALS_XYWing L5] 1 eliminations
        ~elim~  [KrakenFish L6] 1 eliminations
      #  4  R1C8=1  [ForcingChain L5]
-     #  5  R7C8=3  [ForcingChain L5]GNU AFFERO GENERAL PUBLIC LICENSE
+     #  5  R7C8=3  [ForcingChain L5]
        ~elim~  [ALS_XZ L5] 1 eliminations
        ~elim~  [ALS_XZ L5] 1 eliminations
      #  6  R4C6=3  [crossHatch L1]
@@ -109,7 +119,7 @@ Tested against every major Sudoku benchmark collection:
 |---|---|---|---|---|
 | **Top1465** (Stertenbrink) | 1,465 | **100%** | 0.019s | 28s |
 | **Expert 669** (shuffled) | 669 | **100%** | 0.036s | 24s |
-| **Famous 10** (hardest known) | 10 | **70%** | 0.50s | 5s GNU AFFERO GENERAL PUBLIC LICENSE|
+| **Famous 10** (hardest known) | 10 | **70%** | 0.50s | 5s |
 
 Run benchmarks yourself:
 
@@ -150,7 +160,7 @@ Larsdoku implements **35 detectors** across 7 levels of escalation:
 - **Hidden Single** (crossHatch / lastRemaining) — digit possible in only one cell
 
 ### L2 — Linear Algebra
-- **GF(2) Block Lanczos** — Gaussian elimination over GF(2) GNU AFFERO GENERAL PUBLIC LICENSEto find forced digits via parity constraints
+- **GF(2) Block Lanczos** — Gaussian elimination over GF(2) to find forced digits via parity constraints
 - **GF(2) Extended** — probing, conjugate analysis, and band/stack decomposition
 
 ### L3 — Fish
@@ -187,7 +197,7 @@ Larsdoku implements **35 detectors** across 7 levels of escalation:
 - **FPF (Full Pipeline Forcing)** — WSRF invention. Branch on each candidate, run entire pipeline per branch
 
 ---
-GNU AFFERO GENERAL PUBLIC LICENSE
+
 ## CLI Reference
 
 ```bash
@@ -238,7 +248,7 @@ Puzzles are 81-character strings, row by row, left to right. Use `0` or `.` for 
 
 Larsdoku ships with three puzzle collections for testing and benchmarking:
 
-```pythonGNU AFFERO GENERAL PUBLIC LICENSE
+```python
 from larsdoku.puzzles import FAMOUS_10, EXPERT_669, TOP1465
 ```
 
@@ -381,7 +391,7 @@ The result: puzzles that stall at L6 in pure-logic mode **solve cleanly with Aut
 
 ## License
 
-AGPL3. See [LICENSE](LICENSE) for details.
+AGPL-3.0-or-later. See [LICENSE](LICENSE) for details.
 
 ---
 
