@@ -468,7 +468,7 @@ def generate_random_mask(n_clues=17, min_score=0.80, max_attempts=1000, rng=None
     return None
 
 
-def solve_selective(bd81, max_level=99, only_techniques=None,
+def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques=None,
                     verbose=False, detail=False, gf2=False, gf2_extended=False,
                     zone_hints=None, dr_mode='all',
                     zone_oracle=False, rule_oracle=False,
@@ -496,6 +496,8 @@ def solve_selective(bd81, max_level=99, only_techniques=None,
     _use_rule_oracle = rule_oracle
 
     def allowed(tech_name):
+        if exclude_techniques and tech_name in exclude_techniques:
+            return False
         if only_techniques is not None:
             return tech_name in only_techniques
         return TECHNIQUE_LEVELS.get(tech_name, 99) <= max_level
@@ -3242,6 +3244,10 @@ presets:
                        help='Target clue count for --board-forge unique mode (default 22)')
     parser.add_argument('--board-forge-count', type=int, default=1, metavar='N',
                        help='Number of boards to forge (default 1)')
+    parser.add_argument('--require', type=str, metavar='TECHS',
+                       help='Only keep forged boards that need these techniques (comma-separated, e.g. ForcingChain,ALS_XZ)')
+    parser.add_argument('--require-attempts', type=int, default=200, metavar='N',
+                       help='Max boards to try when hunting for --require techniques (default 200)')
 
     args = parser.parse_args()
 
@@ -3598,6 +3604,24 @@ presets:
         pos_name = args.board_forge.upper()
         target_clues = args.board_forge_clues
         count = args.board_forge_count
+        require_str = getattr(args, 'require', None)
+        max_attempts = getattr(args, 'require_attempts', 200)
+
+        # Parse required techniques
+        required_techs = set()
+        if require_str:
+            for t in require_str.split(','):
+                t = t.strip()
+                # Check aliases
+                if t.lower() in TECHNIQUE_ALIASES:
+                    required_techs.add(TECHNIQUE_ALIASES[t.lower()])
+                elif t in TECHNIQUE_LEVELS:
+                    required_techs.add(t)
+                else:
+                    print(f'  Warning: unknown technique "{t}" — skipping')
+            if not required_techs:
+                print(f'  Error: no valid techniques in --require')
+                sys.exit(1)
 
         # Parse position(s) — can be comma-separated like MC,TL
         pos_list = [p.strip() for p in pos_name.split(',')]
@@ -3609,81 +3633,125 @@ presets:
         print(f'\n{"═" * 60}')
         print(f'  BOARD FORGE — Zone Geometry Builder')
         print(f'  Position{"s" if len(pos_list) > 1 else ""}: {", ".join(pos_list)} | Target: {target_clues} clues | Count: {count}')
+        if required_techs:
+            print(f'  Require: {", ".join(sorted(required_techs))}')
+            print(f'  Max attempts per puzzle: {max_attempts}')
         print(f'{"═" * 60}')
 
         import random as _bf_rng
         rng = _bf_rng.Random()
         solved = 0
+        total_attempts = 0
 
-        for i in range(count):
-            # Place digits 1-9 at zone position(s) across all 9 boxes
+        def _forge_one_board():
+            """Generate one unique board from zone geometry."""
             from .board_forge import get_cells_for_position
-            digits_by_cell = {}
-            for name in pos_list:
-                cells = get_cells_for_position(name)
-                perm = list(range(1, 10))
-                rng.shuffle(perm)
-                for cell, digit in zip(cells, perm):
-                    digits_by_cell[cell] = digit
+            for _try in range(50):
+                digits_by_cell = {}
+                for name in pos_list:
+                    cells = get_cells_for_position(name)
+                    perm = list(range(1, 10))
+                    rng.shuffle(perm)
+                    for cell, digit in zip(cells, perm):
+                        digits_by_cell[cell] = digit
 
-            base = ['0'] * 81
-            for cell, digit in digits_by_cell.items():
-                base[cell] = str(digit)
-            base_str = ''.join(base)
-            base_n = sum(1 for c in base_str if c != '0')
+                base = ['0'] * 81
+                for cell, digit in digits_by_cell.items():
+                    base[cell] = str(digit)
+                base_str = ''.join(base)
+                base_n = sum(1 for c in base_str if c != '0')
 
-            # Get full solution via backtracker
-            solution = solve_backtrack(base_str)
-            if not solution:
-                print(f'\n  [{i+1}] No solution from zone placement — retrying')
+                solution = solve_backtrack(base_str)
+                if not solution:
+                    continue
+
+                fat = list(solution)
+                for cell in digits_by_cell:
+                    fat[cell] = str(digits_by_cell[cell])
+                fat_str = ''.join(fat)
+
+                removable = [j for j in range(81) if j not in digits_by_cell]
+                rng.shuffle(removable)
+                puzzle_list = list(fat_str)
+                for pos in removable:
+                    if sum(1 for c in puzzle_list if c != '0') <= target_clues:
+                        break
+                    saved = puzzle_list[pos]
+                    puzzle_list[pos] = '0'
+                    if not has_unique_solution(''.join(puzzle_list)):
+                        puzzle_list[pos] = saved
+                puzzle = ''.join(puzzle_list)
+
+                if has_unique_solution(puzzle):
+                    return puzzle, base_n
+            return None, 0
+
+        found = 0
+        for i in range(count if not required_techs else max_attempts):
+            if required_techs and found >= count:
+                break
+
+            total_attempts += 1
+            puzzle, base_n = _forge_one_board()
+            if puzzle is None:
                 continue
 
-            # Add ALL clues from solution, then minimize back to target
-            fat = list(solution)  # start with full solution
-            for cell in digits_by_cell:
-                fat[cell] = str(digits_by_cell[cell])  # ensure zone base is marked
-            fat_str = ''.join(fat)
-
-            # Minimize: remove clues one at a time, keep if still unique
-            removable = [j for j in range(81) if j not in digits_by_cell]
-            rng.shuffle(removable)
-            puzzle_list = list(fat_str)
-            for pos in removable:
-                if sum(1 for c in puzzle_list if c != '0') <= target_clues:
-                    break
-                saved = puzzle_list[pos]
-                puzzle_list[pos] = '0'
-                if not has_unique_solution(''.join(puzzle_list)):
-                    puzzle_list[pos] = saved  # put it back
-            puzzle = ''.join(puzzle_list)
-
-            is_unique = has_unique_solution(puzzle)
             n_clues = sum(1 for c in puzzle if c != '0')
 
-            # Solve it
-            r = solve_selective(puzzle, verbose=False)
+            # If --require with excludes, solve with exclusions to force technique path
+            only_techs = None
+            if required_techs:
+                # Build exclusion set: everything that's more powerful than required
+                # and would prevent the required technique from firing
+                _exclude = set()
+                if getattr(args, 'exclude', None):
+                    for t in args.exclude.split(','):
+                        t = t.strip()
+                        if t.lower() in TECHNIQUE_ALIASES:
+                            _exclude.add(TECHNIQUE_ALIASES[t.lower()])
+                        elif t in TECHNIQUE_LEVELS:
+                            _exclude.add(t)
+                r = solve_selective(puzzle, verbose=False, exclude_techniques=_exclude if _exclude else None)
+            else:
+                r = solve_selective(puzzle, verbose=False)
             techs = r.get('technique_counts', {})
             success = r.get('success', False)
+
+            # If --require, check if required techniques were used
+            if required_techs:
+                used = set(techs.keys())
+                if not required_techs.issubset(used):
+                    if total_attempts % 25 == 0:
+                        print(f'  ... {total_attempts} attempts, {found}/{count} found')
+                    continue
+
             if success:
                 solved += 1
+            found += 1
 
-            top = sorted(techs.items(), key=lambda x: -x[1])[:4]
+            top = sorted(techs.items(), key=lambda x: -x[1])[:5]
             tech_str = ', '.join(f'{t}={c}' for t, c in top) if top else 'none'
             status = 'SOLVED' if success else 'STALLED'
-            unique_tag = ' unique' if is_unique else ' multi'
 
-            print(f'\n  [{i+1}] {status} | {n_clues} clues ({base_n} from zones){unique_tag}')
+            # Highlight required techniques with ★
+            if required_techs:
+                hit_str = ', '.join(sorted(required_techs & set(techs.keys())))
+                print(f'\n  [{found}/{count}] {status} | {n_clues} clues ({base_n} from zones) ★ {hit_str}')
+            else:
+                print(f'\n  [{found}] {status} | {n_clues} clues ({base_n} from zones) unique')
             print(f'  Puzzle: {puzzle}')
             print(f'  Techs:  {tech_str}')
 
-            if count == 1 and success:
+            if (count == 1 or (required_techs and found == 1)) and success:
                 board_str = r.get('board', '')
                 if board_str:
                     print(format_board(board_str, puzzle))
 
-        if count > 1:
-            print(f'\n{"═" * 60}')
-            print(f'  RESULTS: {solved}/{count} solved')
+        print(f'\n{"═" * 60}')
+        if required_techs:
+            print(f'  RESULTS: {found}/{count} found in {total_attempts} attempts ({solved} solved)')
+        else:
+            print(f'  RESULTS: {solved}/{found} solved')
         print()
         return
 
