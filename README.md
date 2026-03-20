@@ -120,13 +120,14 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
 larsdoku --board-forge MC --require ForcingChain --exclude als,alsxy,ape,fpc,fpce --board-forge-count 1
 
 # Generate a DeathBlossom puzzle
-larsdoku --board-forge MC --require DeathBlossom --exclude als,alsxy --board-larsdoku "600058300030210060000000819002043500040090080000081000000000906054020070006100000" --steps --exclude als,alsxy,ape,fpc,fpceforge-count 1
+larsdoku --board-forge MC --require DeathBlossom --exclude als,alsxy --board-forge-count 1
 
 # Generate a KrakenFish puzzle
 larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-attempts 200
 
 # Generate pure ALS puzzles
 larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
+
 ```
 
 **The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. The solver is sometimes rendering puzzles where ForcingChain is obsolete on its own generated puzzles. Just a note. Something for me to work on. but you can try the below command to see FC to show up!
@@ -326,7 +327,7 @@ from larsdoku import solve
 # Basic solve
 result = solve("4...3.......6..8..........1....5..9..8....6...7.2........1.27..5.3....4.9........")
 
-# Pure logic only
+# Pure logic only5
 result = solve(puzzle, no_oracle=True)
 
 # Limit technique level
