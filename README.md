@@ -113,6 +113,49 @@ larsdoku "0000040060002010900010708000600000203500000080000003700090805000403020
    → #  8  R7C4=4  [lastRemaining L1]
 ```
 
+### Board Forge — Generate Puzzles by Technique
+
+```bash
+# Generate a ForcingChain puzzle
+larsdoku --board-forge MC --require ForcingChain --exclude als,alsxy,ape,fpc,fpce --board-forge-count 1
+
+# Generate a DeathBlossom puzzle
+larsdoku --board-forge MC --require DeathBlossom --exclude als,alsxy --board-forge-count 1
+
+# Generate a KrakenFish puzzle
+larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-attempts 200
+
+# Generate pure ALS puzzles
+larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
+```
+
+**The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. Your solver is so powerful it renders ForcingChain obsolete on its own generated puzzles.
+
+```bash
+# See ForcingChain in action — solve with ALS excluded so FC fires
+larsdoku "600058300030210060000000819002043500040090080000081000000000906054020070006100000" --steps --exclude als,alsxy,ape,fpc,fpce
+
+# Now solve the same puzzle with the full solver — no FC needed
+larsdoku "600058300030210060000000819002043500040090080000081000000000906054020070006100000" --steps --preset expert
+```
+
+### More Tools
+
+```bash
+# Parse a SudokuWiki packed string directly
+larsdoku "S9B8283024j..." --cell R1C1 --path
+
+# Quick backtrack solution
+larsdoku "000809000014020090000040006..." --solution
+
+# Parse a forum grid (paste, then Ctrl+D)
+echo "+---+---+---+
+|.5.|12.|.93|
+|..7|...|8.1|
+|.2.|..9|...|
++---+---+---+" | larsdoku --parse
+```
+
 ---
 
 ## Benchmark Results
