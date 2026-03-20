@@ -34,6 +34,8 @@ def parse_mask(mask_input):
             mask.append(1)
         elif c in ('0', '.'):
             mask.append(0)
+        elif c in '23456789':
+            mask.append(1)
         else:
             mask.append(0)
     if len(mask) != 81:

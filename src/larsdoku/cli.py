@@ -3244,10 +3244,21 @@ presets:
                        help='Target clue count for --board-forge unique mode (default 22)')
     parser.add_argument('--board-forge-count', type=int, default=1, metavar='N',
                        help='Number of boards to forge (default 1)')
+    parser.add_argument('--board-forge-method', type=str, default='zone',
+                       choices=['zone', 'mask'],
+                       help='Generation method: zone = zone geometry (clean), mask = random masks (messy, harder techniques). Default: zone')
     parser.add_argument('--require', type=str, metavar='TECHS',
                        help='Only keep forged boards that need these techniques (comma-separated, e.g. ForcingChain,ALS_XZ)')
     parser.add_argument('--require-attempts', type=int, default=200, metavar='N',
                        help='Max boards to try when hunting for --require techniques (default 200)')
+    parser.add_argument('--prefer', type=str, metavar='TECHS',
+                       help='Auto-exclude techniques that steal solves from the target (e.g. --prefer fc auto-excludes ALS, FPC, etc.)')
+    parser.add_argument('--sculpt', action='store_true',
+                       help='Technique-aware minimization: sculpt puzzles toward --prefer/--require techniques')
+    parser.add_argument('--like', type=str, metavar='PUZZLE',
+                       help='Generate puzzles with similar technique profiles to this puzzle (use with --board-forge-count)')
+    parser.add_argument('--like-count', type=int, default=5, metavar='N',
+                       help='Number of similar puzzles to generate (default 5)')
 
     args = parser.parse_args()
 
@@ -3596,23 +3607,96 @@ presets:
         print()
         return
 
+    # ── Like mode: generate puzzles similar to a given one ──
+    if getattr(args, 'like', None):
+        import random as _like_rng
+        like_rng = _like_rng.Random()
+        like_puzzle = normalize_puzzle(args.like)
+        like_count = getattr(args, 'like_count', 5)
+
+        # Solve the reference puzzle to get its technique profile
+        ref_result = solve_selective(like_puzzle, verbose=False)
+        ref_techs = ref_result.get('technique_counts', {})
+        ref_success = ref_result.get('success', False)
+        ref_n = sum(1 for c in like_puzzle if c != '0')
+        # Extract the mask from the reference puzzle
+        ref_mask = [1 if c != '0' else 0 for c in like_puzzle]
+
+        # Target techniques: all non-L1 techniques used by the reference
+        l1_techs = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+        target_profile = {t for t in ref_techs if t not in l1_techs and ref_techs[t] > 0}
+
+        ref_top = sorted(ref_techs.items(), key=lambda x: -x[1])[:8]
+        ref_tech_str = ', '.join(f'{t}={c}' for t, c in ref_top) if ref_top else 'none'
+
+        print(f'\n{"═" * 60}')
+        print(f'  LIKE — Generate Similar Puzzles')
+        print(f'  Reference: {like_puzzle}')
+        print(f'  Clues: {ref_n} | {"SOLVED" if ref_success else "STALLED"}')
+        print(f'  Techs: {ref_tech_str}')
+        print(f'  Profile: {", ".join(sorted(target_profile)) if target_profile else "L1 only"}')
+        print(f'  Count: {like_count}')
+        print(f'{"═" * 60}')
+
+        found = 0
+        max_like_attempts = like_count * 50
+
+        for attempt in range(max_like_attempts):
+            if found >= like_count:
+                break
+
+            # Strategy 1: shuffle the reference puzzle (preserves structure)
+            shuffled = shuffle_sudoku(like_puzzle, rng=like_rng.random)
+            if not has_unique_solution(shuffled):
+                continue
+
+            # Solve and check technique similarity
+            r = solve_selective(shuffled, verbose=False)
+            s_techs = r.get('technique_counts', {})
+            s_success = r.get('success', False)
+            s_profile = {t for t in s_techs if t not in l1_techs and s_techs[t] > 0}
+
+            # Accept if technique profile overlaps with reference
+            overlap = target_profile & s_profile
+            if target_profile and not overlap:
+                continue
+
+            found += 1
+            s_top = sorted(s_techs.items(), key=lambda x: -x[1])[:5]
+            s_tech_str = ', '.join(f'{t}={c}' for t, c in s_top) if s_top else 'none'
+            s_n = sum(1 for c in shuffled if c != '0')
+            status = 'SOLVED' if s_success else 'STALLED'
+
+            match_str = ', '.join(sorted(overlap)) if overlap else 'L1'
+            print(f'\n  [{found}/{like_count}] {status} | {s_n} clues | match: {match_str}')
+            print(f'  Puzzle: {shuffled}')
+            print(f'  Techs:  {s_tech_str}')
+
+        print(f'\n{"═" * 60}')
+        print(f'  RESULTS: {found}/{like_count} similar puzzles in {attempt + 1} shuffles')
+        print()
+        return
+
     # ── Test mask mode ──
-    # ── Board Forge mode: build boards from zone geometry ──
+    # ── Board Forge mode: build boards from zone/mask geometry ──
     if args.board_forge is not None:
         from .board_forge import forge_board, forge_unique_board, POSITIONS
+        from .constants import PREFER_EXCLUSIONS
 
         pos_name = args.board_forge.upper()
         target_clues = args.board_forge_clues
         count = args.board_forge_count
         require_str = getattr(args, 'require', None)
+        prefer_str = getattr(args, 'prefer', None)
         max_attempts = getattr(args, 'require_attempts', 200)
+        forge_method = getattr(args, 'board_forge_method', 'zone')
+        do_sculpt = getattr(args, 'sculpt', False)
 
         # Parse required techniques
         required_techs = set()
         if require_str:
             for t in require_str.split(','):
                 t = t.strip()
-                # Check aliases
                 if t.lower() in TECHNIQUE_ALIASES:
                     required_techs.add(TECHNIQUE_ALIASES[t.lower()])
                 elif t in TECHNIQUE_LEVELS:
@@ -3623,19 +3707,64 @@ presets:
                 print(f'  Error: no valid techniques in --require')
                 sys.exit(1)
 
-        # Parse position(s) — can be comma-separated like MC,TL
-        pos_list = [p.strip() for p in pos_name.split(',')]
-        for p in pos_list:
-            if p not in POSITIONS:
-                print(f'  Error: unknown position "{p}". Valid: {", ".join(POSITIONS.keys())}')
-                sys.exit(1)
+        # Parse preferred techniques and auto-build exclusion set
+        preferred_techs = set()
+        prefer_exclude = set()
+        if prefer_str:
+            for t in prefer_str.split(','):
+                t = t.strip()
+                if t.lower() in TECHNIQUE_ALIASES:
+                    preferred_techs.add(TECHNIQUE_ALIASES[t.lower()])
+                elif t in TECHNIQUE_LEVELS:
+                    preferred_techs.add(t)
+                else:
+                    print(f'  Warning: unknown technique "{t}" — skipping')
+            # Auto-build exclusion set from PREFER_EXCLUSIONS
+            for tech in preferred_techs:
+                if tech in PREFER_EXCLUSIONS:
+                    prefer_exclude |= PREFER_EXCLUSIONS[tech]
+            # --prefer implies --require if --require wasn't set
+            if not required_techs:
+                required_techs = preferred_techs
 
+        # Build combined exclusion set: --prefer auto-exclusions + manual --exclude
+        _exclude = set(prefer_exclude)
+        if getattr(args, 'exclude', None):
+            for t in args.exclude.split(','):
+                t = t.strip()
+                if t.lower() in TECHNIQUE_ALIASES:
+                    _exclude.add(TECHNIQUE_ALIASES[t.lower()])
+                elif t in TECHNIQUE_LEVELS:
+                    _exclude.add(t)
+        # Never exclude the required techniques themselves
+        _exclude -= required_techs
+
+        # Parse position(s) for zone method
+        pos_list = [p.strip() for p in pos_name.split(',')]
+        if forge_method == 'zone':
+            for p in pos_list:
+                if p not in POSITIONS:
+                    print(f'  Error: unknown position "{p}". Valid: {", ".join(POSITIONS.keys())}')
+                    sys.exit(1)
+
+        # Header
+        method_label = 'Random Mask' if forge_method == 'mask' else 'Zone Geometry'
         print(f'\n{"═" * 60}')
-        print(f'  BOARD FORGE — Zone Geometry Builder')
-        print(f'  Position{"s" if len(pos_list) > 1 else ""}: {", ".join(pos_list)} | Target: {target_clues} clues | Count: {count}')
-        if required_techs:
+        print(f'  BOARD FORGE — {method_label} Builder')
+        if forge_method == 'zone':
+            print(f'  Position{"s" if len(pos_list) > 1 else ""}: {", ".join(pos_list)} | Target: {target_clues} clues | Count: {count}')
+        else:
+            print(f'  Target: {target_clues} clues | Count: {count}')
+        if preferred_techs:
+            print(f'  Prefer: {", ".join(sorted(preferred_techs))}')
+            print(f'  Auto-exclude: {", ".join(sorted(prefer_exclude)) if prefer_exclude else "none"}')
+        if required_techs and not preferred_techs:
             print(f'  Require: {", ".join(sorted(required_techs))}')
-            print(f'  Max attempts per puzzle: {max_attempts}')
+        if _exclude - prefer_exclude:
+            print(f'  Manual exclude: {", ".join(sorted(_exclude - prefer_exclude))}')
+        if do_sculpt:
+            print(f'  Sculpt: ON (technique-aware minimization)')
+        print(f'  Max attempts: {max_attempts}')
         print(f'{"═" * 60}')
 
         import random as _bf_rng
@@ -3643,7 +3772,11 @@ presets:
         solved = 0
         total_attempts = 0
 
-        def _forge_one_board():
+        # When sculpting, forge "fat" puzzles (more clues) so sculpt has
+        # room to selectively remove clues toward the target technique.
+        _forge_target = target_clues + 8 if do_sculpt else target_clues
+
+        def _forge_one_board_zone():
             """Generate one unique board from zone geometry."""
             from .board_forge import get_cells_for_position
             for _try in range(50):
@@ -3674,7 +3807,7 @@ presets:
                 rng.shuffle(removable)
                 puzzle_list = list(fat_str)
                 for pos in removable:
-                    if sum(1 for c in puzzle_list if c != '0') <= target_clues:
+                    if sum(1 for c in puzzle_list if c != '0') <= _forge_target:
                         break
                     saved = puzzle_list[pos]
                     puzzle_list[pos] = '0'
@@ -3686,6 +3819,45 @@ presets:
                     return puzzle, base_n
             return None, 0
 
+        def _forge_one_board_mask():
+            """Generate one unique board from a random mask."""
+            from .mask_forge import forge_unique_randomized
+            # Use the module-level generate_random_mask (not the sub17_solve one
+            # that gets imported later and shadows this name in main's scope)
+            _gen_mask = globals()['generate_random_mask']
+            n_mask_clues = max(_forge_target, 20)
+            mask_result = _gen_mask(n_clues=n_mask_clues,
+                                               min_score=0.70, rng=rng)
+            if mask_result is None:
+                return None, 0
+            positions, _, _ = mask_result
+            mask = [0] * 81
+            for p in positions:
+                mask[p] = 1
+            seed_val = rng.randint(0, 999999)
+            puzzle, sol, _, _ = forge_unique_randomized(mask, seed=seed_val,
+                                                        max_seconds=10,
+                                                        verbose=False)
+            if puzzle is None:
+                return None, 0
+
+            # Minimize to forge target clue count
+            puzzle_list = list(puzzle)
+            clue_pos = [i for i in range(81) if puzzle_list[i] != '0']
+            rng.shuffle(clue_pos)
+            for pos in clue_pos:
+                if sum(1 for c in puzzle_list if c != '0') <= _forge_target:
+                    break
+                saved = puzzle_list[pos]
+                puzzle_list[pos] = '0'
+                if not has_unique_solution(''.join(puzzle_list)):
+                    puzzle_list[pos] = saved
+            puzzle = ''.join(puzzle_list)
+            n_base = len(positions)
+            return puzzle, n_base
+
+        _forge_one_board = _forge_one_board_mask if forge_method == 'mask' else _forge_one_board_zone
+
         found = 0
         for i in range(count if not required_techs else max_attempts):
             if required_techs and found >= count:
@@ -3696,28 +3868,29 @@ presets:
             if puzzle is None:
                 continue
 
+            # Sculpt if requested: technique-aware minimization
+            if do_sculpt and required_techs:
+                from .board_forge import sculpt_for_technique
+                sculpted = sculpt_for_technique(
+                    puzzle, required_techs,
+                    exclude_techs=_exclude if _exclude else None,
+                    rng=rng, verbose=getattr(args, 'verbose', False),
+                )
+                if sculpted is None:
+                    if total_attempts % 25 == 0:
+                        print(f'  ... {total_attempts} attempts, {found}/{count} found (sculpt miss)')
+                    continue
+                puzzle = sculpted
+
             n_clues = sum(1 for c in puzzle if c != '0')
 
-            # If --require with excludes, solve with exclusions to force technique path
-            only_techs = None
-            if required_techs:
-                # Build exclusion set: everything that's more powerful than required
-                # and would prevent the required technique from firing
-                _exclude = set()
-                if getattr(args, 'exclude', None):
-                    for t in args.exclude.split(','):
-                        t = t.strip()
-                        if t.lower() in TECHNIQUE_ALIASES:
-                            _exclude.add(TECHNIQUE_ALIASES[t.lower()])
-                        elif t in TECHNIQUE_LEVELS:
-                            _exclude.add(t)
-                r = solve_selective(puzzle, verbose=False, exclude_techniques=_exclude if _exclude else None)
-            else:
-                r = solve_selective(puzzle, verbose=False)
+            # Solve with exclusions
+            r = solve_selective(puzzle, verbose=False,
+                                exclude_techniques=_exclude if _exclude else None)
             techs = r.get('technique_counts', {})
             success = r.get('success', False)
 
-            # If --require, check if required techniques were used
+            # Check if required techniques were used
             if required_techs:
                 used = set(techs.keys())
                 if not required_techs.issubset(used):
@@ -3732,13 +3905,15 @@ presets:
             top = sorted(techs.items(), key=lambda x: -x[1])[:5]
             tech_str = ', '.join(f'{t}={c}' for t, c in top) if top else 'none'
             status = 'SOLVED' if success else 'STALLED'
+            src_label = 'mask' if forge_method == 'mask' else f'{base_n} from zones'
 
-            # Highlight required techniques with ★
+            # Highlight required techniques
             if required_techs:
                 hit_str = ', '.join(sorted(required_techs & set(techs.keys())))
-                print(f'\n  [{found}/{count}] {status} | {n_clues} clues ({base_n} from zones) ★ {hit_str}')
+                sculpt_tag = ' sculpted' if do_sculpt else ''
+                print(f'\n  [{found}/{count}] {status} | {n_clues} clues ({src_label}{sculpt_tag}) ★ {hit_str}')
             else:
-                print(f'\n  [{found}] {status} | {n_clues} clues ({base_n} from zones) unique')
+                print(f'\n  [{found}] {status} | {n_clues} clues ({src_label}) unique')
             print(f'  Puzzle: {puzzle}')
             print(f'  Techs:  {tech_str}')
 
