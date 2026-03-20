@@ -185,6 +185,43 @@ larsdoku --like "005000903906000500080000010020060080000510400000008007100006000
   RESULTS: 5/5 similar puzzles in 6 shuffles
 ```
 
+# Cell Path — Trace the Solution to Any Cell
+
+Want to know exactly how a specific cell was solved? Use `--cell` with `--path` to see every step the engine took to reach that placement.
+
+```bash
+larsdoku "300002590600008070040050001009100030000000008070060040010080400000000003008700200" --cell R1C3 --path --preset expert
+```
+
+```
+  ✦ Sudoku Expert Approved Techniques ✦
+
+  R1C3 = 1 via ForcingChain (step 5)
+  Candidates: [1, 7]
+  Full solve: 57 steps, COMPLETE
+  Time: 416.9ms
+
+  Verify: All techniques are Sudoku Expert Approved ✓
+  No backtracking or trial-and-error was used at any point.
+  Every placement was derived by deterministic logic alone.
+
+  Techniques used:
+    nakedSingle            2  L1
+    crossHatch             2  L1
+    ForcingChain           1  L5
+    XWing                  1  L3
+
+  Solution path (5 placements, 1 elimination rounds):
+       ~elim~  [XWing L3] 4 eliminations
+     #  1  R1C2=8  [nakedSingle L1]
+     #  2  R2C7=3  [nakedSingle L1]
+     #  3  R4C1=8  [crossHatch L1]
+     #  4  R6C4=8  [crossHatch L1]
+   → #  5  R1C3=1  [ForcingChain L5]
+```
+
+The full puzzle took 57 steps to solve, but R1C3 only needed 5 — an X-Wing elimination to clear the path, four foundation placements, and then a ForcingChain to prove R1C3 = 1. Every step is deterministic logic. No guessing.
+
 ### More Tools
 
 ```bash
