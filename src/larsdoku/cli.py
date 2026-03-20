@@ -2122,9 +2122,42 @@ def parse_cell(cell_str):
     raise ValueError(f'Cannot parse cell: {cell_str}. Use R3C5 or 2,4 format.')
 
 
+def decode_bdp(s):
+    """Decode SudokuWiki packed bd string (S9B format).
+
+    Format: 3-char header (e.g. 'S9B') + 81 x 2-char base-36 pairs.
+    Values: 01-09 = given clue, 10-18 = solved (digit = val-9),
+            19-529 = candidates (bitmask = val-18, not a placed digit).
+    Returns 81-char bd81 string (givens/solved only, candidates → 0).
+    """
+    header = s[:3]
+    body = s[3:]
+    if len(body) < 162:
+        raise ValueError(f'BDP string too short: need 162+ body chars, got {len(body)}')
+
+    bd81 = []
+    for i in range(81):
+        pair = body[i*2:i*2+2]
+        val = int(pair, 36)
+        if 1 <= val <= 9:
+            bd81.append(str(val))     # given
+        elif 10 <= val <= 18:
+            bd81.append(str(val - 9)) # solved
+        else:
+            bd81.append('0')          # candidates = unsolved
+    return ''.join(bd81)
+
+
 def normalize_puzzle(puzzle_str):
-    """Normalize a puzzle string to 81 digits (0 for empty)."""
-    puzzle_str = puzzle_str.strip().replace('.', '0').replace(' ', '').replace('\n', '')
+    """Normalize a puzzle string to 81 digits (0 for empty).
+    Also accepts SudokuWiki BDP strings (S9B/X9B/J9B format)."""
+    puzzle_str = puzzle_str.strip()
+
+    # Detect BDP format: starts with S9, X9, or J9 and is 165+ chars
+    if len(puzzle_str) >= 165 and puzzle_str[:2] in ('S9', 'X9', 'J9'):
+        return decode_bdp(puzzle_str)
+
+    puzzle_str = puzzle_str.replace('.', '0').replace(' ', '').replace('\n', '')
     # Handle potential multi-line grid format
     puzzle_str = ''.join(ch for ch in puzzle_str if ch.isdigit())
     if len(puzzle_str) != 81:
@@ -3131,6 +3164,7 @@ presets:
     parser.add_argument('--save-hardest', type=int, metavar='N', default=0,
                        help='Save top N hardest puzzles from --crosswise or --bench to a file')
     parser.add_argument('--board', '-b', action='store_true', help='Print solved board grid')
+    parser.add_argument('--solution', action='store_true', help='Print backtrack solution string only (fast, no techniques)')
     parser.add_argument('--no-oracle', '-n', action='store_true',
                        help='Pure logic only — stop when stalled, no guessing')
     parser.add_argument('--json', '-j', action='store_true', help='Output as JSON')
@@ -3210,6 +3244,16 @@ presets:
                        help='Number of boards to forge (default 1)')
 
     args = parser.parse_args()
+
+    # ── Solution mode: just print backtrack answer ──
+    if args.solution and args.puzzle:
+        bd81 = normalize_puzzle(args.puzzle)
+        sol = solve_backtrack(bd81)
+        if sol:
+            print(sol)
+        else:
+            print('No solution exists')
+        return
 
     # ── Local web server mode ──
     if args.serve is not None:
