@@ -66,8 +66,7 @@ larsdoku "1000000020904000500060007000509030000000700000008500407000006000300090
 larsdoku "000004006000201090001070800060000020350000008000000370009080500040302000700100000" --cell R7C4 --path --preset expert
 ```
 
-```-exclude als,alsxy
-
+```
   ✦ Sudoku Expert Approved Techniques ✦
 
   R7C4 = 4 via lastRemaining (step 8)
@@ -128,16 +127,9 @@ larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-a
 
 # Generate pure ALS puzzles
 larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
-
-# Sometimes to make your found technique show up you might need to use something like --exclude als,alsxy,ape,fpc,fpce on larsduku 
-# Like from the DeathBlossom example above to get it to show it by including the same exclude from above that created it:
-
-larsdoku "000000009430050120029000006005000900070910080000045000004000700198062040000000090" --exclude als,alsxy
-
-
 ```
 
-**The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. The solver is sometimes rendering puzzles where ForcingChain is obsolete on its own generated puzzles. Just a note. Something for me to work on. but you can try the below command to see FC to show up!
+**The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. Your solver is so powerful it renders ForcingChain obsolete on its own generated puzzles.
 
 ```bash
 # See ForcingChain in action — solve with ALS excluded so FC fires
@@ -145,6 +137,48 @@ larsdoku "6000583000302100600000008190020435000400900800000810000000009060540200
 
 # Now solve the same puzzle with the full solver — no FC needed
 larsdoku "600058300030210060000000819002043500040090080000081000000000906054020070006100000" --steps --preset expert
+```
+
+### Like — Generate Similar Puzzles
+
+Find a puzzle you enjoy and generate more like it. `--like` analyzes the technique profile and shuffles until it finds puzzles that require the same advanced techniques:
+
+```bash
+larsdoku --like "005000903906000500080000010020060080000510400000008007100006000040000090003702000" --like-count 5
+```
+
+```
+════════════════════════════════════════════════════════════
+  LIKE — Generate Similar Puzzles
+  Reference: 005000903906000500080000010020060080000510400000008007100006000040000090003702000
+  Clues: 23 | SOLVED
+  Techs: nakedSingle=26, crossHatch=22, lastRemaining=7, fullHouse=2, ALS_XZ=1, FPCE=1, SimpleColoring=1
+  Profile: ALS_XZ, FPCE, SimpleColoring
+  Count: 5
+════════════════════════════════════════════════════════════
+
+  [1/5] SOLVED | 23 clues | match: ALS_XZ, FPCE, SimpleColoring
+  Puzzle: 000500600000004803070010020002807000580000000300009000100000306020060050009000004
+  Techs:  crossHatch=34, lastRemaining=12, nakedSingle=11, ALS_XZ=1, FPCE=1
+
+  [2/5] SOLVED | 23 clues | match: ALS_XZ, FPCE, SimpleColoring
+  Puzzle: 300400090020000506001000800000501000070006000045090000000003608000070002800900010
+  Techs:  crossHatch=28, lastRemaining=14, nakedSingle=10, fullHouse=5, ALS_XZ=1
+
+  [3/5] SOLVED | 23 clues | match: ALS_XZ, FPCE, SimpleColoring
+  Puzzle: 000900002000040105008007000100000006070000390006005020009006000030820000480030000
+  Techs:  crossHatch=28, lastRemaining=14, nakedSingle=10, fullHouse=5, ALS_XZ=1
+
+  [4/5] SOLVED | 23 clues | match: ALS_XZ, FPCE, SimpleColoring
+  Puzzle: 001200000507060000000305000004000205300000008090007060000010400000900802080006030
+  Techs:  crossHatch=37, nakedSingle=13, lastRemaining=6, ALS_XZ=1, FPCE=1
+
+  [5/5] SOLVED | 23 clues | match: ALS_XZ, FPCE, SimpleColoring
+  Puzzle: 900000027010080500003000060000100076000004009060050300802005000000320000400700000
+  Techs:  crossHatch=36, nakedSingle=12, lastRemaining=9, ALS_XZ=1, FPCE=1
+
+════════════════════════════════════════════════════════════
+  RESULTS: 5/5 similar puzzles in 6 shuffles
 ```
 
 ### More Tools
@@ -228,8 +262,7 @@ Larsdoku implements **35 detectors** across 7 levels of escalation:
 
 ### L5 — Set Logic & Forcing
 - **ALS-XZ** — Almost Locked Set pair with restricted common
-- **ALS-XY Wing** — three-ALS chain elimination-exclude als,alsxy
-
+- **ALS-XY Wing** — three-ALS chain elimination
 - **Sue De Coq** — box/line intersection set partitioning
 - **Aligned Pair Exclusion** — combination validation against common peers
 - **Death Blossom** — stem cell with ALS petals
@@ -335,7 +368,7 @@ from larsdoku import solve
 # Basic solve
 result = solve("4...3.......6..8..........1....5..9..8....6...7.2........1.27..5.3....4.9........")
 
-# Pure logic only5
+# Pure logic only
 result = solve(puzzle, no_oracle=True)
 
 # Limit technique level
