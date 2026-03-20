@@ -66,7 +66,8 @@ larsdoku "1000000020904000500060007000509030000000700000008500407000006000300090
 larsdoku "000004006000201090001070800060000020350000008000000370009080500040302000700100000" --cell R7C4 --path --preset expert
 ```
 
-```
+```-exclude als,alsxy
+
   ✦ Sudoku Expert Approved Techniques ✦
 
   R7C4 = 4 via lastRemaining (step 8)
@@ -129,9 +130,9 @@ larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-a
 larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
 
 # Sometimes to make your found technique show up you might need to use something like --exclude als,alsxy,ape,fpc,fpce on larsduku 
-# Like from the DeathBlossom example above to get it to show i had to do:
+# Like from the DeathBlossom example above to get it to show it by including the same exclude from above that created it:
 
-larsdoku "000000009430050120029000006005000900070910080000045000004000700198062040000000090" --exclude als,alsxy,ape,fpc,fpce
+larsdoku "000000009430050120029000006005000900070910080000045000004000700198062040000000090" --exclude als,alsxy
 
 
 ```
@@ -227,7 +228,8 @@ Larsdoku implements **35 detectors** across 7 levels of escalation:
 
 ### L5 — Set Logic & Forcing
 - **ALS-XZ** — Almost Locked Set pair with restricted common
-- **ALS-XY Wing** — three-ALS chain elimination
+- **ALS-XY Wing** — three-ALS chain elimination-exclude als,alsxy
+
 - **Sue De Coq** — box/line intersection set partitioning
 - **Aligned Pair Exclusion** — combination validation against common peers
 - **Death Blossom** — stem cell with ALS petals
