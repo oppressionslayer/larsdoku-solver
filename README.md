@@ -129,7 +129,7 @@ larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-a
 larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
 ```
 
-**The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. Your solver is so powerful it renders ForcingChain obsolete on its own generated puzzles.
+**The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. The solver is quite good so it renders ForcingChain obsolete on its own generated puzzles so it's hard to do. but check out --like if you really want similar puzzles!
 
 ```bash
 # See ForcingChain in action — solve with ALS excluded so FC fires
