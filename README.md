@@ -128,6 +128,12 @@ larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-a
 # Generate pure ALS puzzles
 larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
 
+# Sometimes to make your found technique show up you might need to use something like --exclude als,alsxy,ape,fpc,fpce on larsduku 
+# Like from the DeathBlossom example above to get it to show i had to do:
+
+larsdoku "000000009430050120029000006005000900070910080000045000004000700198062040000000090" --exclude als,alsxy,ape,fpc,fpce
+
+
 ```
 
 **The flex:** Puzzles generated with `--require ForcingChain` need FC to solve *when ALS is excluded*. But with the full solver, ALS-XZ handles what ForcingChain does — making FC unnecessary. The solver is sometimes rendering puzzles where ForcingChain is obsolete on its own generated puzzles. Just a note. Something for me to work on. but you can try the below command to see FC to show up!
