@@ -533,6 +533,77 @@ def minimize_clues(puzzle_str, rng=None, verbose=False):
 
 
 # ══════════════════════════════════════════════════════════════
+# TECHNIQUE-AWARE SCULPTING — steer toward target technique
+# ══════════════════════════════════════════════════════════════
+
+def sculpt_for_technique(puzzle_str, target_techs, exclude_techs=None,
+                         rng=None, verbose=False):
+    """Sculpt a puzzle toward requiring specific techniques.
+
+    Two-pass selective minimization:
+      Pass 1 — Remove clues that keep uniqueness AND make the target fire.
+      Pass 2 — Trim remaining redundant clues that don't break the target.
+
+    Returns sculpted puzzle string, or None if the target never fired.
+    """
+    if rng is None:
+        rng = random.Random()
+
+    puzzle = list(puzzle_str)
+    clue_positions = [i for i in range(81) if puzzle[i] != '0']
+    rng.shuffle(clue_positions)
+
+    # Pass 1: remove clues that trigger the target technique
+    target_hit = False
+    for pos in clue_positions:
+        saved = puzzle[pos]
+        puzzle[pos] = '0'
+        test_str = ''.join(puzzle)
+
+        if not has_unique_solution(test_str):
+            puzzle[pos] = saved
+            continue
+
+        r = solve_selective(test_str, verbose=False, exclude_techniques=exclude_techs)
+        techs_used = set(r.get('technique_counts', {}).keys())
+
+        if target_techs & techs_used:
+            target_hit = True
+            if verbose:
+                n = sum(1 for c in puzzle if c != '0')
+                print(f'    sculpt: removed {pos} → {n} clues, target HIT')
+        else:
+            puzzle[pos] = saved
+
+    if not target_hit:
+        return None
+
+    # Pass 2: trim remaining redundant clues without losing the target
+    remaining = [i for i in range(81) if puzzle[i] != '0']
+    rng.shuffle(remaining)
+    for pos in remaining:
+        saved = puzzle[pos]
+        puzzle[pos] = '0'
+        test_str = ''.join(puzzle)
+
+        if not has_unique_solution(test_str):
+            puzzle[pos] = saved
+            continue
+
+        r = solve_selective(test_str, verbose=False, exclude_techniques=exclude_techs)
+        techs_used = set(r.get('technique_counts', {}).keys())
+
+        if target_techs & techs_used:
+            if verbose:
+                n = sum(1 for c in puzzle if c != '0')
+                print(f'    sculpt: trimmed {pos} → {n} clues, target still hits')
+        else:
+            puzzle[pos] = saved
+
+    return ''.join(puzzle)
+
+
+# ══════════════════════════════════════════════════════════════
 # DISPLAY
 # ══════════════════════════════════════════════════════════════
 

@@ -54,3 +54,67 @@ PRESETS = {
     'exotic': EXPERT_APPROVED | EXOTIC_TECHNIQUES,
     'wsrf': None,  # None = all techniques (full WSRF stack)
 }
+
+# ══════════════════════════════════════════════════════════════
+# PREFER EXCLUSIONS — auto-exclude techniques that steal solves
+# ══════════════════════════════════════════════════════════════
+#
+# When the user wants puzzles requiring a specific technique,
+# techniques earlier in the solve pipeline often fire first and
+# "steal" the solve. --prefer auto-excludes them.
+#
+# Pipeline order within level 5:
+#   ALS_XZ → SueDeCoq → AlignedPairExcl → ALS_XYWing →
+#   DeathBlossom → KrakenFish → FPC → FPCE → ForcingChain → ForcingNet
+#
+# Each entry maps a target technique to the set of same-or-lower-level
+# techniques that fire before it and commonly steal the solve.
+
+PREFER_EXCLUSIONS = {
+    'ForcingChain': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+    },
+    'ForcingNet': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE', 'ForcingChain',
+    },
+    'DeathBlossom': {'ALS_XZ', 'ALS_XYWing'},
+    'KrakenFish': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom',
+    },
+    'SueDeCoq': {'ALS_XZ', 'ALS_XYWing'},
+    'AlignedPairExcl': {'ALS_XZ', 'ALS_XYWing'},
+    'ALS_XYWing': {'ALS_XZ'},
+    'D2B': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+        'ForcingChain', 'ForcingNet',
+    },
+    'SKLoop': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+        'ForcingChain', 'ForcingNet',
+    },
+    'JuniorExocet': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+        'ForcingChain', 'ForcingNet',
+    },
+    'Template': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+        'ForcingChain', 'ForcingNet',
+    },
+    'BowmanBingo': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+        'ForcingChain', 'ForcingNet',
+    },
+    'FPF': {
+        'ALS_XZ', 'ALS_XYWing', 'AlignedPairExcl', 'SueDeCoq',
+        'DeathBlossom', 'KrakenFish', 'FPC', 'FPCE',
+        'ForcingChain', 'ForcingNet', 'D2B',
+    },
+}
