@@ -140,7 +140,27 @@ larsdoku --board-forge MC --require DeathBlossom --exclude als,alsxy --board-for
 
 # Generate a KrakenFish puzzle
 larsdoku --board-forge MC --require KrakenFish --board-forge-count 1 --require-attempts 200
+```text
+Status: SOLVED
+Steps:  53
+Time:   65.7ms
+Verify: All techniques are Sudoku Expert Approved ✓
 
+  Board validated: every row, column, and box contains
+  digits 1-9 exactly once per international Sudoku rules.
+  No backtracking or trial-and-error was used at any point.
+  Every placement was derived by deterministic logic alone.
+
+Techniques:
+  nakedSingle             22 ( 36.1%)  L1  ████████████
+  crossHatch              17 ( 27.9%)  L1  █████████
+  lastRemaining            8 ( 13.1%)  L1  ████
+  DeathBlossom             5 (  8.2%)  L5  ██
+  fullHouse                5 (  8.2%)  L1  ██
+  KrakenFish               2 (  3.3%)  L6  █
+  SimpleColoring           1 (  1.6%)  L4  █
+  ForcingChain             1 (  1.6%)  L5  █
+```
 # Generate pure ALS puzzles
 larsdoku --board-forge MC --require ALS_XZ --board-forge-count 5
 ```
@@ -233,6 +253,40 @@ larsdoku "3000025906000080700400500010091000300000000080700600400100804000000000
 ```
 
 The full puzzle took 57 steps to solve, but R1C3 only needed 5 — an X-Wing elimination to clear the path, four foundation placements, and then a ForcingChain to prove R1C3 = 1. Every step is deterministic logic. No guessing.
+
+## Still Solves When Key Techniques Are Removed
+
+Larsdoku is not dependent on one narrow family of advanced techniques.
+
+Even with several known techniques disabled, it can still reroute through other expert-approved logic and finish the board cleanly — with **no backtracking, no guessing, and no trial-and-error**.
+
+### Example
+
+```bash
+larsdoku "600058300030210060000000819002043500040090080000081000000000906054020070006100000" --exclude als,alsxy,ape,fpc,fpce
+
+```text
+Status: SOLVED
+Steps:  53
+Time:   65.7ms
+Verify: All techniques are Sudoku Expert Approved ✓
+
+  Board validated: every row, column, and box contains
+  digits 1-9 exactly once per international Sudoku rules.
+  No backtracking or trial-and-error was used at any point.
+  Every placement was derived by deterministic logic alone.
+
+Techniques:
+  nakedSingle             22 ( 36.1%)  L1  ████████████
+  crossHatch              17 ( 27.9%)  L1  █████████
+  lastRemaining            8 ( 13.1%)  L1  ████
+  DeathBlossom             5 (  8.2%)  L5  ██
+  fullHouse                5 (  8.2%)  L1  ██
+  KrakenFish               2 (  3.3%)  L6  █
+  SimpleColoring           1 (  1.6%)  L4  █
+  ForcingChain             1 (  1.6%)  L5  █
+```
+
 
 ### More Tools
 
