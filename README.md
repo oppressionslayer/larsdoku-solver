@@ -2,6 +2,13 @@
 
 **Pure logic Sudoku solver. Zero guessing. Every step proven.**
 
+ ## The Anthem                                                                                                                                                     
+                                                            
+  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/uPq01YJZHH3E4HJu)                                                                
+   
+  *"Solved the whole damn game like it's just another Tuesday"*    
+  
+
 **Documentation: [larsdoku-docs.netlify.app](https://larsdoku-docs.netlify.app/)**
 
 **Web App (WIP): [larsdoku.netlify.app](https://larsdoku.netlify.app/)** — click Expert mode tab to open the Top-N Solver
