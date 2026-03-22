@@ -2748,6 +2748,9 @@ def detect_junior_exocet(bb):
                                         # Must contain ALL base digits
                                         if (bb.cands[tp] & base_cands) != base_cands:
                                             continue
+                                        # Target must contain ONLY base digits (no non-base candidates)
+                                        if bb.cands[tp] & ~base_cands:
+                                            continue
                                         target_candidates.append((tp, tr, tc, obx, t_line))
 
                             # Need 2 targets in different boxes
