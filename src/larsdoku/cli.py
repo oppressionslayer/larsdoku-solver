@@ -99,10 +99,10 @@ EXPERT_APPROVED = {
     if lvl <= 6 and tech not in WSRF_INVENTIONS and tech != 'ORACLE_ONLY'
 }
 
-# Larstech: all techniques EXCEPT JuniorExocet (DX rules under development)
+# Larstech: all techniques (full WSRF + Lars inventions)
 LARSTECH_SET = {
     tech for tech in TECHNIQUE_LEVELS
-    if tech not in {'ORACLE_ONLY', 'JuniorExocet'}
+    if tech != 'ORACLE_ONLY'
 }
 
 PRESETS = {

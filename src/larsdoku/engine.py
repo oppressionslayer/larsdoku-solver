@@ -2745,8 +2745,8 @@ def detect_junior_exocet(bb):
                                         tp = tr * 9 + tc
                                         if bb.board[tp] != 0:
                                             continue
-                                        # Target must have at least one base candidate
-                                        if not (bb.cands[tp] & base_cands):
+                                        # Target must contain ALL base digits (extras OK — Rule 1 removes them)
+                                        if (bb.cands[tp] & base_cands) != base_cands:
                                             continue
                                         target_candidates.append((tp, tr, tc, obx, t_line))
 
