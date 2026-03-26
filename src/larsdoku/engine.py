@@ -2850,11 +2850,15 @@ def detect_junior_exocet(bb):
                                             elims.append((tp, d + 1))
                                             rules_used.add('R1')
 
-                                    # Rule 8: If a base digit in a target cell
-                                    # cannot appear anywhere else in the target's
-                                    # perpendicular line (outside the band), remove it
+                                    # Rule 8: base digit with no cover outside band
+                                    # Only fire R8 on a target that HAS non-base
+                                    # extras (that target specifically had R1 elims).
+                                    # A target with ONLY base digits is not confirmed.
                                     for tp, tr, tc, tbx, tln in [(t1p, t1r, t1c, t1bx, t1ln),
                                                                    (t2p, t2r, t2c, t2bx, t2ln)]:
+                                        # Skip R8 on this target if it has no non-base candidates
+                                        if not (bb.cands[tp] & ~base_cands):
+                                            continue
                                         for d in base_digits:
                                             dbit = BIT[d]
                                             if not (bb.cands[tp] & dbit):
@@ -2874,12 +2878,14 @@ def detect_junior_exocet(bb):
                                                 rules_used.add('R8')
 
                                     # ═══ Double Exocet search ═══
-                                    # Look for a second base pair in the same band
-                                    # (any row, different box) with matching base cands.
-                                    # Two variants:
-                                    #   AlignedDX (Rocha 2026) — same row
-                                    #   CrossDX — different row (beta)
-                                    for search_line in lines:
+                                    # DISABLED: DX-R1/R2 producing incorrect eliminations
+                                    # on some puzzles. R1+R8 verified safe. DX rules
+                                    # need S-cell/cover-line logic rework before enabling.
+                                    # See EXOCET_LARS_ENHANCEMENTS.md for full spec.
+                                    if False:  # TODO: fix DX cover-line logic
+                                     for search_line in lines:
+                                        if search_line == base_line:
+                                            continue
                                         for obx2 in range(3):
                                             if obx2 == bx:
                                                 continue
@@ -2897,7 +2903,31 @@ def detect_junior_exocet(bb):
                                                     bp3, bp4 = empties2[a], empties2[b]
                                                     if bb.cands[bp3] | bb.cands[bp4] != base_cands:
                                                         continue
-
+                                                    # Verify second pair has valid targets too
+                                                    has_targets2 = False
+                                                    for obx3 in range(3):
+                                                        if obx3 == obx2:
+                                                            continue
+                                                        for dl2 in range(3):
+                                                            tl2 = lines[dl2]
+                                                            if tl2 == search_line:
+                                                                continue
+                                                            for dc2 in range(3):
+                                                                pi2 = obx3 * 3 + dc2
+                                                                tr2 = tl2 if orient == 0 else pi2
+                                                                tc2 = pi2 if orient == 0 else tl2
+                                                                tp2 = tr2 * 9 + tc2
+                                                                if bb.board[tp2] != 0:
+                                                                    continue
+                                                                if (bb.cands[tp2] & base_cands) == base_cands:
+                                                                    has_targets2 = True
+                                                                    break
+                                                            if has_targets2:
+                                                                break
+                                                        if has_targets2:
+                                                            break
+                                                    if not has_targets2:
+                                                        continue
                                                     dx_type = 'AlignedDX' if search_line == base_line else 'CrossDX'
                                                     all_bases = {bp1, bp2, bp3, bp4}
                                                     all_targets = {t1p, t2p}
@@ -2915,111 +2945,92 @@ def detect_junior_exocet(bb):
                                                             for dc in range(3):
                                                                 s_cells.add((rs + dc) * 9 + bc_s)
 
-                                                    # DX Rule 1a: base digits from cells
-                                                    # seeing ALL 4 base cells
+                                                    # DX Rule 1: base digits from cells
+                                                    # seeing ALL 4 base cells or ALL targets
                                                     for d in base_digits:
                                                         dval = d + 1
                                                         dbit = BIT[d]
                                                         for pos in range(81):
-                                                            if pos in all_bases or pos in s_cells:
+                                                            if pos in all_bases or pos in s_cells or pos in all_targets:
                                                                 continue
                                                             if bb.board[pos] != 0 or not (bb.cands[pos] & dbit):
                                                                 continue
-                                                            if all(pos // 9 == bp // 9 or
-                                                                   pos % 9 == bp % 9 or
-                                                                   BOX_OF[pos] == BOX_OF[bp]
-                                                                   for bp in all_bases):
-                                                                elims.append((pos, dval))
-                                                                rules_used.add(f'{dx_type}-R1')
-
-                                                    # DX Rule 1b: base digits from cells
-                                                    # seeing ALL target cells
-                                                    for d in base_digits:
-                                                        dval = d + 1
-                                                        dbit = BIT[d]
-                                                        for pos in range(81):
-                                                            if pos in all_targets or pos in s_cells:
-                                                                continue
-                                                            if pos in all_bases:
-                                                                continue
-                                                            if bb.board[pos] != 0 or not (bb.cands[pos] & dbit):
-                                                                continue
-                                                            if all(pos // 9 == tp // 9 or
-                                                                   pos % 9 == tp % 9 or
-                                                                   BOX_OF[pos] == BOX_OF[tp]
-                                                                   for tp in all_targets):
+                                                            sees_all_bases = all(
+                                                                pos // 9 == bp // 9 or
+                                                                pos % 9 == bp % 9 or
+                                                                BOX_OF[pos] == BOX_OF[bp]
+                                                                for bp in all_bases)
+                                                            sees_all_targets = all(
+                                                                pos // 9 == tp // 9 or
+                                                                pos % 9 == tp % 9 or
+                                                                BOX_OF[pos] == BOX_OF[tp]
+                                                                for tp in all_targets)
+                                                            if sees_all_bases or sees_all_targets:
                                                                 elims.append((pos, dval))
                                                                 rules_used.add(f'{dx_type}-R1')
 
                                                     # DX Rule 2: base digits from non-S cells
-                                                    # in their cover rows/cols.
-                                                    # Skip the digit eliminated by Rule 8
-                                                    # (it's false in the base pattern).
+                                                    # in cover rows (S-cells = cross-line cols
+                                                    # outside band). Skip R8-false digit.
                                                     r8_digits = set()
-                                                    for ep, ed in elims:
-                                                        if (ep, ed) != (ep, ed):
-                                                            pass
-                                                    for rr in rules_used:
-                                                        pass
-                                                    # Collect R8-removed digits
                                                     for tp in [t1p, t2p]:
                                                         for d in base_digits:
-                                                            dbit = BIT[d]
-                                                            if not (bb.cands[tp] & dbit):
+                                                            dbit_r8 = BIT[d]
+                                                            if not (bb.cands[tp] & dbit_r8):
                                                                 continue
                                                             perp = 0
                                                             for ln in range(9):
                                                                 if band_idx * 3 <= ln < band_idx * 3 + 3:
                                                                     continue
-                                                                if orient == 0:
-                                                                    sp = ln * 9 + (tp % 9)
-                                                                else:
-                                                                    sp = (tp // 9) * 9 + ln
-                                                                if bb.board[sp] == 0 and (bb.cands[sp] & dbit):
+                                                                sp = (ln * 9 + (tp % 9)) if orient == 0 else ((tp // 9) * 9 + ln)
+                                                                if bb.board[sp] == 0 and (bb.cands[sp] & dbit_r8):
                                                                     perp += 1
                                                             if perp == 0:
                                                                 r8_digits.add(d)
 
+                                                    # Combine cross positions from BOTH base pairs
+                                                    dx_cross = set(cross_positions)
+                                                    # Add companion col from second base pair
+                                                    for dc in range(3):
+                                                        pos_idx = obx2 * 3 + dc
+                                                        bp3_r, bp3_c = divmod(bp3, 9)
+                                                        bp4_r, bp4_c = divmod(bp4, 9)
+                                                        cp_val = pos_idx
+                                                        if orient == 0:
+                                                            if cp_val != bp3_c and cp_val != bp4_c:
+                                                                dx_cross.add(cp_val)
+                                                        else:
+                                                            if cp_val != bp3_r and cp_val != bp4_r:
+                                                                dx_cross.add(cp_val)
                                                     s_cell_set = set()
-                                                    for cp in cross_positions:
+                                                    for cp in dx_cross:
                                                         for ln in range(9):
                                                             if band_idx * 3 <= ln < band_idx * 3 + 3:
                                                                 continue
-                                                            if orient == 0:
-                                                                s_cell_set.add(ln * 9 + cp)
-                                                            else:
-                                                                s_cell_set.add(cp * 9 + ln)
+                                                            sp = (ln * 9 + cp) if orient == 0 else (cp * 9 + ln)
+                                                            s_cell_set.add(sp)
 
                                                     for d in base_digits:
                                                         if d in r8_digits:
-                                                            continue  # skip R8-false digit
+                                                            continue
                                                         dval = d + 1
                                                         dbit = BIT[d]
-                                                        # Find cover lines: which rows outside band
-                                                        # have this digit in the S-cells?
                                                         cover_rows = set()
                                                         for sp in s_cell_set:
                                                             if bb.board[sp] == 0 and (bb.cands[sp] & dbit):
-                                                                if orient == 0:
-                                                                    cover_rows.add(sp // 9)
-                                                                else:
-                                                                    cover_rows.add(sp % 9)
+                                                                cover_rows.add((sp // 9) if orient == 0 else (sp % 9))
                                                         if len(cover_rows) > 2:
                                                             continue
-                                                        # Eliminate from non-S cells in cover rows
                                                         for ln in cover_rows:
                                                             for p in range(9):
-                                                                if orient == 0:
-                                                                    sp = ln * 9 + p
-                                                                else:
-                                                                    sp = p * 9 + ln
+                                                                sp = (ln * 9 + p) if orient == 0 else (p * 9 + ln)
                                                                 if sp in s_cell_set:
                                                                     continue
                                                                 if bb.board[sp] == 0 and (bb.cands[sp] & dbit):
                                                                     elims.append((sp, dval))
                                                                     rules_used.add(f'{dx_type}-R2')
 
-                                    # Deduplicate eliminations
+                                    # Deduplicate
                                     elims = list(dict.fromkeys(elims))
 
                                     if elims:

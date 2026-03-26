@@ -2400,8 +2400,11 @@ def detect_junior_exocet(bb):
                                             rules_used.add('R1')
 
                                     # Rule 8: base digit with no cover outside band
+                                    # Only fire on targets that HAVE non-base extras
                                     for tp, tr, tc, tbx, tln in [(t1p, t1r, t1c, t1bx, t1ln),
                                                                    (t2p, t2r, t2c, t2bx, t2ln)]:
+                                        if not (bb.cands[tp] & ~base_cands):
+                                            continue
                                         for d in base_digits:
                                             dbit = BIT[d]
                                             if not (bb.cands[tp] & dbit):
@@ -2420,7 +2423,8 @@ def detect_junior_exocet(bb):
                                                 elims.append((tp, d + 1))
                                                 rules_used.add('R8')
 
-                                    # ═══ Double Exocet search ═══
+                                    # ═══ Double Exocet search (DISABLED — DX-R2 bug) ═══
+                                    if False:  # TODO: fix DX cover-line logic
                                     for search_line in lines:
                                         for obx2 in range(3):
                                             if obx2 == bx:

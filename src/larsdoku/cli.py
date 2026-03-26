@@ -3128,7 +3128,7 @@ def _start_server(port):
 def main():
     parser = argparse.ArgumentParser(
         description='WSRF Sudoku Solver — Instant solutions via bitwise engine + GF(2) linear algebra',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawDescriptionHelpFormatter, prog='larsdoku',
         epilog="""
 examples:
   %(prog)s "003..." --board                           auto-solve, print grid
@@ -3151,6 +3151,7 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
+    parser.add_argument('--version', action='version', version='larsdoku 1.4.0')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
