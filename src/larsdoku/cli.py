@@ -39,7 +39,8 @@ from .engine import (
     detect_d2b_bitwise, detect_fpf_bitwise,
     detect_xwing, detect_swordfish, detect_simple_coloring,
     detect_bug_plus1, detect_ur_type2, detect_ur_type4,
-    detect_junior_exocet, detect_template, detect_bowman_bingo,
+    detect_junior_exocet, detect_junior_exocet_stuart,
+    detect_template, detect_bowman_bingo,
     detect_gf2_lanczos, detect_gf2_extended, fast_propagate, iter_bits9,
     detect_x_cycle_bitwise, detect_als_xz_bitwise,
     detect_sue_de_coq_bitwise, detect_aligned_pair_exclusion_bitwise,
@@ -990,7 +991,20 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet — TODO: implement Andrew Stuart's validated version
+        # Junior Exocet — Andrew Stuart's validated version (strict cover-line ≤2)
+        if allowed('JuniorExocet'):
+            je_elims, je_detail = detect_junior_exocet_stuart(bb)
+            if je_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'JuniorExocet',
+                        'eliminations': list(je_elims),
+                        'detail': je_detail,
+                    })
+                for pos, d in je_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                continue
 
         # JETest — experimental: our original Exocet detector (fire once)
         if allowed('JETest') and technique_counts.get('JETest', 0) < 1:
@@ -1651,9 +1665,16 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet — TODO: implement Andrew Stuart's validated version
+        # Junior Exocet — Stuart's validated version
+        if allowed('JuniorExocet'):
+            je_elims, _ = detect_junior_exocet_stuart(bb)
+            if je_elims:
+                for pos, d in je_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                continue
 
-        # JETest — experimental: our original Exocet detector (fire once)
+        # JETest — experimental
         if allowed('JETest') and technique_counts.get('JETest', 0) < 1:
             je_elims, _ = detect_junior_exocet(bb)
             if je_elims:

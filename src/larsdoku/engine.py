@@ -2689,6 +2689,176 @@ def detect_ur_type4(bb):
     return [], None
 
 
+def detect_junior_exocet_stuart(bb):
+    """Junior Exocet — Andrew Stuart's validated implementation.
+
+    Pattern Rules 1-4 from Bird's specification via sudokuwiki.org:
+      1. Base pair in minirow with 3-4 combined candidates
+      2. Two targets in other boxes, different lines, can't see each other
+      3. Companion cells must not contain placed base digits
+      4. Cover-line check: S-cells (cross-line columns, OUTSIDE band),
+         each base digit in ≤2 perpendicular cover lines
+
+    Elimination: Rule 1 only (remove non-base from targets).
+    No R8, no trial validation needed — the strict cover-line check
+    rejects all false patterns.
+    """
+    for orient in range(2):
+        for band_idx in range(3):
+            lines = [band_idx * 3, band_idx * 3 + 1, band_idx * 3 + 2]
+            for base_line in lines:
+                for bx in range(3):
+                    empties = []
+                    for dc in range(3):
+                        pos_idx = bx * 3 + dc
+                        if orient == 0:
+                            r, c = base_line, pos_idx
+                        else:
+                            r, c = pos_idx, base_line
+                        pos = r * 9 + c
+                        if bb.board[pos] == 0:
+                            empties.append((pos_idx, pos, r, c))
+                    if len(empties) < 2:
+                        continue
+
+                    for ei in range(len(empties)):
+                        for ej in range(ei + 1, len(empties)):
+                            bp1_idx, bp1, br1, bc1 = empties[ei]
+                            bp2_idx, bp2, br2, bc2 = empties[ej]
+
+                            base_cands = bb.cands[bp1] | bb.cands[bp2]
+                            base_pc = POPCOUNT[base_cands]
+                            if base_pc < 3 or base_pc > 4:
+                                continue
+                            base_digits = [d for d in iter_bits9(base_cands)]
+
+                            target_candidates = []
+                            for obx in range(3):
+                                if obx == bx:
+                                    continue
+                                for dl in range(3):
+                                    t_line = lines[dl]
+                                    if t_line == base_line:
+                                        continue
+                                    for dc in range(3):
+                                        pos_idx = obx * 3 + dc
+                                        if orient == 0:
+                                            tr, tc = t_line, pos_idx
+                                        else:
+                                            tr, tc = pos_idx, t_line
+                                        tp = tr * 9 + tc
+                                        if bb.board[tp] != 0:
+                                            continue
+                                        if (bb.cands[tp] & base_cands) != base_cands:
+                                            continue
+                                        target_candidates.append((tp, tr, tc, obx, t_line))
+
+                            for ti in range(len(target_candidates)):
+                                for tj in range(ti + 1, len(target_candidates)):
+                                    t1p, t1r, t1c, t1bx, t1ln = target_candidates[ti]
+                                    t2p, t2r, t2c, t2bx, t2ln = target_candidates[tj]
+                                    if t1bx == t2bx:
+                                        continue
+                                    if t1r == t2r or t1c == t2c or BOX_OF[t1p] == BOX_OF[t2p]:
+                                        continue
+
+                                    # Rule 3: Companion check
+                                    companion_bad = False
+                                    for tp, tr, tc, tbx, tln in [(t1p, t1r, t1c, t1bx, t1ln),
+                                                                   (t2p, t2r, t2c, t2bx, t2ln)]:
+                                        for dc in range(3):
+                                            pos_idx = tbx * 3 + dc
+                                            if orient == 0:
+                                                cr, cc = tln, pos_idx
+                                            else:
+                                                cr, cc = pos_idx, tln
+                                            cp = cr * 9 + cc
+                                            if cp == tp:
+                                                continue
+                                            if bb.board[cp] != 0 and (BIT[bb.board[cp] - 1] & base_cands):
+                                                companion_bad = True
+                                                break
+                                        if companion_bad:
+                                            break
+                                    if companion_bad:
+                                        continue
+
+                                    # Rule 4: Cover-line validation (Stuart/Bird)
+                                    # Cross-lines = target columns + unused base column
+                                    base_box_start = bx * 3
+                                    cross_positions = set()
+                                    if orient == 0:
+                                        cross_positions.add(t1c)
+                                        cross_positions.add(t2c)
+                                        for dc in range(3):
+                                            pos_idx = base_box_start + dc
+                                            if pos_idx != bc1 and pos_idx != bc2:
+                                                cross_positions.add(pos_idx)
+                                    else:
+                                        cross_positions.add(t1r)
+                                        cross_positions.add(t2r)
+                                        for dc in range(3):
+                                            pos_idx = base_box_start + dc
+                                            if pos_idx != br1 and pos_idx != br2:
+                                                cross_positions.add(pos_idx)
+
+                                    # S-cells: cross-line positions OUTSIDE the band
+                                    # Count perpendicular cover lines per base digit (≤2)
+                                    cover_ok = True
+                                    for d in base_digits:
+                                        dval = d + 1
+                                        placed_in_band = False
+                                        for ln in lines:
+                                            for p in range(9):
+                                                if orient == 0:
+                                                    sr, sc = ln, p
+                                                else:
+                                                    sr, sc = p, ln
+                                                sp = sr * 9 + sc
+                                                if bb.board[sp] == dval:
+                                                    placed_in_band = True
+                                                    break
+                                            if placed_in_band:
+                                                break
+                                        if placed_in_band:
+                                            continue
+
+                                        cover_lines = set()
+                                        for cross_pos in cross_positions:
+                                            for ln in range(9):
+                                                if band_idx * 3 <= ln < band_idx * 3 + 3:
+                                                    continue
+                                                if orient == 0:
+                                                    sr, sc = ln, cross_pos
+                                                else:
+                                                    sr, sc = cross_pos, ln
+                                                sp = sr * 9 + sc
+                                                if bb.board[sp] == 0 and (bb.cands[sp] & BIT[d]):
+                                                    cover_lines.add(ln)
+                                        if len(cover_lines) > 2:
+                                            cover_ok = False
+                                            break
+                                    if not cover_ok:
+                                        continue
+
+                                    # ═══ VALIDATED — Rule 1 eliminations ═══
+                                    elims = []
+                                    for tp in [t1p, t2p]:
+                                        non_base = bb.cands[tp] & ~base_cands
+                                        for d in iter_bits9(non_base):
+                                            elims.append((tp, d + 1))
+
+                                    if elims:
+                                        elims = list(dict.fromkeys(elims))
+                                        base_str = ','.join(str(d + 1) for d in base_digits)
+                                        detail = (f'JuniorExocet [R1]: '
+                                                  f'base {{{base_str}}} at '
+                                                  f'R{br1+1}C{bc1+1},R{br2+1}C{bc2+1} → '
+                                                  f'targets R{t1r+1}C{t1c+1},R{t2r+1}C{t2c+1}')
+                                        return elims, detail
+    return [], None
+
+
 def detect_junior_exocet(bb):
     """Junior Exocet: base-target pattern with cover-line validation.
     Both horizontal and vertical orientations. Returns (eliminations, detail) or ([], None).
