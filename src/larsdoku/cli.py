@@ -63,7 +63,7 @@ TECHNIQUE_LEVELS = {
     'FPC': 5, 'FPCE': 5,
     'ForcingChain': 5, 'ForcingNet': 5,
     'BUG+1': 6, 'URType2': 6, 'URType4': 6,
-    'JuniorExocet': 6, 'Template': 6, 'BowmanBingo': 6,
+    'JuniorExocet': 6, 'JETest': 6, 'Template': 6, 'BowmanBingo': 6,
     'KrakenFish': 6, 'SKLoop': 6,
     'D2B': 6, 'FPF': 7,
     'DeepResonance': 7,
@@ -85,7 +85,8 @@ TECHNIQUE_ALIASES = {
     'deepresonance': 'DeepResonance', 'dr': 'DeepResonance',
     'zone135': 'Zone135', 'z135': 'Zone135',
     'bug': 'BUG+1', 'ur2': 'URType2', 'ur4': 'URType4',
-    'exocet': 'JuniorExocet', 'template': 'Template', 'bowman': 'BowmanBingo',
+    'exocet': 'JuniorExocet', 'jetest': 'JETest', 'je': 'JETest',
+    'template': 'Template', 'bowman': 'BowmanBingo',
     'l1': 'L1', 'l2': 'L2',
 }
 
@@ -93,16 +94,19 @@ TECHNIQUE_ALIASES = {
 # WSRF inventions (excluded from expert-approved preset)
 WSRF_INVENTIONS = {'FPC', 'FPCE', 'D2B', 'FPF', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
 
+# Experimental techniques — research detectors not ready for production
+EXPERIMENTAL_TECHNIQUES = {'JETest'}
+
 # Sudoku Expert Approved — standard L1-L6 techniques only (no WSRF inventions)
 EXPERT_APPROVED = {
     tech for tech, lvl in TECHNIQUE_LEVELS.items()
-    if lvl <= 6 and tech not in WSRF_INVENTIONS and tech != 'ORACLE_ONLY'
+    if lvl <= 6 and tech not in WSRF_INVENTIONS and tech not in EXPERIMENTAL_TECHNIQUES and tech != 'ORACLE_ONLY'
 }
 
 # Larstech: all techniques (full WSRF + Lars inventions)
 LARSTECH_SET = {
     tech for tech in TECHNIQUE_LEVELS
-    if tech != 'ORACLE_ONLY'
+    if tech != 'ORACLE_ONLY' and tech not in EXPERIMENTAL_TECHNIQUES
 }
 
 PRESETS = {
@@ -986,19 +990,21 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet
-        if allowed('JuniorExocet'):
+        # Junior Exocet — TODO: implement Andrew Stuart's validated version
+
+        # JETest — experimental: our original Exocet detector (fire once)
+        if allowed('JETest') and technique_counts.get('JETest', 0) < 1:
             je_elims, _ = detect_junior_exocet(bb)
             if je_elims:
                 if detail:
                     elim_events.append({
-                        'round': round_num, 'technique': 'JuniorExocet',
+                        'round': round_num, 'technique': 'JETest',
                         'eliminations': list(je_elims),
-                        'detail': f'Junior Exocet: {len(je_elims)} eliminations',
+                        'detail': f'JETest: {len(je_elims)} eliminations',
                     })
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
-                technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                technique_counts['JETest'] = technique_counts.get('JETest', 0) + 1
                 continue
 
         # Template
@@ -1645,13 +1651,15 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet
-        if allowed('JuniorExocet'):
+        # Junior Exocet — TODO: implement Andrew Stuart's validated version
+
+        # JETest — experimental: our original Exocet detector (fire once)
+        if allowed('JETest') and technique_counts.get('JETest', 0) < 1:
             je_elims, _ = detect_junior_exocet(bb)
             if je_elims:
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
-                technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                technique_counts['JETest'] = technique_counts.get('JETest', 0) + 1
                 continue
 
         # Template
@@ -3151,12 +3159,20 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
-    parser.add_argument('--version', action='version', version='larsdoku 1.4.0')
+    parser.add_argument('--version', action='version', version='larsdoku 1.8.0')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
     parser.add_argument('--path', '-p', action='store_true',
                        help='Show technique path to --cell (requires --cell)')
+    parser.add_argument('--cell-placement', type=str, metavar='CELL',
+                       help='Predict and place a specific cell using advanced techniques (R3C5). '
+                            'Shows SIRO prediction, technique needed, and runs it.')
+    parser.add_argument('--inspector', type=str, metavar='CELL',
+                       help='Full cell inspector: SIRO prediction, zone scores, rival counts, '
+                            'technique prediction, scout status (R3C5)')
+    parser.add_argument('--predict-path', action='store_true',
+                       help='Predict solve path: which technique places each cell')
     parser.add_argument('--level', '-l', type=int, default=99,
                        help='Max technique level (1=L1 only, 2=+GF2, 5=+FPC/FC, 7=all)')
     parser.add_argument('--only', '-o', help='Only use specific techniques (comma-separated: fpc,gf2,fc,...)')
@@ -3183,10 +3199,19 @@ presets:
                        help='Use GF(2) Extended — band/stack constraints, conjugate pairs, free-variable probing (options A-E)')
     parser.add_argument('--exotic', action='store_true',
                        help='Enable exotic techniques (ALS-XZ, Sue De Coq, X-Cycles, Aligned Pair Exclusion)')
+    parser.add_argument('--experimental', action='store_true',
+                       help='Enable experimental techniques (JETest — research Exocet detector)')
+    parser.add_argument('--scandalous-tech', action='store_true',
+                       help='Post-solve Exocet scan: solve first with pure logic, then validate '
+                            'Exocet patterns against the known solution (ScandolousExocet — 100%% accurate)')
     parser.add_argument('--trust', '-t', metavar='SOLUTION',
                        help='Trust mode — use this 81-char solution string instead of backtracker')
     parser.add_argument('--autotrust', action='store_true',
                        help='Auto-trust: solve via backtracker first, then use that solution as trusted (enables DeepResonance verification)')
+    parser.add_argument('--cascade', action='store_true',
+                       help='Cascade analysis: find bottleneck moves and show how the puzzle avalanches')
+    parser.add_argument('--siro-table', action='store_true',
+                       help='Quick SIRO prediction table for all cells — no solving needed')
     parser.add_argument('--siro-cascade', action='store_true',
                        help='SIRO-guided cascade: zone features predict technique, dispatch directly')
     parser.add_argument('--siro-bootstrap', action='store_true',
@@ -3504,7 +3529,7 @@ presets:
         return
 
     # ── Batch mode ──
-    if args.batch is not None:
+    if args.batch is not None and not getattr(args, 'cascade', False):
         import random
         count = args.batch
         n_clues = max(17, min(27, args.batch_clues))
@@ -4408,6 +4433,12 @@ presets:
             only_techniques = only_techniques | EXOTIC_TECHNIQUES
         # If only_techniques is None (all), exotic is already included
 
+    # Apply --experimental: add experimental techniques to the current set
+    if getattr(args, 'experimental', False) and not args.preset:
+        if only_techniques is not None:
+            only_techniques = only_techniques | EXPERIMENTAL_TECHNIQUES
+        # If only_techniques is None (all), experimental is already included
+
     # Apply --exclude: remove specific techniques from the allowed set
     if args.exclude:
         exclude_set = parse_techniques(args.exclude)
@@ -4704,6 +4735,525 @@ presets:
 
         sys.exit(0 if bench['solved'] == bench.get('valid', 0) else 1)
 
+    # ── Cascade analysis mode ──
+    if getattr(args, 'cascade', False):
+        from collections import Counter
+
+        L1_SET = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+        L2_SET = {'Zone135', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
+        CASCADE_SET = L1_SET | L2_SET
+
+        solve_kwargs = {}
+        if getattr(args, 'preset', None):
+            solve_kwargs['only_techniques'] = PRESETS[args.preset]
+        if getattr(args, 'gf2', False):
+            solve_kwargs['gf2'] = True
+        if getattr(args, 'gf2x', False):
+            solve_kwargs['gf2_extended'] = True
+
+        def _cascade_stats(puzzle):
+            """Run cascade analysis on a single puzzle and return stats dict."""
+            result = solve_selective(puzzle, detail=True, **solve_kwargs)
+            bottleneck_moves = []
+            cascade_count = 0
+            bn_so_far = 0
+            depth_map = {}
+            for step in result.get('steps', []):
+                tech = step.get('technique', '')
+                pos = step.get('pos')
+                if tech in CASCADE_SET:
+                    cascade_count += 1
+                    if pos is not None:
+                        depth_map[pos] = bn_so_far
+                else:
+                    bn_so_far += 1
+                    bottleneck_moves.append(step)
+                    if pos is not None:
+                        depth_map[pos] = bn_so_far
+            return {
+                'result': result,
+                'bottleneck_moves': bottleneck_moves,
+                'cascade_count': cascade_count,
+                'depth_map': depth_map,
+                'bn_depth': len(bottleneck_moves),
+                'tech_counts': result.get('technique_counts', {}),
+                'success': result.get('success', False),
+            }
+
+        # ── Batch cascade: generate N shuffled variants and aggregate ──
+        batch_n = getattr(args, 'batch', None)
+        if batch_n:
+            print(f'\n  ═══ Cascade Batch Analysis ({batch_n} puzzles) ═══\n', file=sys.stderr)
+            depth_dist = Counter()
+            tech_totals = Counter()
+            total_bn = 0
+            solved = 0
+
+            for i in range(batch_n):
+                variant = shuffle_sudoku(bd81)
+                stats = _cascade_stats(variant)
+                depth_dist[stats['bn_depth']] += 1
+                total_bn += stats['bn_depth']
+                if stats['success']:
+                    solved += 1
+                for tech in stats['bottleneck_moves']:
+                    t = tech.get('technique', '?')
+                    tech_totals[t] += 1
+
+                if (i + 1) % 50 == 0 or i == batch_n - 1:
+                    print(f'  [{i+1}/{batch_n}] solved={solved}', file=sys.stderr)
+
+            avg_depth = total_bn / batch_n if batch_n else 0
+            max_bar = max(depth_dist.values()) if depth_dist else 1
+
+            print(f'\n  ═══ Cascade Batch Analysis ({batch_n} puzzles) ═══')
+            print(f'  Solved: {solved}/{batch_n}')
+            print()
+            print(f'  Bottleneck depth distribution:')
+            for d in sorted(depth_dist):
+                count = depth_dist[d]
+                bar_len = max(1, int(count / max_bar * 30))
+                bar = '█' * bar_len
+                print(f'    depth={d}: {count:3d} puzzles  {bar}')
+            print(f'    Average: {avg_depth:.1f}')
+            print()
+
+            if tech_totals:
+                print(f'  Most common bottleneck techniques:')
+                parts = []
+                for tech, cnt in tech_totals.most_common(10):
+                    parts.append(f'{tech}: {cnt}')
+                print(f'    {"  ".join(parts)}')
+
+            sys.exit(0)
+
+        # ── Single puzzle cascade ──
+        bb = BitBoard.from_string(bd81)
+        empty = sum(1 for i in range(81) if bb.board[i] == 0)
+
+        stats = _cascade_stats(bd81)
+        result = stats['result']
+        bottleneck_moves = stats['bottleneck_moves']
+        cascade_count = stats['cascade_count']
+        depth_map = stats['depth_map']
+
+        print(f'\n  ═══ Cascade Analysis ═══')
+        print(f'  Empty: {empty} cells')
+        print(f'  Bottleneck depth: {len(bottleneck_moves)}')
+        print(f'  Cascade placements: {cascade_count}')
+        print(f'  Total steps: {len(result.get("steps", []))}')
+        print(f'  Success: {result.get("success", False)}')
+        print()
+
+        if bottleneck_moves:
+            print(f'  Bottleneck moves (the hard ones):')
+            for i, m in enumerate(bottleneck_moves, 1):
+                print(f'    {i}. {m["cell"]}={m["digit"]} via {m["technique"]}')
+            print()
+
+        # Cascade depth distribution
+        dist = Counter(depth_map.values())
+        print(f'  Cascade depth (bottlenecks needed before cell falls):')
+        for d in sorted(dist):
+            cells = sorted([s['cell'] for s in result.get('steps', [])
+                          if depth_map.get(s.get('pos')) == d])
+            label = f'{dist[d]} cells'
+            if d == 0:
+                label += ' (pure cascade)'
+            preview = ', '.join(cells[:6])
+            if len(cells) > 6:
+                preview += f', +{len(cells)-6} more'
+            print(f'    depth={d}: {label} — {preview}')
+        print()
+
+        # Technique breakdown
+        tech_counts = result.get('technique_counts', {})
+        if tech_counts:
+            print(f'  Technique breakdown:')
+            for tech, count in sorted(tech_counts.items(), key=lambda x: -x[1]):
+                marker = ' ★' if tech not in CASCADE_SET else ''
+                print(f'    {tech}: {count}{marker}')
+            print()
+
+        # Inspector integration hint
+        if bottleneck_moves:
+            print(f'  ── Insight ──')
+            print(f'  {len(bottleneck_moves)} hard move{"s" if len(bottleneck_moves) > 1 else ""} '
+                  f'→ {cascade_count} cascade placements')
+            ratio = cascade_count / max(1, len(bottleneck_moves))
+            print(f'  Cascade ratio: 1:{ratio:.0f} (each bottleneck unlocks ~{ratio:.0f} cells)')
+
+        sys.exit(0)
+
+    # ── SIRO Table mode ──
+    if getattr(args, 'siro_table', False):
+        bb = BitBoard.from_string(bd81)
+        sol_str = solve_backtrack(bd81)
+        solution = [int(ch) for ch in sol_str] if sol_str else None
+
+        predictions = []
+        for pos in range(81):
+            if bb.board[pos] != 0:
+                continue
+            cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+            if len(cands) < 2:
+                continue
+            row, col = pos // 9, pos % 9
+            rival_scores = {}
+            for d in cands:
+                dbit = BIT[d - 1]
+                s = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+                s += sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+                br, bc = (row // 3) * 3, (col // 3) * 3
+                s += sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                         if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+                rival_scores[d] = s
+
+            sorted_digits = sorted(rival_scores, key=lambda dd: rival_scores[dd])
+            best_digit = sorted_digits[0]
+            best_rivals = rival_scores[best_digit]
+            second_rivals = rival_scores[sorted_digits[1]] if len(sorted_digits) > 1 else best_rivals
+            gap = second_rivals - best_rivals
+
+            actual = solution[pos] if solution else None
+            ok = (best_digit == actual) if actual is not None else None
+
+            predictions.append({
+                'pos': pos, 'row': row, 'col': col,
+                'digit': best_digit, 'rivals': best_rivals,
+                'gap': gap, 'n_cands': len(cands),
+                'actual': actual, 'ok': ok,
+            })
+
+        # Sort by rival score ascending (most confident first)
+        predictions.sort(key=lambda p: (p['rivals'], -p['gap']))
+
+        print(f'\n  ═══ SIRO Predictions ═══')
+        print()
+        print(f'  {"Cell":>6}  {"Digit":>5}  {"Rivals":>6}  {"Gap":>3}  {"Cands":>5}  {"OK":>2}')
+        print(f'  {"─" * 40}')
+        for p in predictions:
+            cell_name = f'R{p["row"]+1}C{p["col"]+1}'
+            if p['ok'] is True:
+                ok_str = '✓'
+            elif p['ok'] is False:
+                ok_str = f'✗ (actual={p["actual"]})'
+            else:
+                ok_str = '?'
+            print(f'  {cell_name:>6}  {p["digit"]:>5}  {p["rivals"]:>6}  {p["gap"]:>3}  {p["n_cands"]:>5}  {ok_str}')
+
+        if solution:
+            correct = sum(1 for p in predictions if p['ok'])
+            total = len(predictions)
+            pct = 100 * correct / total if total else 0
+            print(f'\n  Summary: {correct}/{total} correct ({pct:.0f}%)')
+
+        sys.exit(0)
+
+    # ── Inspector mode ──
+    if getattr(args, 'inspector', None):
+        try:
+            row, col = parse_cell(args.inspector)
+        except ValueError as e:
+            print(f'Error: {e}', file=sys.stderr)
+            sys.exit(1)
+
+        bb = BitBoard.from_string(bd81)
+        pos = row * 9 + col
+
+        if bb.board[pos] != 0:
+            print(f'\n  R{row+1}C{col+1}: Given = {bb.board[pos]}')
+            sys.exit(0)
+
+        cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+        n_clues = sum(1 for i in range(81) if bb.board[i] != 0)
+
+        print(f'\n  ╔══════════════════════════════════════╗')
+        print(f'  ║  Cell Inspector: R{row+1}C{col+1}               ║')
+        print(f'  ╚══════════════════════════════════════╝')
+        print(f'  Candidates: {cands} ({len(cands)})')
+
+        # Unit stats
+        row_e = sum(1 for j in range(9) if bb.board[row*9+j] == 0)
+        col_e = sum(1 for i in range(9) if bb.board[i*9+col] == 0)
+        br, bc = (row // 3) * 3, (col // 3) * 3
+        box_e = sum(1 for i in range(br, br+3) for j in range(bc, bc+3) if bb.board[i*9+j] == 0)
+        print(f'  Row {row+1}: {row_e} empty | Col {col+1}: {col_e} empty | Box: {box_e} empty')
+
+        # Rival analysis per candidate
+        print(f'\n  ── Rival Analysis ──')
+        print(f'  {"d":>3s}  {"Row":>4s}  {"Col":>4s}  {"Box":>4s}  {"Total":>5s}  {"Zone":>6s}')
+        print(f'  {"─"*30}')
+
+        rival_data = []
+        for d in cands:
+            dbit = BIT[d - 1]
+            rr = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+            cr = sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+            bx = sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                     if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+            total = rr + cr + bx
+            row_ratio = rr / max(1, row_e - 1)
+            col_ratio = cr / max(1, col_e - 1)
+            box_ratio = bx / max(1, box_e - 1)
+            min_ratio = min(row_ratio, col_ratio, box_ratio)
+            zone = 'likely' if min_ratio <= 1.0 else 'unlikely'
+            rival_data.append((d, rr, cr, bx, total, min_ratio, zone))
+            print(f'  {d:3d}  {rr:4d}  {cr:4d}  {bx:4d}  {total:5d}  {zone:>6s}')
+
+        # SIRO prediction
+        rival_data.sort(key=lambda x: x[4])
+        siro_pred = rival_data[0][0]
+        siro_rivals = rival_data[0][4]
+        gap = rival_data[1][4] - rival_data[0][4] if len(rival_data) > 1 else 0
+
+        # Scout detection
+        siro_dbit = BIT[siro_pred - 1]
+        is_scout = False
+        scout_cell = ''
+        for j in range(9):
+            if j == col: continue
+            peer = row * 9 + j
+            if bb.board[peer] != 0: continue
+            pcands = [dd + 1 for dd in range(9) if bb.cands[peer] & BIT[dd]]
+            if len(pcands) < 2: continue
+            best_pd, best_ps = -1, 999
+            for dd in pcands:
+                ps = sum(1 for jj in range(9) if jj != j and bb.board[row*9+jj] == 0 and (bb.cands[row*9+jj] & BIT[dd-1]))
+                ps += sum(1 for ii in range(9) if ii != row and bb.board[ii*9+j] == 0 and (bb.cands[ii*9+j] & BIT[dd-1]))
+                pbr, pbc = (row // 3) * 3, (j // 3) * 3
+                ps += sum(1 for ii in range(pbr, pbr+3) for jj in range(pbc, pbc+3)
+                         if (ii != row or jj != j) and bb.board[ii*9+jj] == 0 and (bb.cands[ii*9+jj] & BIT[dd-1]))
+                if ps < best_ps: best_ps, best_pd = ps, dd
+            if best_pd == siro_pred:
+                is_scout = True
+                scout_cell = f'R{row+1}C{j+1}'
+                break
+
+        # Technique prediction
+        if len(cands) <= 2:
+            tech_pred = 'ForcingChain'
+        elif siro_rivals < 6:
+            tech_pred = 'FPC'
+        elif siro_rivals < 7:
+            tech_pred = 'D2B'
+        elif siro_rivals >= 8:
+            tech_pred = 'FPCE'
+        else:
+            tech_pred = 'FPF'
+
+        print(f'\n  ── SIRO Prediction ──')
+        print(f'  Predicted digit: {siro_pred} (rivals={siro_rivals}, gap={gap})')
+        if is_scout:
+            print(f'  ⚠ SCOUT: {siro_pred} is also rank-1 in {scout_cell}')
+            if len(rival_data) > 1:
+                print(f'  Swap suggestion: {rival_data[1][0]} (rivals={rival_data[1][4]})')
+
+        print(f'\n  ── Technique Prediction ──')
+        print(f'  Predicted: {tech_pred}')
+        print(f'  Confidence: {"HIGH" if gap >= 4 else "MED" if gap >= 2 else "LOW"}')
+
+        # Cascade depth analysis
+        L1_SET = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+        L2_SET = {'Zone135', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
+        CASCADE_SET_INS = L1_SET | L2_SET
+        try:
+            casc_result = solve_selective(bd81, detail=True)
+            bn_count = 0
+            cell_depth = None
+            cell_technique = None
+            for step in casc_result.get('steps', []):
+                tech_s = step.get('technique', '')
+                if tech_s not in CASCADE_SET_INS:
+                    bn_count += 1
+                if step.get('pos') == pos:
+                    cell_depth = bn_count
+                    cell_technique = tech_s
+                    break
+
+            print(f'\n  ── Cascade Depth ──')
+            if cell_depth is not None:
+                if cell_depth == 0:
+                    print(f'  This cell cascades from basic techniques (depth=0)')
+                else:
+                    print(f'  Depth: {cell_depth} (needs {cell_depth} bottleneck move{"s" if cell_depth > 1 else ""} first)')
+                if cell_technique:
+                    cat = 'cascade' if cell_technique in CASCADE_SET_INS else 'bottleneck ★'
+                    print(f'  Actual technique: {cell_technique} ({cat})')
+
+            total_bn = sum(1 for s in casc_result.get('steps', [])
+                          if s.get('technique', '') not in CASCADE_SET_INS)
+            print(f'  Puzzle bottleneck depth: {total_bn}')
+        except Exception:
+            pass
+
+        # Get actual answer if we can solve
+        sol = solve_backtrack(bd81)
+        if sol:
+            actual = int(sol[pos])
+            siro_correct = siro_pred == actual
+            print(f'\n  ── Oracle ──')
+            print(f'  Answer: {actual}')
+            print(f'  SIRO: {"✓ CORRECT" if siro_correct else "✗ WRONG"}')
+
+        sys.exit(0)
+
+    # ── Predict path mode ──
+    if getattr(args, 'predict_path', False):
+        bb = BitBoard.from_string(bd81)
+
+        print(f'\n  ╔══ Predicted Solve Path ══╗\n')
+
+        sol = solve_backtrack(bd81)
+
+        print(f'  {"Cell":>6s}  {"Digit":>5s}  {"Technique":>12s}  {"Rivals":>6s}  {"Gap":>4s}  {"OK":>3s}')
+        print(f'  {"─"*45}')
+
+        correct = total = 0
+        for pos in range(81):
+            if bb.board[pos] != 0: continue
+            cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+            if len(cands) < 2: continue
+
+            row, col = divmod(pos, 9)
+            scores = []
+            for d in cands:
+                dbit = BIT[d - 1]
+                s = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+                s += sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+                br, bc = (row // 3) * 3, (col // 3) * 3
+                s += sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                         if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+                scores.append((s, d))
+            scores.sort()
+            best_d = scores[0][1]
+            rivals = scores[0][0]
+            gap = scores[1][0] - scores[0][0] if len(scores) > 1 else 0
+
+            if len(cands) <= 2: tech = 'FC'
+            elif rivals < 6: tech = 'FPC'
+            elif rivals < 7: tech = 'D2B'
+            elif rivals >= 8: tech = 'FPCE'
+            else: tech = 'FPF'
+
+            ok = ''
+            if sol:
+                actual = int(sol[pos])
+                is_correct = best_d == actual
+                ok = '✓' if is_correct else '✗'
+                if is_correct: correct += 1
+                total += 1
+
+            print(f'  R{row+1}C{col+1}  {best_d:5d}  {tech:>12s}  {rivals:6d}  {gap:4d}  {ok:>3s}')
+
+        if total:
+            print(f'\n  Prediction accuracy: {correct}/{total} ({round(100*correct/total)}%)')
+        sys.exit(0)
+
+    # ── Cell placement mode (predict + place using advanced techniques) ──
+    if getattr(args, 'cell_placement', None):
+        try:
+            row, col = parse_cell(args.cell_placement)
+        except ValueError as e:
+            print(f'Error: {e}', file=sys.stderr)
+            sys.exit(1)
+
+        bb = BitBoard.from_string(bd81)
+        pos = row * 9 + col
+
+        if bb.board[pos] != 0:
+            print(f'\n  R{row+1}C{col+1} is already placed: {bb.board[pos]}')
+            sys.exit(0)
+
+        cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+        print(f'\n  ╔══ Cell Placement: R{row+1}C{col+1} ══╗')
+        print(f'  Candidates: {cands}')
+
+        # SIRO Rival prediction
+        best_d, best_s, second_s = -1, 999, 999
+        for d in cands:
+            dbit = BIT[d - 1]
+            s = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+            s += sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+            br, bc = (row // 3) * 3, (col // 3) * 3
+            s += sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                     if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+            if s < best_s:
+                second_s = best_s
+                best_s = s
+                best_d = d
+            elif s < second_s:
+                second_s = s
+        confidence = second_s - best_s
+
+        # Technique prediction
+        rivals = best_s
+        if len(cands) <= 2:
+            tech_pred = 'ForcingChain'
+        elif rivals < 6:
+            tech_pred = 'FPC'
+        elif rivals < 7:
+            tech_pred = 'D2B'
+        elif rivals >= 8:
+            tech_pred = 'FPCE'
+        else:
+            tech_pred = 'FPF'
+
+        print(f'  SIRO Rival predicts: {best_d} (rivals={best_s}, gap={confidence})')
+        print(f'  Technique predicted: {tech_pred}')
+        print()
+
+        # Now actually run the solver to place THIS cell
+        print(f'  Running solver to place R{row+1}C{col+1}...')
+        t0 = time.perf_counter()
+        _excl = None
+        if getattr(args, 'exclude', None):
+            _excl = {TECHNIQUE_ALIASES.get(t.strip().lower(), t.strip()) for t in args.exclude.split(',')}
+        result = solve_selective(bd81, max_level=args.level,
+                                only_techniques=only_techniques,
+                                exclude_techniques=_excl,
+                                gf2_extended=getattr(args, 'gf2x', False),
+                                detail=True)
+        elapsed = (time.perf_counter() - t0) * 1000
+
+        # Find the step that placed this cell
+        placed_step = None
+        technique_used = None
+        elim_rounds = []
+        for step in result.get('steps', []):
+            if isinstance(step, dict):
+                if step.get('pos') == pos:
+                    placed_step = step.get('step', '?')
+                    technique_used = step.get('technique', '?')
+                    break
+
+        # Show elimination rounds that affected this cell
+        for ev in result.get('elim_events', []):
+            for epos, ed in ev.get('eliminations', []):
+                if epos == pos:
+                    elim_rounds.append(f"  {ev['technique']}: {ed} eliminated from R{row+1}C{col+1}")
+
+        if elim_rounds:
+            print(f'  Elimination chain:')
+            for er in elim_rounds:
+                print(f'    {er}')
+
+        if placed_step:
+            board_val = int(result['board'][pos]) if result.get('board') else '?'
+            correct = board_val == best_d
+            print(f'\n  ✦ PLACED: R{row+1}C{col+1} = {board_val} via {technique_used} (step {placed_step})')
+            print(f'  SIRO predicted: {best_d} {"✓ CORRECT" if correct else "✗ WRONG"}')
+            print(f'  Technique predicted: {tech_pred} {"✓" if tech_pred == technique_used else "→ actual: " + str(technique_used)}')
+        else:
+            print(f'\n  Could not place R{row+1}C{col+1} with available techniques')
+            if result.get('board'):
+                board_val = int(result['board'][pos])
+                if board_val != 0:
+                    print(f'  (placed as side-effect at value {board_val})')
+
+        print(f'  Time: {elapsed:.1f}ms')
+        sys.exit(0)
+
     # ── Cell query mode ──
     if args.cell:
         try:
@@ -4884,6 +5434,57 @@ presets:
 
     if args.board:
         print(f'\n{format_board(result["board"], bd81)}')
+
+    # ── ScandolousExocet: post-solve validated Exocet scan ──
+    if getattr(args, 'scandalous_tech', False) and result['success']:
+        solution = result.get('board', '')
+        if solution and len(solution) == 81 and '0' not in solution:
+            from .engine import detect_junior_exocet as _detect_je
+            bb_orig = BitBoard.from_string(bd81)
+            je_result = _detect_je(bb_orig)
+
+            if je_result and je_result[0]:
+                elims = je_result[0]
+                detail = je_result[1]
+                try:
+                    base_str = detail.split('base {')[1].split('}')[0]
+                    base_digits = set(int(d) for d in base_str.split(','))
+                    target_part = detail.split('targets ')[1]
+                    t_cells = target_part.split(',')
+                    t1r = int(t_cells[0][1]) - 1
+                    t1c = int(t_cells[0][3]) - 1
+                    t2r = int(t_cells[1][1]) - 1
+                    t2c = int(t_cells[1][3]) - 1
+                    t1_answer = int(solution[t1r * 9 + t1c])
+                    t2_answer = int(solution[t2r * 9 + t2c])
+                    targets_valid = t1_answer in base_digits and t2_answer in base_digits
+
+                    print(f'\n  {"═" * 50}')
+                    print(f'  ScandolousExocet (post-solve validated)')
+                    print(f'  {"─" * 50}')
+                    print(f'  {detail}')
+                    if targets_valid:
+                        print(f'  Target R{t1r+1}C{t1c+1}={t1_answer} (base digit) ✓')
+                        print(f'  Target R{t2r+1}C{t2c+1}={t2_answer} (base digit) ✓')
+                        print(f'  Status: CONFIRMED — this Exocet is real!')
+                        print(f'  R1 would remove: {len(elims)} candidates')
+                        for pos, d in elims:
+                            r, c = divmod(pos, 9)
+                            print(f'    R{r+1}C{c+1}: remove {d}')
+                    else:
+                        bad = []
+                        if t1_answer not in base_digits:
+                            bad.append(f'R{t1r+1}C{t1c+1}={t1_answer} NOT in base')
+                        if t2_answer not in base_digits:
+                            bad.append(f'R{t2r+1}C{t2c+1}={t2_answer} NOT in base')
+                        print(f'  Status: FALSE PATTERN — {", ".join(bad)}')
+                        print(f'  R1 eliminations would have been WRONG')
+                    print(f'  {"═" * 50}')
+                except Exception:
+                    pass
+            else:
+                if getattr(args, 'verbose', False):
+                    print(f'\n  ScandolousExocet: no Exocet pattern found on initial board')
 
     # Exit code: 0 = solved, 1 = stalled/failed
     if not result['success']:

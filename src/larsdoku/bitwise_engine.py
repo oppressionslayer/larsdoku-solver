@@ -2331,63 +2331,6 @@ def detect_junior_exocet(bb):
                                     if companion_bad:
                                         continue
 
-                                    # Cover-line validation
-                                    base_box_start = bx * 3
-                                    cross_positions = set()
-                                    if orient == 0:
-                                        cross_positions.add(t1c)
-                                        cross_positions.add(t2c)
-                                        for dc in range(3):
-                                            pos_idx = base_box_start + dc
-                                            if pos_idx != bc1 and pos_idx != bc2:
-                                                cross_positions.add(pos_idx)
-                                    else:
-                                        cross_positions.add(t1r)
-                                        cross_positions.add(t2r)
-                                        for dc in range(3):
-                                            pos_idx = base_box_start + dc
-                                            if pos_idx != br1 and pos_idx != br2:
-                                                cross_positions.add(pos_idx)
-
-                                    # Each base digit coverable by ≤2 perpendicular lines
-                                    cover_ok = True
-                                    for d in base_digits:
-                                        dval = d + 1
-                                        # Check if digit already placed in band
-                                        placed_in_band = False
-                                        for ln in lines:
-                                            for p in range(9):
-                                                if orient == 0:
-                                                    sr, sc = ln, p
-                                                else:
-                                                    sr, sc = p, ln
-                                                sp = sr * 9 + sc
-                                                if bb.board[sp] == dval:
-                                                    placed_in_band = True
-                                                    break
-                                            if placed_in_band:
-                                                break
-                                        if placed_in_band:
-                                            continue
-
-                                        cover_lines = set()
-                                        for cross_pos in cross_positions:
-                                            for ln in range(9):
-                                                if band_idx * 3 <= ln < band_idx * 3 + 3:
-                                                    continue
-                                                if orient == 0:
-                                                    sr, sc = ln, cross_pos
-                                                else:
-                                                    sr, sc = cross_pos, ln
-                                                sp = sr * 9 + sc
-                                                if bb.board[sp] == 0 and (bb.cands[sp] & BIT[d]):
-                                                    cover_lines.add(ln)
-                                        if len(cover_lines) > 2:
-                                            cover_ok = False
-                                            break
-                                    if not cover_ok:
-                                        continue
-
                                     # ═══ PATTERN CONFIRMED — collect eliminations ═══
                                     elims = []
                                     rules_used = set()
@@ -2399,29 +2342,59 @@ def detect_junior_exocet(bb):
                                             elims.append((tp, d + 1))
                                             rules_used.add('R1')
 
-                                    # Rule 8: base digit with no cover outside band
-                                    # Only fire on targets that HAVE non-base extras
-                                    for tp, tr, tc, tbx, tln in [(t1p, t1r, t1c, t1bx, t1ln),
-                                                                   (t2p, t2r, t2c, t2bx, t2ln)]:
-                                        if not (bb.cands[tp] & ~base_cands):
-                                            continue
-                                        for d in base_digits:
-                                            dbit = BIT[d]
-                                            if not (bb.cands[tp] & dbit):
-                                                continue
-                                            perp_count = 0
-                                            for ln in range(9):
-                                                if band_idx * 3 <= ln < band_idx * 3 + 3:
+                                    # Trial validation: apply R1 eliminations to a
+                                    # copy and check for contradictions (empty cands).
+                                    # Catches false Exocet patterns that look valid
+                                    # structurally but produce wrong eliminations.
+                                    if elims:
+                                        bb_trial = BitBoard.from_string(''.join(str(bb.board[i]) for i in range(81)))
+                                        for tp_e, dval_e in elims:
+                                            bb_trial.cands[tp_e] &= ~BIT[dval_e - 1]
+                                        # Propagate naked singles on trial board
+                                        trial_ok = True
+                                        changed = True
+                                        while changed and trial_ok:
+                                            changed = False
+                                            for pos_t in range(81):
+                                                if bb_trial.board[pos_t] != 0:
                                                     continue
-                                                if orient == 0:
-                                                    sp = ln * 9 + tc
+                                                c_t = bb_trial.cands[pos_t]
+                                                if c_t == 0:
+                                                    trial_ok = False
+                                                    break
+                                                if c_t & (c_t - 1) == 0:
+                                                    d_t = c_t.bit_length() - 1
+                                                    bb_trial.place(pos_t, d_t)
+                                                    changed = True
+                                            if not trial_ok:
+                                                break
+                                            # Hidden singles
+                                            for ui in range(27):
+                                                if not trial_ok:
+                                                    break
+                                                if ui < 9:
+                                                    unit = [ui*9+j for j in range(9)]
+                                                elif ui < 18:
+                                                    c_u = ui - 9
+                                                    unit = [r*9+c_u for r in range(9)]
                                                 else:
-                                                    sp = tr * 9 + ln
-                                                if bb.board[sp] == 0 and (bb.cands[sp] & dbit):
-                                                    perp_count += 1
-                                            if perp_count == 0:
-                                                elims.append((tp, d + 1))
-                                                rules_used.add('R8')
+                                                    b_u = ui - 18
+                                                    br_u, bc_u = (b_u//3)*3, (b_u%3)*3
+                                                    unit = [((br_u+dr)*9+bc_u+dc) for dr in range(3) for dc in range(3)]
+                                                for d_u in range(9):
+                                                    cells = [p for p in unit if bb_trial.board[p] == 0 and (bb_trial.cands[p] & BIT[d_u])]
+                                                    if len(cells) == 0:
+                                                        # Check if digit already placed in unit
+                                                        placed = any(bb_trial.board[p] == d_u + 1 for p in unit)
+                                                        if not placed:
+                                                            trial_ok = False
+                                                            break
+                                                    elif len(cells) == 1:
+                                                        if bb_trial.board[cells[0]] == 0:
+                                                            bb_trial.place(cells[0], d_u)
+                                                            changed = True
+                                        if not trial_ok:
+                                            continue  # reject this Exocet pattern
 
                                     # ═══ Double Exocet search (DISABLED — DX-R2 bug) ═══
                                     if False:  # TODO: fix DX cover-line logic
