@@ -3187,7 +3187,7 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
-    parser.add_argument('--version', action='version', version='larsdoku 1.8.1')
+    parser.add_argument('--version', action='version', version='larsdoku 1.8.5')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
@@ -3218,6 +3218,12 @@ presets:
                        help='Save top N hardest puzzles from --crosswise or --bench to a file')
     parser.add_argument('--board', '-b', action='store_true', help='Print solved board grid')
     parser.add_argument('--solution', action='store_true', help='Print backtrack solution string only (fast, no techniques)')
+    parser.add_argument('--unique', action='store_true', help='Check if puzzle has a unique solution')
+    parser.add_argument('--backtrack-solve', action='store_true',
+                       help='Solve using backtracker (like JS solver) — always finds a solution, print board')
+    parser.add_argument('--solutions', type=int, metavar='N',
+                       help='Find first N solutions (for multi-solution puzzles). '
+                            'Then use --trust <solution> to solve to a specific one with real techniques.')
     parser.add_argument('--no-oracle', '-n', action='store_true',
                        help='Pure logic only — stop when stalled, no guessing')
     parser.add_argument('--json', '-j', action='store_true', help='Output as JSON')
@@ -3247,6 +3253,8 @@ presets:
     parser.add_argument('--board-siro', action='store_true',
                        help='Global SIRO board illumination: show band/stack/cascade impact for every cell')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output during solve')
+    parser.add_argument('--rich-output', action='store_true',
+                       help='Rich terminal output with colored panels and technique highlighting (requires: pip install rich)')
     parser.add_argument('--serve', type=int, nargs='?', const=8265, metavar='PORT',
                        help='Start local web server (default port 8265) — full Python engine via browser')
     parser.add_argument('--generate', type=int, nargs='?', const=24, metavar='CLUES',
@@ -3330,6 +3338,100 @@ presets:
             print(sol)
         else:
             print('No solution exists')
+        return
+
+    # ── Find N solutions ──
+    if getattr(args, 'solutions', None) and args.puzzle:
+        import sys as _sys
+        bd81 = normalize_puzzle(args.puzzle)
+        n_want = args.solutions
+        n_clues = sum(1 for c in bd81 if c != '0')
+
+        # Multi-solution backtracker
+        grid = [int(c) for c in bd81]
+        def _valid(g, pos, d):
+            r, c = divmod(pos, 9)
+            for j in range(9):
+                if g[r*9+j] == d: return False
+                if g[j*9+c] == d: return False
+            br, bc = (r//3)*3, (c//3)*3
+            for i in range(br, br+3):
+                for j in range(bc, bc+3):
+                    if g[i*9+j] == d: return False
+            return True
+        empties = [i for i in range(81) if grid[i] == 0]
+        solutions = []
+        _sys.setrecursionlimit(10000)
+        def _bt(idx):
+            if len(solutions) >= n_want: return
+            if idx == len(empties):
+                solutions.append(''.join(str(d) for d in grid))
+                return
+            pos = empties[idx]
+            for d in range(1, 10):
+                if _valid(grid, pos, d):
+                    grid[pos] = d
+                    _bt(idx + 1)
+                    if len(solutions) >= n_want: return
+                    grid[pos] = 0
+
+        print(f'  Finding up to {n_want} solutions ({n_clues} clues)...')
+        import time as _time_mod
+        t0 = _time_mod.time()
+        _bt(0)
+        elapsed = _time_mod.time() - t0
+
+        print(f'  Found: {len(solutions)} solutions in {elapsed:.2f}s\n')
+        for i, sol in enumerate(solutions):
+            print(f'  #{i+1}: {sol}')
+
+        if len(solutions) > 1:
+            print(f'\n  To solve to a specific solution with real techniques:')
+            print(f'  larsdoku "{bd81}" --trust "{solutions[0]}" --preset larstech --steps')
+        elif len(solutions) == 1:
+            print(f'\n  ✓ Only 1 solution found — puzzle is unique!')
+        else:
+            print(f'\n  ✗ No solutions found')
+        return
+
+    # ── Unique check ──
+    if getattr(args, 'unique', False) and args.puzzle:
+        bd81 = normalize_puzzle(args.puzzle)
+        unique = has_unique_solution(bd81)
+        sol = solve_backtrack(bd81)
+        n_clues = sum(1 for c in bd81 if c != '0')
+        print(f'  Puzzle: {bd81[:20]}{"..." if len(bd81)>20 else ""}')
+        print(f'  Clues: {n_clues}')
+        print(f'  Solvable: {"Yes" if sol else "No"}')
+        print(f'  Unique: {"✓ Yes — one solution" if unique else "✗ No — multiple solutions"}')
+        return
+
+    # ── Backtrack solve ──
+    if getattr(args, 'backtrack_solve', False) and args.puzzle:
+        bd81 = normalize_puzzle(args.puzzle)
+        sol = solve_backtrack(bd81)
+        if sol:
+            print(f'\n  Backtrack solution:')
+            print(f'  {sol}')
+            # Print board
+            print()
+            print('  ╔═════════╤═════════╤═════════╗')
+            for r in range(9):
+                row = '  ║'
+                for c in range(9):
+                    d = sol[r*9+c]
+                    given = bd81[r*9+c] != '0'
+                    row += f' {d} '
+                    if c % 3 == 2 and c < 8: row += '│'
+                    elif c == 8: row += '║'
+                print(row)
+                if r == 2 or r == 5: print('  ╟─────────┼─────────┼─────────╢')
+                elif r == 8: print('  ╚═════════╧═════════╧═════════╝')
+            # Check uniqueness
+            unique = has_unique_solution(bd81)
+            print(f'\n  Unique: {"✓ Yes" if unique else "✗ No — multiple solutions exist"}')
+        else:
+            print('  No solution exists')
         return
 
     # ── Local web server mode ──
@@ -5454,11 +5556,55 @@ presets:
 
     # Print detailed round-by-round output
     if use_detail:
-        print(f'\n{"═" * 60}')
-        print(f'DETAILED SOLVE LOG ({result.get("rounds", "?")} rounds)')
-        print(f'{"═" * 60}')
-        print(format_detail(result))
-        print(f'{"═" * 60}')
+        if getattr(args, 'rich_output', False):
+            # Rich terminal output
+            try:
+                from rich.console import Console
+                from rich.panel import Panel
+                from rich.text import Text
+                _rc = Console()
+                _rc.print(Panel("[bold magenta]DETAILED SOLVE LOG[/]", width=60))
+                current_round = 0
+                for step in result.get('steps', []):
+                    if step.get('round', 0) != current_round:
+                        current_round = step['round']
+                        _rc.print()
+                        _rc.print(Panel(f"[bold]ROUND {current_round}[/]", style="magenta", width=50))
+                    tech = step.get('technique', '?')
+                    cell = step.get('cell', '?')
+                    digit = step.get('digit', 0)
+                    # Color by technique
+                    if tech in ('crossHatch','lastRemaining','fullHouse','nakedSingle'):
+                        border, ts = 'cyan', 'bold cyan'
+                    elif tech in ('FPC','FPCE','ForcingChain','ForcingNet'):
+                        border, ts = 'green', 'bold green'
+                    elif tech in ('DeepResonance','D2B','FPF'):
+                        border, ts = 'red', 'bold red'
+                    elif tech in ('ALS_XZ','ALS_XYWing','KrakenFish','DeathBlossom','SueDeCoq'):
+                        border, ts = 'yellow', 'bold yellow'
+                    elif tech in ('JuniorExocet','Template','BowmanBingo'):
+                        border, ts = 'magenta', 'bold magenta'
+                    else:
+                        border, ts = 'blue', 'bold blue'
+                    t = Text()
+                    t.append(f"  {tech}", style=ts)
+                    t.append(f"  {cell}", style="white")
+                    if digit:
+                        t.append(f" = ", style="dim")
+                        t.append(f"{digit}", style="bold white on blue")
+                    t.append("\n")
+                    _rc.print(Panel(t, border_style=border, width=60, padding=(0, 1)))
+            except ImportError:
+                print("Install 'rich' for rich output: pip install rich")
+                print(f'\n{"═" * 60}')
+                print(format_detail(result))
+                print(f'{"═" * 60}')
+        else:
+            print(f'\n{"═" * 60}')
+            print(f'DETAILED SOLVE LOG ({result.get("rounds", "?")} rounds)')
+            print(f'{"═" * 60}')
+            print(format_detail(result))
+            print(f'{"═" * 60}')
 
     if args.board:
         print(f'\n{format_board(result["board"], bd81)}')
