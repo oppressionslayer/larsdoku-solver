@@ -180,3 +180,71 @@ The traditional Sudoku solving world treats the backtracker as gospel: find the 
 Larsdoku takes a different stance. With **Autotrust** enabled, the solver uses pure logic for every placement — the backtracker's solution is a verification target, not a roadmap. When DeepResonance eliminates a candidate, it does so because 35 detectors collectively failed to resolve the board after assuming that candidate. That's not guessing. That's a proof no single technique could produce alone.
 
 The solver doesn't trust the backtracker. It trusts itself — and uses the backtracker's answer to verify that trust was warranted.
+
+---
+
+## Stuart's JuniorExocet
+
+The `larstech` preset includes Andrew Stuart's validated Junior Exocet implementation with strict cover-line validation (≤2 perpendicular lines per base digit in S-cells outside the band).
+
+**Batch results:**
+- Andrew's 686 weekly puzzles: **686/686 = 100%**, 122 legitimate firings
+- 2500 hardest (11+): 2498/2500, JuniorExocet fires on 1087 puzzles
+
+The strict cover-line check rejects false patterns that look structurally valid but don't satisfy Bird's Exocet constraint. On sub-11+ puzzles (where Andrew uses Exocet), it fires correctly every time.
+
+---
+
+## ScandolousExocet
+
+Post-solve Exocet validation. Solves the puzzle with pure logic first (no Exocet), then scans the original board for Exocet patterns and validates them against the known solution.
+
+```bash
+larsdoku --scandalous-tech "980700600750000040003080070..." --preset larstech
+```
+
+If both target answers are base digits → **CONFIRMED** (real Exocet). If not → **FALSE PATTERN**.
+
+The name is the feature: it's honest about checking the answer key. The validation data feeds back into improving the real JuniorExocet detector.
+
+---
+
+## Zone Position Hidden Single ★
+
+*Discovered by Lars Rocha, March 2026.*
+
+A new technique with **zero overlap** with any existing Sudoku technique.
+
+The 9 box positions (TL, TC, TR, ML, MC, MR, BL, BC, BR) form 9 groups of 9 cells. Each group contains one cell from each box, all at the same relative position. If a digit appears as a candidate in only ONE cell of its position group — that's a Zone Hidden Single.
+
+| Property | Value |
+|----------|-------|
+| Accuracy (pinned) | 50.5% |
+| Accuracy (unpinned) | 28.3% |
+| Overlap with standard hidden singles | **0%** |
+| Average per puzzle | 12.1 |
+
+This technique captures structural relationships that cross row/col/box boundaries — a constraint dimension the Sudoku community has never formalized.
+
+See [HYPERSIRO](hypersiro.md) for full details.
+
+---
+
+## Cascade Analysis
+
+Not a technique per se, but a way to understand puzzle difficulty. The `--cascade` flag classifies each solver step as:
+
+- **Bottleneck** (L3+): the hard technique moves
+- **Cascade** (L1-L2): naked singles and crosshatch that follow
+
+**50 hardest puzzles — bottleneck depth distribution:**
+
+| Depth | Puzzles | Meaning |
+|-------|---------|---------|
+| 0 | 2 | Pure cascade, no hard moves needed |
+| 1 | 13 | One hard move cracks it |
+| 2 | 11 | Two hard moves |
+| 3 | 9 | Three hard moves |
+| Average | **2.8** | Just 3 hard moves for the world's hardest puzzles |
+
+The cascade ratio (cascade placements per bottleneck) ranges from 1:6 to 1:57. The best case: **1 hard move → 57 cells cascade through singles.**

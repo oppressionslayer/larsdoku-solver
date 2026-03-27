@@ -236,6 +236,109 @@ When `cell` is provided, the API calls `query_cell()` instead:
 
 ---
 
+## larsdoku-zs Board API
+
+The `larsdoku-zs` package provides a higher-level `Board` class with zone intelligence and HYPERSIRO features.
+
+```python
+from larsdoku_zs import Board
+```
+
+### Board.solve_cascade()
+
+Cascade solver: classifies each step as bottleneck (L3+) or cascade (L1-L2). Shows how the puzzle avalanches from a few hard moves.
+
+```python
+b = Board("980700600700000090006050000...")
+result = b.solve_cascade()
+
+print(f"Bottleneck depth: {result['bottleneck_depth']}")
+print(f"Cascade placements: {result['cascade_count']}")
+print(f"Ratio: 1:{result['cascade_count'] // max(1, result['bottleneck_depth'])}")
+
+for m in result['bottleneck_moves']:
+    print(f"  {m['cell']}={m['digit']} via {m['technique']}")
+```
+
+**Result:** On the 50 hardest puzzles, average bottleneck depth is 2.8 — just 3 hard moves, everything else cascades.
+
+### Board.siro_solve()
+
+Hybrid solver: techniques crack bottlenecks, SIRO predicts the rest.
+
+```python
+b = Board("980700600700000090006050000...")
+result = b.siro_solve()
+
+print(f"Predictions: {result['correct']}/{result['total_predictions']} ({result['accuracy']:.1%})")
+print(f"Propagated: {result['propagated']} cells")
+```
+
+### Board.scandalous_exocet()
+
+Post-solve validated Exocet scan. Solves with pure logic first, then checks if any Exocet patterns on the original board are valid.
+
+```python
+b = Board("980700600750000040003080070...")
+results = b.scandalous_exocet(preset='larstech')
+
+for r in results:
+    print(f"{r['detail']}")
+    print(f"Valid: {r['valid']}")
+    print(f"Technique: {r['technique']}")  # 'ScandolousExocet'
+```
+
+**Why "Scandalous"?** It uses the solved board to validate — honest about the fact that it checked the answer first. Every validated pattern IS a real Exocet; the scandalous part is how we confirmed it.
+
+---
+
+## wsrf-zone-oracle (HYPERSIRO)
+
+Zone-aware metrics across 10 dimensions for Sudoku prediction.
+
+```python
+from wsrf_zone_oracle import ZoneAnalyzer
+```
+
+### ZoneAnalyzer.analyze()
+
+Full 10-zone analysis of a puzzle. Each cell gets metrics across row, col, box, band, stack, row-ML, col-ML, cross-band, cross-stack, and unconnected zones.
+
+```python
+analyzer = ZoneAnalyzer()
+metrics = analyzer.analyze("980700600...", solution="985732641...")
+
+cell = metrics.cells[pos]
+for d, cm in cell.candidate_metrics.items():
+    print(f"d={d}: row={cm.row_rivals} band={cm.band_rivals} "
+          f"ML_confined={cm.row_ml_confined} chan={cm.band_boxes_placed+cm.stack_boxes_placed}")
+```
+
+### ZoneAnalyzer.hypersiro_cascade()
+
+HYPERSIRO Cascade: channeling picks WHERE, SIRO picks WHAT. +16.2pp over standard SIRO on the hardest puzzles.
+
+```python
+result = analyzer.hypersiro_cascade("980700600...", solution="985732641...")
+print(f"Accuracy: {result['accuracy']:.1%}")
+print(f"Propagated: {result['propagated']} cells")
+```
+
+### ZoneAnalyzer.zone_hidden_singles()
+
+Zone Position Hidden Singles — Lars's 11th dimension. Finds digits unique in their box-position group (TL/TC/TR/ML/MC/MR/BL/BC/BR). Zero overlap with standard hidden singles.
+
+```python
+zhs = analyzer.zone_hidden_singles("980700600...", solution="985732641...")
+for z in zhs:
+    print(f"R{z['row']+1}C{z['col']+1} d={z['digit']} {z['box_pos']} "
+          f"{'PINNED' if z['pinned'] else 'unpinned'} ({z['confidence']:.1%})")
+```
+
+**Discovery:** 50.5% accuracy when pinned (row or col rivals ≤ 1). Zero overlap with any existing technique. A new constraint dimension.
+
+---
+
 ## Engine Access
 
 For advanced usage, you can access the bitwise engine directly:

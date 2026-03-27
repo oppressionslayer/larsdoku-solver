@@ -1,6 +1,6 @@
 # CLI Reference
 
-Larsdoku installs two commands: `larsdoku` (solver) and `larsdoku-bench` (benchmarks).
+Larsdoku installs three commands: `larsdoku` (solver), `larsdoku-bench` (benchmarks), and `larsdoku-research` (oracle-guided research tool).
 
 ## larsdoku
 
@@ -10,27 +10,58 @@ Larsdoku installs two commands: `larsdoku` (solver) and `larsdoku-bench` (benchm
 larsdoku <puzzle> [options]
 ```
 
-### Options
+### Core Options
 
 | Flag | Short | Description |
 |---|---|---|
 | `--board` | `-b` | Print solved board grid |
 | `--steps` | `-s` | Show step-by-step solution trace |
 | `--detail` | `-d` | Rich round-by-round output with candidates and explanations |
+| `--rich-output` | | Colored terminal output with panels and technique highlighting (requires `rich`) |
 | `--no-oracle` | `-n` | Pure logic only — stop when stalled, no guessing |
 | `--level N` | `-l N` | Max technique level (1-7) |
 | `--only TECHS` | `-o` | Only use specific techniques (comma-separated) |
 | `--exclude TECHS` | `-x` | Exclude specific techniques |
-| `--preset NAME` | | Use preset: `expert` or `wsrf` |
+| `--preset NAME` | | Use preset: `expert`, `larstech`, or `wsrf` |
+| `--verbose` | `-v` | Verbose output during solve |
+| `--json` | `-j` | Output as JSON |
+
+### Analysis Tools
+
+| Flag | Description |
+|---|---|
+| `--cascade` | Cascade analysis: find bottleneck moves and show how the puzzle avalanches |
+| `--cascade --batch N` | Batch cascade: generate N shuffled variants and show bottleneck distribution |
+| `--siro-table` | Quick SIRO prediction table for all cells — no solving needed |
+| `--inspector CELL` | Full cell inspector with SIRO, zone metrics, technique prediction, cascade depth |
+| `--cell-placement CELL` | Predict and place a specific cell |
+| `--predict-path` | Predict which technique places each cell |
 | `--cell CELL` | `-c` | Query solution for a specific cell (e.g., R3C5) |
 | `--path` | `-p` | Show technique path to `--cell` |
-| `--bench N` | | Benchmark N shuffled variants |
-| `--json` | `-j` | Output as JSON |
-| `--gf2x` | | Enable GF(2) Extended mode |
-| `--autotrust` | | Trust backtrack solution for verification (enables DeepResonance) |
-| `--serve` | | Launch the web UI (default port 8765) |
-| `--port N` | | Port for `--serve` (default: 8765) |
-| `--verbose` | `-v` | Verbose output during solve |
+
+### Puzzle Utilities
+
+| Flag | Description |
+|---|---|
+| `--unique` | Check if puzzle has a unique solution |
+| `--solutions N` | Find first N solutions (for multi-solution puzzles) |
+| `--backtrack-solve` | Solve using backtracker — always finds a solution, prints board |
+| `--solution` | Print backtrack solution string only (fast, no techniques) |
+
+### Exocet & Experimental
+
+| Flag | Description |
+|---|---|
+| `--scandalous-tech` | Post-solve Exocet scan: solve with pure logic, then validate Exocet patterns against the solution (ScandolousExocet — 100% accurate) |
+| `--experimental` | Enable experimental techniques (JETest — research Exocet detector) |
+
+### Technique Presets
+
+| Preset | Description |
+|---|---|
+| `expert` | Standard L1-L6 techniques only (no WSRF inventions, no exotic) |
+| `larstech` | All techniques including WSRF inventions (FPC, FPCE, D2B, FPF) + Stuart's JuniorExocet |
+| `wsrf` | Full WSRF stack |
 
 ### Technique Aliases
 
@@ -62,6 +93,7 @@ Use these short names with `--only` and `--exclude`:
 | `ur2` | URType2 |
 | `ur4` | URType4 |
 | `exocet` | JuniorExocet |
+| `jetest`, `je` | JETest (experimental) |
 | `template` | Template |
 | `bowman` | BowmanBingo |
 
@@ -77,84 +109,152 @@ Use these short names with `--only` and `--exclude`:
 
 ### Examples
 
-**Solve Inkala's "World's Hardest" with board output:**
+**Solve with rich terminal output:**
 
 ```bash
-larsdoku "800000000003600000070090200050007000000045700000100030001000068008500010090000400" --board --no-oracle
+larsdoku "800000000003600000070090200050007000000045700000100030001000068008500010090000400" --detail --rich-output --board
 ```
 
-**Watch the engine solve AI Escargot step by step:**
+**Cascade analysis — find the bottleneck:**
+
+```bash
+larsdoku --cascade "980700600700000090006050000400003000007500060000000002009600280008200050000010900"
+```
+
+Output:
+```
+═══ Cascade Analysis ═══
+Empty: 58 cells
+Bottleneck depth: 1
+Cascade placements: 57
+Cascade ratio: 1:57 (each bottleneck unlocks ~57 cells)
+```
+
+**Quick SIRO predictions for all cells:**
+
+```bash
+larsdoku --siro-table "980700600700000090006050000..."
+```
+
+**Check if a puzzle has a unique solution:**
+
+```bash
+larsdoku --unique "000003020300080009000900300..."
+```
+
+**Find 10 solutions of a multi-solution puzzle:**
+
+```bash
+larsdoku --solutions 10 "000003020300080009000900300..."
+```
+
+**ScandolousExocet — post-solve validated Exocet scan:**
+
+```bash
+larsdoku --scandalous-tech "980700600750000040003080070..." --preset larstech
+```
+
+**Cell inspector with HYPERSIRO metrics:**
+
+```bash
+larsdoku --inspector R6C2 "980700600700000090006050000..."
+```
+
+**Batch cascade distribution:**
+
+```bash
+larsdoku --cascade --batch 20 "980700600700000090006050000..."
+```
+
+**Watch the engine solve step by step:**
 
 ```bash
 larsdoku "100007090030020008009600500005300900010080002600004000300000010040000007007000300" --steps
 ```
 
-**Detailed trace of Easter Monster with round-by-round candidates:**
-
-```bash
-larsdoku "100000002090400050006000700050903000000070000000850040700000600030009080002000001" --detail --board
-```
-
-**How does the engine solve cell R5C5?**
-
-```bash
-larsdoku "4...3.......6..8..........1....5..9..8....6...7.2........1.27..5.3....4.9........" --cell R5C5 --path
-```
-
-**Benchmark 250 shuffled variants of Golden Nugget:**
-
-```bash
-larsdoku "000000039000010005003005800008009006070020000100400000009008050020000600400700000" --bench 250
-```
-
-**See how far L1+L2+GF(2) alone can go:**
-
-```bash
-larsdoku "800000000003600000070090200050007000000045700000100030001000068008500010090000400" --level 2 --no-oracle --board
-```
-
-**Expert-approved techniques only (no WSRF inventions):**
+**Expert-approved techniques only:**
 
 ```bash
 larsdoku "4...3.......6..8..........1....5..9..8....6...7.2........1.27..5.3....4.9........" --preset expert --no-oracle --board
 ```
 
-**JSON output piped to pretty-printer:**
+---
+
+## larsdoku-research
+
+Oracle-guided technique explorer. **Completely separate from the main solver.** Uses legitimate techniques with an oracle safety net — every individual move is logically valid, but the selection is guided by the answer.
+
+### Usage
 
 ```bash
-larsdoku "000000039000010005003005800008009006070020000100400000009008050020000600400700000" --json --no-oracle | python -m json.tool
+larsdoku-research <puzzle> [options]
 ```
 
-**Extract a mask from any puzzle:**
+### Options
+
+| Flag | Description |
+|---|---|
+| `--super-sus` | Oracle-guided solve: backtrack first, then apply techniques with safety net |
+| `--trust SOLUTION` | Use this 81-char solution as the oracle |
+| `--trust-solve-to SOLUTION` | Super-sus solve to a specific solution (shortcut for `--super-sus --trust`) |
+| `--solution-num N` | Find N solutions, then super-sus solve to solution #N |
+| `--detail` | Rich detailed output with colored panels and technique breakdowns |
+| `--verbose` | `-v` | Show each step |
+| `--board` | `-b` | Print solved board |
+
+### How Super-Sus Works
+
+1. **Backtrack first** — gets the solution upfront
+2. **Run techniques** — each makes eliminations and placements
+3. **Oracle safety net** — after each technique fires, checks: "did this elimination remove the correct answer?" If yes → undo it and try the next technique
+4. **Result** — shows which techniques CAN solve the puzzle when guided by the answer
+
+On **unique puzzles**, the oracle safety net never fires — every valid elimination IS correct. The solve is pure logic.
+
+On **multi-solution puzzles**, the safety net steers the solve toward the chosen solution by rejecting eliminations valid for OTHER solutions.
+
+### Research-Only Techniques
+
+`larsdoku-research` includes two techniques not in the main solver:
+
+- **FPC-Elim** — FPC in elimination mode: trial-place a candidate, propagate, if contradiction → eliminate. Uses oracle to define "contradiction" as disagreement with the trusted solution.
+- **FinnedPointingChain** — Gold-filtered finned pointing chain placement.
+
+These exist ONLY in `larsdoku-research`. They never touch the main solver.
+
+### Examples
+
+**Super-sus solve (auto-backtrack):**
 
 ```bash
-larsdoku --to-mask "000004006000201090001070800060000020350000008000000370009080500040302000700100000"
-# Output: Mask (23 clues): 00000X00X000X0X0X000X0X0X000X00000X0XX000000X000000XX000X0X0X000X0X0X000X00X00000
+larsdoku-research "980700600700000090006050000..." --super-sus --detail --board
 ```
 
-**Forge 10 guaranteed-unique puzzles from a mask and solve them all:**
+**Solve to a specific solution:**
 
 ```bash
-larsdoku --forge-solve "XX0X00X000X00X00X000XX000X00X0X0000X00X0X000X00000X0X00X000X00X000X00X000X00X0XX" --forge-count 10
+larsdoku-research "000003020300080009000900300..." --trust-solve-to "179653824365284719428971356..." --board
 ```
 
-**Test a mask — how many random boards produce unique puzzles?**
+**Find solution #3 and solve to it:**
 
 ```bash
-larsdoku --test-mask "XX0X00X000X00X00X000XX000X00X0X0000X00X0X000X00000X0X00X000X00X000X00X000X00X0XX"
+larsdoku-research "000003020300080009000900300..." --solution-num 3 --detail --board
 ```
 
-**Launch the web UI:**
+**Test: can techniques solve a multi-solution puzzle?**
 
 ```bash
-larsdoku --serve
-# Open http://localhost:8765
+# Step 1: Find all solutions
+larsdoku --solutions 10 "000003020300080009000900300..."
 
-# Custom port
-larsdoku --serve --port 9000
+# Step 2: Try solving to each one
+larsdoku-research "000003020300080009000900300..." --solution-num 1 --detail --board
+larsdoku-research "000003020300080009000900300..." --solution-num 5 --detail --board
+larsdoku-research "000003020300080009000900300..." --solution-num 10 --detail --board
 ```
 
-The web UI exposes the full Python engine through an interactive board with step-by-step playback, candidate notes, technique breakdown, cell query, and all CLI options (level, preset, no-oracle, autotrust, GF(2)) via a collapsible options panel. Check "Python Engine" to activate it — the JS solver works standalone as a fallback.
+This reveals which solutions are reachable by technique + oracle, and how many oracle saves each requires. More saves = more sus. Zero saves = pure logic.
 
 ---
 
