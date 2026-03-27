@@ -509,6 +509,11 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
     def allowed(tech_name):
         if exclude_techniques and tech_name in exclude_techniques:
             return False
+        if tech_name in EXPERIMENTAL_TECHNIQUES:
+            # Experimental techniques require explicit opt-in via only_techniques
+            if only_techniques is not None:
+                return tech_name in only_techniques
+            return False
         if only_techniques is not None:
             return tech_name in only_techniques
         return TECHNIQUE_LEVELS.get(tech_name, 99) <= max_level
@@ -1426,6 +1431,8 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
     solution = [int(ch) for ch in solution_str]
 
     def allowed(tech_name):
+        if tech_name in EXPERIMENTAL_TECHNIQUES:
+            return False
         return TECHNIQUE_LEVELS.get(tech_name, 99) <= max_level
 
     steps = []
@@ -3180,7 +3187,7 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
-    parser.add_argument('--version', action='version', version='larsdoku 1.8.0')
+    parser.add_argument('--version', action='version', version='larsdoku 1.8.1')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
