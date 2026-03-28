@@ -9,7 +9,30 @@ Quick usage:
     print(result['n_steps'])     # number of steps
     print(result['technique_counts'])  # technique frequency
 """
-__version__ = "1.9.1"
+__version__ = "1.9.2"
+
+
+def _lars_warmup():
+    """Background JIT warmup — compiles all Numba functions on first import.
+    If cache exists, this is nearly instant. If not, runs in background
+    so the user's code isn't blocked."""
+    try:
+        from larsdoku.cli import solve_selective
+        # Simple puzzle triggers L1-L5 JIT paths
+        solve_selective('530070000600195000098000060800060003400803001700020006060000280000419005000080079')
+    except Exception:
+        pass  # silently ignore warmup failures
+
+
+def _lars_background_warmup():
+    """Spawn warmup in a background thread so import returns immediately."""
+    import threading
+    t = threading.Thread(target=_lars_warmup, daemon=True)
+    t.start()
+
+
+# Auto-warmup on import — compiles JIT in background
+_lars_background_warmup()
 
 
 def solve(puzzle, max_level=99, no_oracle=False, detail=False, gf2_extended=False):

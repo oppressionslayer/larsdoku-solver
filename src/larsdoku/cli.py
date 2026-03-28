@@ -3303,6 +3303,8 @@ presets:
                             'and output just the bd81 strings (no solving)')
     parser.add_argument('--forge-multi-to-unique-count', type=int, default=5, metavar='N',
                        help='Number of unique puzzles to forge (default 5)')
+    parser.add_argument('--warmup', action='store_true',
+                       help='Pre-compile all JIT functions (run once after install, ~10s)')
     parser.add_argument('--daily', action='store_true',
                        help='Generate today\'s daily puzzle via LarsForge (deterministic, same for everyone)')
     parser.add_argument('--lars-forge', type=str, metavar='PUZZLE',
@@ -4351,6 +4353,20 @@ presets:
             print(f'  Try more attempts: --forge-larstech-attempts 200')
         print(f'\n  Total forge time: {total_forge_time:.0f}ms')
         print()
+        return
+
+    # ── Warmup: pre-compile all JIT functions ──
+    if args.warmup:
+        import time as _time
+        print('  Warming up JIT — compiling all Numba functions...')
+        t0 = _time.perf_counter()
+        # Solve a simple puzzle to trigger L1-L5 JIT compilation
+        solve_selective('530070000600195000098000060800060003400803001700020006060000280000419005000080079')
+        # Solve a hard puzzle to trigger DeepRes/D2B/FC JIT compilation
+        solve_selective('280900070100087000000025003390070020006000000000000004001000000970002050050090300')
+        elapsed = (_time.perf_counter() - t0) * 1000
+        print(f'  Done! All JIT functions compiled and cached ({elapsed:.0f}ms)')
+        print(f'  Future runs will start instantly.')
         return
 
     # ── LarsForge: Daily puzzle ──
