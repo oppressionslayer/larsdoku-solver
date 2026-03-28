@@ -9,7 +9,7 @@ Quick usage:
     print(result['n_steps'])     # number of steps
     print(result['technique_counts'])  # technique frequency
 """
-__version__ = "1.9.0"
+__version__ = "1.9.1"
 
 
 def solve(puzzle, max_level=99, no_oracle=False, detail=False, gf2_extended=False):
