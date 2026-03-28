@@ -182,6 +182,457 @@ NP_COL_OF = np.arange(81, dtype=np.int8) % 9
 NP_BOX_ROW = (NP_ROW_OF // 3) * 3
 NP_BOX_COL = (NP_COL_OF // 3) * 3
 
+# Peer visibility matrix: SEES[a, b] = True if cell a sees cell b
+NP_SEES = np.zeros((81, 81), dtype=np.bool_)
+for _a in range(81):
+    for _b in PEERS[_a]:
+        NP_SEES[_a, _b] = True
+
+# Unit cells as contiguous numpy for JIT
+NP_UNIT_CELLS = np.zeros((27, 9), dtype=np.int32)
+for _ui in range(27):
+    for _ci, _pos in enumerate(UNITS[_ui]):
+        NP_UNIT_CELLS[_ui, _ci] = _pos
+
+
+@nb.njit(cache=True)
+def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
+    """JIT: find all ALS up to size 5. Returns als_cells, als_ncells, als_cands, n_als."""
+    MAX_ALS = 4000
+    als_cells = np.zeros((MAX_ALS, 5), dtype=np.int32)
+    als_ncells = np.zeros(MAX_ALS, dtype=np.int32)
+    als_cands = np.zeros(MAX_ALS, dtype=np.int32)
+    n_als = 0
+
+    for ui in range(27):
+        ucells = np.zeros(9, dtype=np.int32)
+        n_uc = 0
+        for ci in range(9):
+            pos = unit_cells[ui, ci]
+            if board[pos] == 0 and cands[pos] != 0:
+                ucells[n_uc] = pos
+                n_uc += 1
+        if n_uc < 2:
+            continue
+
+        for i in range(n_uc):
+            m = cands[ucells[i]]
+            if popcount_lut[m] == 2:
+                if n_als < MAX_ALS:
+                    als_cells[n_als, 0] = ucells[i]
+                    als_ncells[n_als] = 1
+                    als_cands[n_als] = m
+                    n_als += 1
+
+        for i in range(n_uc - 1):
+            ca = cands[ucells[i]]
+            for j in range(i + 1, n_uc):
+                union = ca | cands[ucells[j]]
+                if popcount_lut[union] == 3:
+                    if n_als < MAX_ALS:
+                        als_cells[n_als, 0] = ucells[i]
+                        als_cells[n_als, 1] = ucells[j]
+                        als_ncells[n_als] = 2
+                        als_cands[n_als] = union
+                        n_als += 1
+
+        for i in range(n_uc - 2):
+            ca = cands[ucells[i]]
+            for j in range(i + 1, n_uc - 1):
+                cab = ca | cands[ucells[j]]
+                if popcount_lut[cab & 0x1FF] > 4:
+                    continue
+                for k in range(j + 1, n_uc):
+                    union = cab | cands[ucells[k]]
+                    if popcount_lut[union] == 4:
+                        if n_als < MAX_ALS:
+                            als_cells[n_als, 0] = ucells[i]
+                            als_cells[n_als, 1] = ucells[j]
+                            als_cells[n_als, 2] = ucells[k]
+                            als_ncells[n_als] = 3
+                            als_cands[n_als] = union
+                            n_als += 1
+
+        for i in range(n_uc - 3):
+            ca = cands[ucells[i]]
+            for j in range(i + 1, n_uc - 2):
+                cab = ca | cands[ucells[j]]
+                if popcount_lut[cab & 0x1FF] > 5:
+                    continue
+                for k in range(j + 1, n_uc - 1):
+                    cabc = cab | cands[ucells[k]]
+                    if popcount_lut[cabc & 0x1FF] > 5:
+                        continue
+                    for l in range(k + 1, n_uc):
+                        union = cabc | cands[ucells[l]]
+                        if popcount_lut[union] == 5:
+                            if n_als < MAX_ALS:
+                                als_cells[n_als, 0] = ucells[i]
+                                als_cells[n_als, 1] = ucells[j]
+                                als_cells[n_als, 2] = ucells[k]
+                                als_cells[n_als, 3] = ucells[l]
+                                als_ncells[n_als] = 4
+                                als_cands[n_als] = union
+                                n_als += 1
+
+        for i in range(n_uc - 4):
+            ca = cands[ucells[i]]
+            for j in range(i + 1, n_uc - 3):
+                cab = ca | cands[ucells[j]]
+                if popcount_lut[cab & 0x1FF] > 6:
+                    continue
+                for k in range(j + 1, n_uc - 2):
+                    cabc = cab | cands[ucells[k]]
+                    if popcount_lut[cabc & 0x1FF] > 6:
+                        continue
+                    for l in range(k + 1, n_uc - 1):
+                        cabcd = cabc | cands[ucells[l]]
+                        if popcount_lut[cabcd & 0x1FF] > 6:
+                            continue
+                        for m in range(l + 1, n_uc):
+                            union = cabcd | cands[ucells[m]]
+                            if popcount_lut[union] == 6:
+                                if n_als < MAX_ALS:
+                                    als_cells[n_als, 0] = ucells[i]
+                                    als_cells[n_als, 1] = ucells[j]
+                                    als_cells[n_als, 2] = ucells[k]
+                                    als_cells[n_als, 3] = ucells[l]
+                                    als_cells[n_als, 4] = ucells[m]
+                                    als_ncells[n_als] = 5
+                                    als_cands[n_als] = union
+                                    n_als += 1
+
+    return als_cells, als_ncells, als_cands, n_als
+
+
+@nb.njit(cache=True)
+def _check_rcc(als_cells, als_ncells, i, j, digit, cands, sees):
+    """Check if digit is a Restricted Common Candidate between ALS i and j."""
+    na = als_ncells[i]
+    nb_ = als_ncells[j]
+    d_bit = 1 << digit
+    # Cells in i with digit
+    for ai in range(na):
+        if cands[als_cells[i, ai]] & d_bit:
+            for bi in range(nb_):
+                if cands[als_cells[j, bi]] & d_bit:
+                    if not sees[als_cells[i, ai], als_cells[j, bi]]:
+                        return False
+    return True
+
+
+@nb.njit(cache=True)
+def _als_xz_from_als_jit(als_cells, als_ncells, als_cands, n_als, cands, sees, popcount_lut):
+    """JIT ALS-XZ: given pre-found ALS, check pairs for RCC eliminations."""
+    elim_out = np.zeros((200, 2), dtype=np.int32)
+    n_elims = 0
+    elim_seen = np.zeros(729, dtype=np.bool_)
+
+    for i in range(n_als):
+        na = als_ncells[i]
+        ca = als_cands[i]
+        for j in range(i + 1, n_als):
+            nb_ = als_ncells[j]
+            cb = als_cands[j]
+
+            overlap = False
+            for ai in range(na):
+                for bi in range(nb_):
+                    if als_cells[i, ai] == als_cells[j, bi]:
+                        overlap = True
+                        break
+                if overlap:
+                    break
+            if overlap:
+                continue
+
+            common = ca & cb
+            if popcount_lut[common] < 2:
+                continue
+
+            x_mask = common
+            while x_mask:
+                x_bit = x_mask & (-x_mask)
+                x_mask ^= x_bit
+                x = 0
+                tmp = x_bit
+                while tmp > 1:
+                    x += 1
+                    tmp >>= 1
+
+                if not _check_rcc(als_cells, als_ncells, i, j, x, cands, sees):
+                    continue
+
+                other = common ^ x_bit
+                z_mask = other
+                while z_mask:
+                    z_bit = z_mask & (-z_mask)
+                    z_mask ^= z_bit
+                    z = 0
+                    ztmp = z_bit
+                    while ztmp > 1:
+                        z += 1
+                        ztmp >>= 1
+
+                    all_z = np.zeros(10, dtype=np.int32)
+                    n_z = 0
+                    for ai in range(na):
+                        if cands[als_cells[i, ai]] & z_bit:
+                            all_z[n_z] = als_cells[i, ai]
+                            n_z += 1
+                    for bi in range(nb_):
+                        if cands[als_cells[j, bi]] & z_bit:
+                            all_z[n_z] = als_cells[j, bi]
+                            n_z += 1
+                    if n_z == 0:
+                        continue
+
+                    for pos in range(81):
+                        if not (cands[pos] & z_bit):
+                            continue
+                        in_als = False
+                        for ai in range(na):
+                            if pos == als_cells[i, ai]:
+                                in_als = True
+                                break
+                        if not in_als:
+                            for bi in range(nb_):
+                                if pos == als_cells[j, bi]:
+                                    in_als = True
+                                    break
+                        if in_als:
+                            continue
+                        sees_all = True
+                        for zi in range(n_z):
+                            if not sees[pos, all_z[zi]]:
+                                sees_all = False
+                                break
+                        if sees_all:
+                            key = pos * 9 + z
+                            if not elim_seen[key]:
+                                elim_seen[key] = True
+                                if n_elims < 200:
+                                    elim_out[n_elims, 0] = pos
+                                    elim_out[n_elims, 1] = z + 1
+                                    n_elims += 1
+
+            if n_elims > 0:
+                return elim_out[:n_elims], n_elims
+
+    return elim_out[:n_elims], n_elims
+
+
+@nb.njit(cache=True)
+def _als_xy_wing_jit(als_cells, als_ncells, als_cands, n_als, cands, sees, popcount_lut):
+    """JIT ALS-XY Wing: pivot C + wings A, B via RCC."""
+    # Build RCC adjacency: rcc_digits[i, j] = 9-bit mask of RCC digits
+    MAX_RCC = 4000
+    rcc_i = np.zeros(MAX_RCC, dtype=np.int32)
+    rcc_j = np.zeros(MAX_RCC, dtype=np.int32)
+    rcc_mask = np.zeros(MAX_RCC, dtype=np.int32)
+    n_rcc = 0
+
+    # Per-ALS adjacency: adj_idx[i] = start in adj_list, adj_count[i] = count
+    adj_list = np.zeros(MAX_RCC * 2, dtype=np.int32)
+    adj_rcc = np.zeros(MAX_RCC * 2, dtype=np.int32)
+    adj_start = np.zeros(n_als + 1, dtype=np.int32)
+    adj_count = np.zeros(n_als, dtype=np.int32)
+
+    # First pass: find all RCC pairs
+    for i in range(n_als):
+        na = als_ncells[i]
+        ca = als_cands[i]
+        for j in range(i + 1, n_als):
+            nb_ = als_ncells[j]
+            cb = als_cands[j]
+
+            overlap = False
+            for ai in range(na):
+                for bi in range(nb_):
+                    if als_cells[i, ai] == als_cells[j, bi]:
+                        overlap = True
+                        break
+                if overlap:
+                    break
+            if overlap:
+                continue
+
+            common = ca & cb
+            if not common:
+                continue
+
+            rmask = 0
+            d_mask = common
+            while d_mask:
+                d_bit = d_mask & (-d_mask)
+                d_mask ^= d_bit
+                d = 0
+                tmp = d_bit
+                while tmp > 1:
+                    d += 1
+                    tmp >>= 1
+                if _check_rcc(als_cells, als_ncells, i, j, d, cands, sees):
+                    rmask |= d_bit
+
+            if rmask and n_rcc < MAX_RCC:
+                rcc_i[n_rcc] = i
+                rcc_j[n_rcc] = j
+                rcc_mask[n_rcc] = rmask
+                n_rcc += 1
+
+    # Build adjacency from RCC pairs
+    # Simple approach: for each ALS, collect its neighbors
+    # Use two passes: count then fill
+    for ri in range(n_rcc):
+        adj_count[rcc_i[ri]] += 1
+        adj_count[rcc_j[ri]] += 1
+
+    total = 0
+    for i in range(n_als):
+        adj_start[i] = total
+        total += adj_count[i]
+        adj_count[i] = 0  # reset for fill pass
+
+    fill_count = np.zeros(n_als, dtype=np.int32)
+    for ri in range(n_rcc):
+        ii = rcc_i[ri]
+        jj = rcc_j[ri]
+        idx_i = adj_start[ii] + fill_count[ii]
+        adj_list[idx_i] = jj
+        adj_rcc[idx_i] = rcc_mask[ri]
+        fill_count[ii] += 1
+        idx_j = adj_start[jj] + fill_count[jj]
+        adj_list[idx_j] = ii
+        adj_rcc[idx_j] = rcc_mask[ri]
+        fill_count[jj] += 1
+
+    # Search for triples: pivot C, wings A, B
+    elim_out = np.zeros((200, 2), dtype=np.int32)
+    n_elims = 0
+    elim_seen = np.zeros(729, dtype=np.bool_)
+
+    for ci in range(n_als):
+        n_adj_c = fill_count[ci]
+        if n_adj_c < 2:
+            continue
+
+        start_c = adj_start[ci]
+        for ni in range(n_adj_c):
+            ai = adj_list[start_c + ni]
+            rcc_ca = adj_rcc[start_c + ni]
+
+            for nj in range(ni + 1, n_adj_c):
+                bi = adj_list[start_c + nj]
+                rcc_cb = adj_rcc[start_c + nj]
+
+                # A and B must not overlap
+                na = als_ncells[ai]
+                nb_ = als_ncells[bi]
+                overlap = False
+                for a_idx in range(na):
+                    for b_idx in range(nb_):
+                        if als_cells[ai, a_idx] == als_cells[bi, b_idx]:
+                            overlap = True
+                            break
+                    if overlap:
+                        break
+                if overlap:
+                    continue
+
+                common_ab = als_cands[ai] & als_cands[bi]
+
+                # Try X from rcc_ca, Y from rcc_cb
+                x_mask = rcc_ca
+                while x_mask:
+                    x_bit = x_mask & (-x_mask)
+                    x_mask ^= x_bit
+
+                    y_mask = rcc_cb & ~x_bit
+                    while y_mask:
+                        y_bit = y_mask & (-y_mask)
+                        y_mask ^= y_bit
+
+                        z_cands = common_ab & ~x_bit & ~y_bit
+                        if not z_cands:
+                            continue
+
+                        z_m = z_cands
+                        while z_m:
+                            z_bit = z_m & (-z_m)
+                            z_m ^= z_bit
+                            z = 0
+                            ztmp = z_bit
+                            while ztmp > 1:
+                                z += 1
+                                ztmp >>= 1
+
+                            # Gather Z-cells from A and B
+                            all_z = np.zeros(10, dtype=np.int32)
+                            n_z = 0
+                            for a_idx in range(na):
+                                if cands[als_cells[ai, a_idx]] & z_bit:
+                                    all_z[n_z] = als_cells[ai, a_idx]
+                                    n_z += 1
+                            for b_idx in range(nb_):
+                                if cands[als_cells[bi, b_idx]] & z_bit:
+                                    all_z[n_z] = als_cells[bi, b_idx]
+                                    n_z += 1
+                            if n_z == 0:
+                                continue
+
+                            # Find elimination targets
+                            nc = als_ncells[ci]
+                            for pos in range(81):
+                                if not (cands[pos] & z_bit):
+                                    continue
+                                in_any = False
+                                for a_idx in range(na):
+                                    if pos == als_cells[ai, a_idx]:
+                                        in_any = True
+                                        break
+                                if not in_any:
+                                    for b_idx in range(nb_):
+                                        if pos == als_cells[bi, b_idx]:
+                                            in_any = True
+                                            break
+                                if not in_any:
+                                    for c_idx in range(nc):
+                                        if pos == als_cells[ci, c_idx]:
+                                            in_any = True
+                                            break
+                                if in_any:
+                                    continue
+                                sees_all = True
+                                for zi in range(n_z):
+                                    if not sees[pos, all_z[zi]]:
+                                        sees_all = False
+                                        break
+                                if sees_all:
+                                    key = pos * 9 + z
+                                    if not elim_seen[key]:
+                                        elim_seen[key] = True
+                                        if n_elims < 200:
+                                            elim_out[n_elims, 0] = pos
+                                            elim_out[n_elims, 1] = z + 1
+                                            n_elims += 1
+
+                        if n_elims > 0:
+                            return elim_out[:n_elims], n_elims
+
+    return elim_out[:n_elims], n_elims
+
+
+@nb.njit(cache=True)
+def _find_and_check_als_xz_jit(board, cands, sees, unit_cells, popcount_lut):
+    """JIT ALS-XZ: find all ALS and check for RCC eliminations."""
+    als_cells, als_ncells, als_cands, n_als = _find_all_als_jit(
+        board, cands, unit_cells, popcount_lut)
+    if n_als < 2:
+        return np.zeros((0, 2), dtype=np.int32), 0
+    return _als_xz_from_als_jit(als_cells, als_ncells, als_cands, n_als,
+                                 cands, sees, popcount_lut)
+
+
 # ── 81-bit popcount ──
 def popcount81(x):
     """Popcount for 81-bit integer using divide-and-conquer."""
@@ -1631,9 +2082,13 @@ def _fast_prop_jit(b, c, test_pos, test_digit, peers, peer_len, units, box_of, p
 
 
 def fast_propagate_np(board_list, cands_list, test_pos, test_digit):
-    """Numba-JIT contradiction check wrapper. Copies input to int32 arrays."""
-    b = np.array(board_list, dtype=np.int32)
-    c = np.array(cands_list, dtype=np.int32)
+    """Numba-JIT contradiction check wrapper. Accepts lists or numpy arrays."""
+    if isinstance(board_list, np.ndarray):
+        b = board_list.copy()
+        c = cands_list.copy()
+    else:
+        b = np.array(board_list, dtype=np.int32)
+        c = np.array(cands_list, dtype=np.int32)
     return _fast_prop_jit(b, c, np.int32(test_pos), np.int32(test_digit),
                           _NB_PEERS, _NB_PEER_LEN, _NB_UNITS, _NB_BOX_OF, _NB_POPCOUNT)
 
@@ -1642,16 +2097,22 @@ fast_propagate_pure = fast_propagate   # keep original for benchmarking
 fast_propagate = fast_propagate_np     # JIT is now the default (34x faster)
 
 
-def fast_propagate_full(board, cands, test_pos, test_digit):
+def fast_propagate_full(board, cands, test_pos, test_digit, return_np=False):
     """JIT-accelerated propagation with full state return.
-    Returns (board, cands) as Python lists or (None, None) on contradiction."""
-    b = np.array(board, dtype=np.int32)
-    c = np.array(cands, dtype=np.int32)
-    # Reuse the same JIT core — it returns True for contradiction
+    Returns (board, cands) or (None, None) on contradiction.
+    If return_np=True, returns numpy arrays. Otherwise returns Python lists."""
+    if isinstance(board, np.ndarray):
+        b = board.copy()
+        c = cands.copy()
+    else:
+        b = np.array(board, dtype=np.int32)
+        c = np.array(cands, dtype=np.int32)
     contra = _fast_prop_jit(b, c, np.int32(test_pos), np.int32(test_digit),
                             _NB_PEERS, _NB_PEER_LEN, _NB_UNITS, _NB_BOX_OF, _NB_POPCOUNT)
     if contra:
         return None, None
+    if return_np:
+        return b, c
     return b.tolist(), c.tolist()
 
 
@@ -2086,9 +2547,14 @@ def _follow_chain_contra_jit(board, cands, start_pos, start_val,
 
 
 def follow_chain_contra(board, cands, start_pos, start_val):
-    """Python wrapper: JIT contradiction-only chain follower."""
-    b = np.array(board, dtype=np.int32)
-    c = np.array(cands, dtype=np.int32)
+    """Python wrapper: JIT contradiction-only chain follower.
+    Accepts both Python lists and numpy arrays."""
+    if isinstance(board, np.ndarray):
+        b = board.copy()
+        c = cands.copy()
+    else:
+        b = np.array(board, dtype=np.int32)
+        c = np.array(cands, dtype=np.int32)
     return _follow_chain_contra_jit(b, c, np.int32(start_pos), np.int32(start_val),
                                      _NB_PEERS, _NB_PEER_LEN, _NB_UNITS, _NB_POPCOUNT)
 
@@ -2269,142 +2735,249 @@ def detect_fpce_bitwise(bb):
 # FORCING CHAIN (bitmask version)
 # ══════════════════════════════════════════════════════════════════════
 
-def follow_chain_bitwise(bb, start_pos, start_val, max_depth=12):
-    """Follow forcing chain using bitmask candidate operations.
-    Uses forced_vals[81] array instead of dict for O(1) peer lookups.
-    Returns 'contradiction', dict of {pos: digit}, or None."""
-    forced_vals = [0] * 81  # 0 = not forced, 1-9 = forced digit
+@nb.njit(cache=True)
+def _follow_chain_jit(board, cands, start_pos, start_val, peers, unit_cells, max_depth=12):
+    """JIT forcing chain. Returns (status, forced_vals).
+    status: 0=inconclusive/None, 1=contradiction, 2=valid result."""
+    forced_vals = np.zeros(81, dtype=np.int32)
     forced_vals[start_pos] = start_val
-    forced_81 = 1 << start_pos
-    # Precompute elimination masks per cell: what digit bits are forced by peers
-    # elim_at[pos] = bitmask of digits eliminated by forced cells that see pos
-    elim_at = [0] * 81
-    # Initialize: start_pos eliminates its digit from all its peers
-    start_bit = BIT[start_val - 1]
-    for peer in PEERS[start_pos]:
+    forced_mask = np.zeros(81, dtype=np.bool_)
+    forced_mask[start_pos] = True
+
+    elim_at = np.zeros(81, dtype=np.int32)
+    start_bit = 1 << (start_val - 1)
+    for pi in range(20):
+        peer = peers[start_pos, pi]
         elim_at[peer] |= start_bit
 
-    queue = [start_pos]
+    queue = np.zeros(81, dtype=np.int32)
+    queue[0] = start_pos
+    q_len = 1
 
     for depth in range(max_depth):
-        if not queue:
+        if q_len == 0:
             break
-        nxt = []
+        nxt = np.zeros(81, dtype=np.int32)
+        n_nxt = 0
 
-        for fpos in queue:
+        for qi in range(q_len):
+            fpos = queue[qi]
             fval = forced_vals[fpos]
-            fbit = BIT[fval - 1]
-            for peer in PEERS[fpos]:
-                if bb.board[peer] != 0 or (forced_81 & (1 << peer)):
+            for pi in range(20):
+                peer = peers[fpos, pi]
+                if board[peer] != 0 or forced_mask[peer]:
                     continue
-                ec = bb.cands[peer] & ~elim_at[peer]
+                ec = cands[peer] & ~elim_at[peer]
                 if ec == 0:
-                    return 'contradiction'
+                    return 1, forced_vals  # contradiction
                 if ec & (ec - 1) == 0:  # single candidate
-                    nv = ec.bit_length()
+                    nv = 0
+                    tmp = ec
+                    while tmp > 1:
+                        nv += 1
+                        tmp >>= 1
+                    nv += 1  # 1-indexed
                     forced_vals[peer] = nv
-                    forced_81 |= 1 << peer
-                    nxt.append(peer)
-                    # Update elim_at for the new forced cell's peers
-                    nv_bit = BIT[nv - 1]
-                    for p2 in PEERS[peer]:
+                    forced_mask[peer] = True
+                    nxt[n_nxt] = peer
+                    n_nxt += 1
+                    nv_bit = 1 << (nv - 1)
+                    for p2i in range(20):
+                        p2 = peers[peer, p2i]
                         elim_at[p2] |= nv_bit
 
         # Hidden singles in units
-        for unit in UNITS:
+        for ui in range(27):
             for n in range(1, 10):
-                nbit = BIT[n - 1]
+                nbit = 1 << (n - 1)
                 placed = False
-                for p in unit:
-                    if bb.board[p] == n or forced_vals[p] == n:
+                for ci in range(9):
+                    p = unit_cells[ui, ci]
+                    if board[p] == n or forced_vals[p] == n:
                         placed = True
                         break
                 if placed:
                     continue
                 spots_count = 0
                 last_spot = -1
-                for p in unit:
-                    if bb.board[p] != 0 or (forced_81 & (1 << p)):
+                for ci in range(9):
+                    p = unit_cells[ui, ci]
+                    if board[p] != 0 or forced_mask[p]:
                         continue
-                    ec = bb.cands[p] & ~elim_at[p]
+                    ec = cands[p] & ~elim_at[p]
                     if ec & nbit:
                         spots_count += 1
                         last_spot = p
                         if spots_count > 1:
                             break
                 if spots_count == 0:
-                    return 'contradiction'
-                if spots_count == 1 and not (forced_81 & (1 << last_spot)):
+                    return 1, forced_vals  # contradiction
+                if spots_count == 1 and not forced_mask[last_spot]:
                     forced_vals[last_spot] = n
-                    forced_81 |= 1 << last_spot
-                    nxt.append(last_spot)
-                    n_bit = BIT[n - 1]
-                    for p2 in PEERS[last_spot]:
+                    forced_mask[last_spot] = True
+                    nxt[n_nxt] = last_spot
+                    n_nxt += 1
+                    n_bit = 1 << (n - 1)
+                    for p2i in range(20):
+                        p2 = peers[last_spot, p2i]
                         elim_at[p2] |= n_bit
 
-        queue = nxt
+        # Copy nxt to queue
+        q_len = n_nxt
+        for i in range(n_nxt):
+            queue[i] = nxt[i]
 
-    # Build result dict
-    result = {}
+    # Count forced
+    count = 0
     for pos in range(81):
-        if forced_vals[pos]:
-            result[pos] = forced_vals[pos]
-    return result if len(result) > 1 else None
+        if forced_vals[pos] != 0:
+            count += 1
+    if count > 1:
+        return 2, forced_vals  # valid result
+    return 0, forced_vals  # inconclusive
+
+
+def follow_chain_bitwise(bb, start_pos, start_val, max_depth=12):
+    """Follow forcing chain — JIT-accelerated wrapper."""
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    status, forced = _follow_chain_jit(board_arr, cands_arr, start_pos, start_val,
+                                        NP_PEERS, NP_UNIT_CELLS, max_depth)
+    if status == 1:
+        return 'contradiction'
+    if status == 2:
+        result = {}
+        for pos in range(81):
+            if forced[pos] != 0:
+                result[pos] = int(forced[pos])
+        return result
+    return None
+
+
+@nb.njit(cache=True)
+def _detect_forcing_chain_jit(board, cands, peers, unit_cells, popcount_lut):
+    """JIT forcing chain detection: bivalue/trivalue cells, contradiction/convergence."""
+    # Output: (pos, digit, mode) mode: 0=contradict, 1=converge
+    out = np.zeros((10, 3), dtype=np.int32)
+    n_out = 0
+
+    # Collect start cells (bivalue first, then trivalue)
+    starts_bi = np.zeros(81, dtype=np.int32)
+    starts_tri = np.zeros(81, dtype=np.int32)
+    n_bi = 0
+    n_tri = 0
+    for pos in range(81):
+        if board[pos] != 0:
+            continue
+        pc = popcount_lut[cands[pos]]
+        if pc == 2:
+            starts_bi[n_bi] = pos
+            n_bi += 1
+        elif pc == 3:
+            starts_tri[n_tri] = pos
+            n_tri += 1
+
+    for phase in range(2):
+        arr = starts_bi if phase == 0 else starts_tri
+        count = n_bi if phase == 0 else n_tri
+        for si in range(count):
+            pos = arr[si]
+            m = cands[pos]
+            # Extract digits
+            digits = np.zeros(4, dtype=np.int32)
+            n_d = 0
+            for d in range(9):
+                if m & (1 << d):
+                    digits[n_d] = d + 1
+                    n_d += 1
+
+            # Run chains for each digit
+            statuses = np.zeros(4, dtype=np.int32)
+            forced_all = np.zeros((4, 81), dtype=np.int32)
+            for di in range(n_d):
+                st, fv = _follow_chain_jit(board, cands, pos, digits[di],
+                                            peers, unit_cells, 12)
+                statuses[di] = st
+                for p in range(81):
+                    forced_all[di, p] = fv[p]
+
+            # Check contradiction pattern
+            n_contra = 0
+            n_valid = 0
+            valid_idx = -1
+            for di in range(n_d):
+                if statuses[di] == 1:
+                    n_contra += 1
+                elif statuses[di] == 2:
+                    n_valid += 1
+                    valid_idx = di
+
+            if n_contra == n_d - 1 and n_valid == 1:
+                if n_out < 10:
+                    out[n_out, 0] = pos
+                    out[n_out, 1] = digits[valid_idx]
+                    out[n_out, 2] = 0
+                    n_out += 1
+                return out[:n_out], n_out
+
+            # Convergence: all chains valid and agree on some cell
+            if n_valid == n_d and n_valid >= 2:
+                for p in range(81):
+                    if p == pos or board[p] != 0:
+                        continue
+                    v = forced_all[0, p]
+                    if v == 0:
+                        continue
+                    agree = True
+                    for di in range(1, n_d):
+                        if forced_all[di, p] != v:
+                            agree = False
+                            break
+                    if agree:
+                        if n_out < 10:
+                            out[n_out, 0] = p
+                            out[n_out, 1] = v
+                            out[n_out, 2] = 1
+                            n_out += 1
+                        return out[:n_out], n_out
+
+            # Partial contradiction: some contradict, one remains
+            if n_contra > 0 and n_contra < n_d:
+                remaining = -1
+                n_rem = 0
+                for di in range(n_d):
+                    if statuses[di] != 1:
+                        remaining = di
+                        n_rem += 1
+                if n_rem == 1:
+                    if n_out < 10:
+                        out[n_out, 0] = pos
+                        out[n_out, 1] = digits[remaining]
+                        out[n_out, 2] = 0
+                        n_out += 1
+                    return out[:n_out], n_out
+
+    return out[:n_out], n_out
 
 
 def detect_forcing_chain_bitwise(bb):
-    """Detect forcing chain placements. Uses Python chain following for
-    precise inconclusive/contradiction/valid trichotomy on bivalue/trivalue cells."""
+    """Detect forcing chain placements — JIT-accelerated."""
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    out, n_out = _detect_forcing_chain_jit(board_arr, cands_arr,
+                                            NP_PEERS, NP_UNIT_CELLS, NP_POPCOUNT)
     results = []
-    start_cells = []
-    for pos in range(81):
-        if bb.board[pos] != 0:
-            continue
-        pc = POPCOUNT[bb.cands[pos]]
-        if pc == 2:
-            start_cells.append((pos, 0))
-        elif pc == 3:
-            start_cells.append((pos, 1))
-    start_cells.sort(key=lambda x: x[1])
-
-    for pos, _ in start_cells:
-        digits = [d + 1 for d in iter_bits9(bb.cands[pos])]
-
-        chains = [follow_chain_bitwise(bb, pos, v) for v in digits]
-
-        contradicted = [i for i, ch in enumerate(chains) if ch == 'contradiction']
-        valid = [i for i, ch in enumerate(chains) if ch != 'contradiction' and ch is not None]
-
-        if len(contradicted) == len(digits) - 1 and len(valid) == 1:
-            val = digits[valid[0]]
-            r, c = pos // 9, pos % 9
-            results.append((pos, val, f'ForcingChain R{r+1}C{c+1}={val} (all others contradict)'))
-            return results
-
-        # Convergence: ALL chains must be valid dicts (sound deduction — no guessing)
-        if len(valid) == len(digits) and len(valid) >= 2:
-            first_map = chains[valid[0]]
-            for key, val in first_map.items():
-                if key == pos or bb.board[key] != 0:
-                    continue
-                if all(isinstance(chains[vi], dict) and chains[vi].get(key) == val for vi in valid[1:]):
-                    r2, c2 = key // 9, key % 9
-                    sr, sc = pos // 9, pos % 9
-                    results.append((key, val,
-                        f'ForcingChain from R{sr+1}C{sc+1}: R{r2+1}C{c2+1}={val} (all agree)'))
-                    return results
-
-        if contradicted and len(contradicted) < len(digits):
-            remaining = set(digits)
-            for i in contradicted:
-                remaining.discard(digits[i])
-            if len(remaining) == 1:
-                val = next(iter(remaining))
-                r, c = pos // 9, pos % 9
-                results.append((pos, val,
-                    f'ForcingChain R{r+1}C{c+1}={val} ({len(contradicted)} eliminated)'))
-                return results
-
+    for k in range(n_out):
+        pos = int(out[k, 0])
+        val = int(out[k, 1])
+        r, c = pos // 9, pos % 9
+        mode = int(out[k, 2])
+        if mode == 0:
+            results.append((pos, val, f'ForcingChain R{r+1}C{c+1}={val} (contradiction)'))
+        else:
+            results.append((pos, val, f'ForcingChain R{r+1}C{c+1}={val} (convergence)'))
     return results
 
 
@@ -3349,81 +3922,165 @@ def detect_bowman_bingo(bb):
 # D2B — Depth-2 Bilateral (full bitmask, no sets)
 # ══════════════════════════════════════════════════════════════════════
 
-def detect_d2b_bitwise(bb):
-    """D2B using bitmask arrays throughout. No set conversions.
-    Elimination intersection via 81-element AND of uint16 arrays."""
-    pivots = []
+@nb.njit(cache=True)
+def _d2b_jit(board, cands, peers, peer_len, units, box_of, popcount_lut):
+    """JIT D2B: double-blind deduction. No Python boundary crossings."""
+    # Collect pivot cells (2-4 candidates), sorted by candidate count
+    pivots = np.zeros(81, dtype=np.int32)
+    pivot_pc = np.zeros(81, dtype=np.int32)
+    n_piv = 0
     for pos in range(81):
-        if bb.board[pos] != 0:
+        if board[pos] != 0:
             continue
-        pc = POPCOUNT[bb.cands[pos]]
+        pc = popcount_lut[cands[pos]]
         if 2 <= pc <= 4:
-            pivots.append((pos, pc))
-    pivots.sort(key=lambda x: x[1])
+            pivots[n_piv] = pos
+            pivot_pc[n_piv] = pc
+            n_piv += 1
 
-    for pivot_pos, _ in pivots[:15]:
-        pivot_mask = bb.cands[pivot_pos]
-        pivot_digits = [d + 1 for d in iter_bits9(pivot_mask)]
+    # Simple insertion sort by pc
+    for i in range(1, n_piv):
+        key_pos = pivots[i]
+        key_pc = pivot_pc[i]
+        j = i - 1
+        while j >= 0 and pivot_pc[j] > key_pc:
+            pivots[j + 1] = pivots[j]
+            pivot_pc[j + 1] = pivot_pc[j]
+            j -= 1
+        pivots[j + 1] = key_pos
+        pivot_pc[j + 1] = key_pc
 
-        branch_elims = []
-        for d1 in pivot_digits:
-            # Check contradiction
-            if fast_propagate(bb.board, bb.cands, pivot_pos, d1):
-                branch_elims.append(None)
-                continue
+    limit = min(n_piv, 15)
+    out = np.zeros((10, 3), dtype=np.int32)
+    n_out = 0
 
-            # Full propagation to get branch state
-            prop_b, prop_c = fast_propagate_full(bb.board, bb.cands, pivot_pos, d1)
-            if prop_b is None:
-                branch_elims.append(None)
-                continue
+    for pi in range(limit):
+        pivot_pos = pivots[pi]
+        pivot_mask = cands[pivot_pos]
 
-            # FPCE on branch: test each candidate in 2-4 candidate cells
-            elim = [0] * 81  # per-cell bitmask of eliminable digits
+        # Extract digits
+        digits = np.zeros(4, dtype=np.int32)
+        n_d = 0
+        for d in range(9):
+            if pivot_mask & (1 << d):
+                digits[n_d] = d + 1
+                n_d += 1
+
+        # Per-branch elimination arrays
+        branch_elims = np.zeros((4, 81), dtype=np.int32)
+        branch_valid = np.zeros(4, dtype=np.bool_)
+
+        # Pre-allocate scratch arrays for inner loop
+        b1 = np.empty(81, dtype=np.int32)
+        c1 = np.empty(81, dtype=np.int32)
+        b2 = np.empty(81, dtype=np.int32)
+        c2 = np.empty(81, dtype=np.int32)
+
+        for di in range(n_d):
+            d1 = digits[di]
+
+            # Fast propagate (contradiction check)
             for i in range(81):
-                if prop_b[i] != 0:
+                b1[i] = board[i]
+                c1[i] = cands[i]
+            contra = _fast_prop_jit(b1, c1, np.int32(pivot_pos), np.int32(d1),
+                                     peers, peer_len, units, box_of, popcount_lut)
+            if contra:
+                continue
+
+            # FPCE on branch: for each 2-4 candidate cell, try placing each candidate
+            elim = np.zeros(81, dtype=np.int32)
+            for i in range(81):
+                if b1[i] != 0:
                     continue
-                pc = POPCOUNT[prop_c[i]]
+                pc = popcount_lut[c1[i]]
                 if pc < 2 or pc > 4:
                     continue
-                for dd in iter_bits9(prop_c[i]):
-                    if fast_propagate(prop_b, prop_c, i, dd + 1):
-                        elim[i] |= BIT[dd]
-            branch_elims.append(elim)
+                for dd in range(9):
+                    if not (c1[i] & (1 << dd)):
+                        continue
+                    for k in range(81):
+                        b2[k] = b1[k]
+                        c2[k] = c1[k]
+                    if _fast_prop_jit(b2, c2, np.int32(i), np.int32(dd + 1),
+                                       peers, peer_len, units, box_of, popcount_lut):
+                        elim[i] |= (1 << dd)
 
-        valid = [e for e in branch_elims if e is not None]
-        if len(valid) < 2:
+            branch_elims[di] = elim
+            branch_valid[di] = True
+
+        # Count valid branches
+        n_valid = 0
+        for di in range(n_d):
+            if branch_valid[di]:
+                n_valid += 1
+        if n_valid < 2:
             continue
 
-        # AND-intersection: eliminations common to ALL valid branches
-        common = valid[0][:]
-        for v in valid[1:]:
-            for i in range(81):
-                common[i] &= v[i]
+        # AND-intersection of valid branch eliminations
+        common = np.full(81, 0x1FF, dtype=np.int32)
+        first = True
+        for di in range(n_d):
+            if not branch_valid[di]:
+                continue
+            if first:
+                for i in range(81):
+                    common[i] = branch_elims[di, i]
+                first = False
+            else:
+                for i in range(81):
+                    common[i] &= branch_elims[di, i]
 
-        if not any(common[i] for i in range(81)):
-            continue
-
-        # Apply common eliminations, find placements
-        test_c = bb.cands[:]
+        has_any = False
         for i in range(81):
             if common[i]:
-                test_c[i] &= ~common[i]
+                has_any = True
+                break
+        if not has_any:
+            continue
 
-        placements = []
+        # Find placements from common eliminations
         for pos in range(81):
-            if bb.board[pos] == 0 and test_c[pos]:
-                if (test_c[pos] & (test_c[pos] - 1)) == 0:
-                    digit = test_c[pos].bit_length()
-                    if POPCOUNT[bb.cands[pos]] > 1:
-                        r, c = pos // 9, pos % 9
-                        placements.append((pos, digit,
-                            f'D2B pivot R{pivot_pos//9+1}C{pivot_pos%9+1} -> R{r+1}C{c+1}={digit}'))
+            if board[pos] != 0 or not common[pos]:
+                continue
+            test_c = cands[pos] & ~common[pos]
+            if test_c and (test_c & (test_c - 1)) == 0:
+                if popcount_lut[cands[pos]] > 1:
+                    digit = 0
+                    tmp = test_c
+                    while tmp > 1:
+                        digit += 1
+                        tmp >>= 1
+                    digit += 1
+                    if n_out < 10:
+                        out[n_out, 0] = pos
+                        out[n_out, 1] = digit
+                        out[n_out, 2] = pivot_pos
+                        n_out += 1
 
-        if placements:
-            return placements
+        if n_out > 0:
+            return out[:n_out], n_out
 
-    return []
+    return out[:n_out], n_out
+
+
+def detect_d2b_bitwise(bb):
+    """D2B — JIT-accelerated double-blind deduction."""
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    out, n_out = _d2b_jit(board_arr, cands_arr,
+                           _NB_PEERS, _NB_PEER_LEN, _NB_UNITS, _NB_BOX_OF, _NB_POPCOUNT)
+
+    placements = []
+    for k in range(n_out):
+        pos = int(out[k, 0])
+        digit = int(out[k, 1])
+        pivot = int(out[k, 2])
+        r, c = pos // 9, pos % 9
+        placements.append((pos, digit,
+            f'D2B pivot R{pivot//9+1}C{pivot%9+1} -> R{r+1}C{c+1}={digit}'))
+    return placements
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -5068,199 +5725,208 @@ def find_all_als_bitwise(bb, max_size=7):
 # X-CYCLES — Single-digit alternating inference chains (bitwise)
 # ══════════════════════════════════════════════════════════════════════
 
-def detect_x_cycle_bitwise(bb):
-    """X-Cycles: single-digit alternating inference chains forming loops.
-
-    For each digit, builds a graph of strong links (conjugate pairs — units
-    where the digit appears in exactly 2 cells) and weak links (non-conjugate
-    cells that see each other).  BFS searches for alternating chains that
-    close back to the start node.
-
-    Rule 1 (continuous nice loop / even cycle): eliminate digit from off-chain
-            cells that see both endpoints of any weak link in the loop.
-    Rule 2 (odd cycle, strong-strong discontinuity): the discontinuity cell
-            must hold the digit — place it.
-    Rule 3 (odd cycle, weak-weak discontinuity): the discontinuity cell
-            cannot hold the digit — eliminate it.
-
-    Returns (placements, eliminations) where
-      placements  = list of (pos, digit, 'XCycle') tuples
-      eliminations = list of (pos, digit) tuples
-    """
-    MAX_CHAIN = 12   # cap chain length (number of nodes)
-    MIN_CYCLE = 4    # minimum nodes for a valid cycle
+@nb.njit(cache=True)
+def _x_cycle_jit(board, cands, sees, unit_cells, popcount_lut):
+    """JIT X-Cycles: single-digit alternating inference chains forming loops."""
+    MAX_CHAIN = 12
+    MIN_CYCLE = 4
     MAX_QUEUE = 25000
+    MAX_NODES = 60
+
+    # Output: placements and eliminations
+    place_out = np.zeros((10, 2), dtype=np.int32)  # (pos, digit1idx)
+    n_place = 0
+    elim_out = np.zeros((200, 2), dtype=np.int32)
+    n_elims = 0
 
     for d in range(9):
-        cross_d = bb.cross[d]
-        if not cross_d:
-            continue
+        dbit = 1 << d
         dval = d + 1
-        dbit = BIT[d]
 
-        # ── Collect cells with candidate d ──
-        cells = []       # list of positions (0-80)
-        cell_idx = {}    # pos -> index into cells[]
-        tmp = cross_d
-        while tmp:
-            lsb = tmp & -tmp
-            pos = lsb.bit_length() - 1
-            cell_idx[pos] = len(cells)
-            cells.append(pos)
-            tmp ^= lsb
-        n = len(cells)
-        if n < 3:
+        # Collect cells with candidate d
+        cells = np.zeros(MAX_NODES, dtype=np.int32)
+        n = 0
+        for pos in range(81):
+            if board[pos] == 0 and (cands[pos] & dbit):
+                cells[n] = pos
+                n += 1
+        if n < 3 or n > MAX_NODES:
             continue
 
-        # ── Build adjacency lists ──
-        # strong[i] = list of node indices connected by strong link
-        # weak[i]   = list of node indices connected by weak link (not strong)
-        strong = [[] for _ in range(n)]
-        s_set  = [0] * n  # bitmask of strong neighbours (up to ~60 nodes, fits int)
+        # pos -> node index lookup
+        pos_to_idx = np.full(81, -1, dtype=np.int32)
+        for i in range(n):
+            pos_to_idx[cells[i]] = i
 
-        # Strong links: conjugate pairs in each unit
+        # Build strong links (conjugate pairs per unit)
+        strong = np.zeros((n, n), dtype=np.bool_)
         for ui in range(27):
-            unit = UNITS[ui]
-            pair = []
-            for pos in unit:
-                idx = cell_idx.get(pos)
-                if idx is not None:
-                    pair.append(idx)
-                    if len(pair) > 2:
+            pair = np.zeros(2, dtype=np.int32)
+            n_pair = 0
+            for ci in range(9):
+                pos = unit_cells[ui, ci]
+                idx = pos_to_idx[pos]
+                if idx >= 0:
+                    if n_pair < 2:
+                        pair[n_pair] = idx
+                        n_pair += 1
+                    else:
+                        n_pair = 3
                         break
-            if len(pair) == 2:
-                a, b = pair
-                if not (s_set[a] & (1 << b)):
-                    strong[a].append(b)
-                    strong[b].append(a)
-                    s_set[a] |= 1 << b
-                    s_set[b] |= 1 << a
+            if n_pair == 2:
+                strong[pair[0], pair[1]] = True
+                strong[pair[1], pair[0]] = True
 
-        # Weak links: cells that see each other but are NOT conjugate
-        weak = [[] for _ in range(n)]
+        # Build weak links (see each other, not strong)
+        weak = np.zeros((n, n), dtype=np.bool_)
         for a in range(n):
-            pa = cells[a]
-            a_peers = PEER_81[pa]
             for b in range(a + 1, n):
-                if s_set[a] & (1 << b):
-                    continue  # already a strong link
-                pb = cells[b]
-                if a_peers & (1 << pb):
-                    weak[a].append(b)
-                    weak[b].append(a)
+                if not strong[a, b] and sees[cells[a], cells[b]]:
+                    weak[a, b] = True
+                    weak[b, a] = True
 
-        # ── BFS for alternating cycles ──
-        # State: (current_node, last_link_type, path_as_tuple)
-        # last_link_type: 0 = strong, 1 = weak
+        # BFS for alternating cycles
+        # Queue: cur, last_lt, path_len, path nodes, visited mask
+        q_cur = np.zeros(MAX_QUEUE, dtype=np.int32)
+        q_lt = np.zeros(MAX_QUEUE, dtype=np.int32)
+        q_vis = np.zeros(MAX_QUEUE, dtype=np.int64)
+        q_plen = np.zeros(MAX_QUEUE, dtype=np.int32)
+        q_path = np.zeros((MAX_QUEUE, MAX_CHAIN), dtype=np.int32)
+        q_start_lt = np.zeros(MAX_QUEUE, dtype=np.int32)
+
         for start in range(n):
-            if not strong[start]:
-                continue  # start must have at least one strong link
+            has_strong = False
+            for b in range(n):
+                if strong[start, b]:
+                    has_strong = True
+                    break
+            if not has_strong:
+                continue
 
-            for start_lt in (0, 1):  # 0=strong first edge, 1=weak first edge
-                first_adj = strong[start] if start_lt == 0 else weak[start]
-                if not first_adj:
-                    continue
+            for slt in range(2):  # 0=strong first, 1=weak first
+                qi_head = 0
+                qi_tail = 0
+                start_bit = np.int64(1) << np.int64(start)
 
-                # Queue entries: (current_node, last_link_type, visited_mask, path_tuple)
-                # visited_mask: bitmask of visited node indices (prevents revisiting)
-                queue = []
-                start_bit = 1 << start
-                for nxt in first_adj:
-                    vis = start_bit | (1 << nxt)
-                    queue.append((nxt, start_lt, vis, (start, nxt)))
+                for nxt in range(n):
+                    use = False
+                    if slt == 0 and strong[start, nxt]:
+                        use = True
+                    elif slt == 1 and weak[start, nxt]:
+                        use = True
+                    if use and qi_tail < MAX_QUEUE:
+                        q_cur[qi_tail] = nxt
+                        q_lt[qi_tail] = slt
+                        q_vis[qi_tail] = start_bit | (np.int64(1) << np.int64(nxt))
+                        q_plen[qi_tail] = 2
+                        q_path[qi_tail, 0] = start
+                        q_path[qi_tail, 1] = nxt
+                        q_start_lt[qi_tail] = slt
+                        qi_tail += 1
 
-                qi = 0
-                while qi < len(queue) and qi < MAX_QUEUE:
-                    cur, last_lt, vis, path = queue[qi]
-                    qi += 1
-                    path_len = len(path)
+                while qi_head < qi_tail:
+                    cur = q_cur[qi_head]
+                    last_lt = q_lt[qi_head]
+                    vis = q_vis[qi_head]
+                    plen = q_plen[qi_head]
+                    cur_slt = q_start_lt[qi_head]
+                    qi_head += 1
 
-                    # ── Check for cycle closure back to start ──
-                    if path_len >= MIN_CYCLE:
-                        # Next link must alternate
+                    # Check cycle closure
+                    if plen >= MIN_CYCLE:
                         close_lt = 1 - last_lt
-                        close_adj = strong[cur] if close_lt == 0 else weak[cur]
-                        if start in close_adj:
-                            # Cycle found!  Edges = path_len (closing edge included)
-                            # The first edge type is start_lt.
-                            # Edge i (0-based) connects path[i]->path[i+1] (mod path_len).
-                            # Edge 0 has type start_lt, edge 1 has type 1-start_lt, etc.
-                            # The closing edge from cur->start has type close_lt.
-                            #
-                            # For an even-length path (path_len nodes, path_len edges):
-                            #   The closing edge alternates properly → continuous nice loop.
-                            # For an odd-length path:
-                            #   The closing edge creates a discontinuity at 'start'.
-                            #   If both edges at start are strong → Rule 2 (place).
-                            #   If both edges at start are weak → Rule 3 (eliminate).
+                        can_close = False
+                        if close_lt == 0 and strong[cur, start]:
+                            can_close = True
+                        elif close_lt == 1 and weak[cur, start]:
+                            can_close = True
 
-                            if path_len % 2 == 0:
-                                # ── Rule 1: Continuous nice loop ──
-                                # Find weak links in the loop; eliminate d from off-chain
-                                # cells that see both endpoints of any weak link.
-                                path_81 = 0
-                                for ni in path:
-                                    path_81 |= 1 << cells[ni]
+                        if can_close:
+                            if plen % 2 == 0:
+                                # Rule 1: even cycle — eliminate from off-chain peers of weak links
+                                in_path = np.zeros(81, dtype=np.bool_)
+                                for pi in range(plen):
+                                    in_path[cells[q_path[qi_head - 1, pi]]] = True
 
-                                elims = []
-                                elim_seen = 0  # 81-bit dedup mask
+                                for ei in range(plen):
+                                    edge_lt = cur_slt if (ei % 2 == 0) else (1 - cur_slt)
+                                    if edge_lt == 1:
+                                        p1 = cells[q_path[qi_head - 1, ei]]
+                                        p2 = cells[q_path[qi_head - 1, (ei + 1) % plen]]
+                                        for pos in range(81):
+                                            if in_path[pos]:
+                                                continue
+                                            if board[pos] != 0:
+                                                continue
+                                            if not (cands[pos] & dbit):
+                                                continue
+                                            if sees[pos, p1] and sees[pos, p2]:
+                                                if n_elims < 200:
+                                                    elim_out[n_elims, 0] = pos
+                                                    elim_out[n_elims, 1] = dval
+                                                    n_elims += 1
 
-                                for ei in range(path_len):
-                                    # Determine edge type for edge ei
-                                    edge_lt = start_lt if (ei % 2 == 0) else (1 - start_lt)
-                                    if edge_lt == 1:  # weak link
-                                        p1 = cells[path[ei]]
-                                        p2 = cells[path[(ei + 1) % path_len]]
-                                        # Cells seeing both p1 and p2, with candidate d,
-                                        # that are NOT in the chain
-                                        both_peers = PEER_81[p1] & PEER_81[p2]
-                                        cands_d = cross_d & both_peers & ~path_81 & ~elim_seen
-                                        tmp2 = cands_d
-                                        while tmp2:
-                                            lb = tmp2 & -tmp2
-                                            epos = lb.bit_length() - 1
-                                            if bb.board[epos] == 0 and (bb.cands[epos] & dbit):
-                                                elims.append((epos, dval))
-                                                elim_seen |= lb
-                                            tmp2 ^= lb
-
-                                if elims:
-                                    return [], elims
+                                if n_elims > 0:
+                                    return place_out[:n_place], n_place, elim_out[:n_elims], n_elims
 
                             else:
-                                # ── Odd cycle: discontinuity at start ──
-                                # The first edge (start->path[1]) has type start_lt.
-                                # The closing edge (cur->start) has type close_lt = 1-last_lt.
-                                # Both edges meet at 'start'.
-                                # start_lt = type of first edge leaving start
-                                # close_lt = type of closing edge arriving at start
-                                #
-                                # For odd path_len, close_lt == start_lt (both same type).
-                                # If start_lt == 0: both strong → Rule 2 (place digit).
-                                # If start_lt == 1: both weak → Rule 3 (eliminate digit).
-
+                                # Odd cycle
                                 start_pos = cells[start]
-                                if start_lt == 0:
-                                    # Rule 2: strong-strong discontinuity → place
-                                    if bb.board[start_pos] == 0 and (bb.cands[start_pos] & dbit):
-                                        return [(start_pos, dval, 'XCycle')], []
-                                else:
-                                    # Rule 3: weak-weak discontinuity → eliminate
-                                    if bb.board[start_pos] == 0 and (bb.cands[start_pos] & dbit):
-                                        return [], [(start_pos, dval)]
+                                if board[start_pos] == 0 and (cands[start_pos] & dbit):
+                                    if cur_slt == 0:
+                                        # Rule 2: place
+                                        if n_place < 10:
+                                            place_out[n_place, 0] = start_pos
+                                            place_out[n_place, 1] = dval
+                                            n_place += 1
+                                        return place_out[:n_place], n_place, elim_out[:n_elims], n_elims
+                                    else:
+                                        # Rule 3: eliminate
+                                        if n_elims < 200:
+                                            elim_out[n_elims, 0] = start_pos
+                                            elim_out[n_elims, 1] = dval
+                                            n_elims += 1
+                                        return place_out[:n_place], n_place, elim_out[:n_elims], n_elims
 
-                    # ── Extend chain ──
-                    if path_len >= MAX_CHAIN:
+                    # Extend chain
+                    if plen >= MAX_CHAIN:
                         continue
                     next_lt = 1 - last_lt
-                    next_adj = strong[cur] if next_lt == 0 else weak[cur]
-                    for nxt in next_adj:
-                        nxt_bit = 1 << nxt
-                        if vis & nxt_bit:
-                            continue  # already in path
-                        queue.append((nxt, next_lt, vis | nxt_bit, path + (nxt,)))
+                    for nxt in range(n):
+                        use = False
+                        if next_lt == 0 and strong[cur, nxt]:
+                            use = True
+                        elif next_lt == 1 and weak[cur, nxt]:
+                            use = True
+                        if use:
+                            nxt_bit = np.int64(1) << np.int64(nxt)
+                            if vis & nxt_bit:
+                                continue
+                            if qi_tail < MAX_QUEUE:
+                                q_cur[qi_tail] = nxt
+                                q_lt[qi_tail] = next_lt
+                                q_vis[qi_tail] = vis | nxt_bit
+                                q_plen[qi_tail] = plen + 1
+                                for pi in range(plen):
+                                    q_path[qi_tail, pi] = q_path[qi_head - 1, pi]
+                                q_path[qi_tail, plen] = nxt
+                                q_start_lt[qi_tail] = cur_slt
+                                qi_tail += 1
 
-    return [], []
+    return place_out[:n_place], n_place, elim_out[:n_elims], n_elims
+
+
+def detect_x_cycle_bitwise(bb):
+    """X-Cycles — JIT-accelerated. Returns (placements, eliminations)."""
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    p_arr, n_p, e_arr, n_e = _x_cycle_jit(
+        board_arr, cands_arr, NP_SEES, NP_UNIT_CELLS, NP_POPCOUNT)
+
+    placements = [(int(p_arr[k, 0]), int(p_arr[k, 1]), 'XCycle') for k in range(n_p)]
+    eliminations = [(int(e_arr[k, 0]), int(e_arr[k, 1])) for k in range(n_e)]
+    return placements, eliminations
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -5270,302 +5936,201 @@ def detect_x_cycle_bitwise(bb):
 def detect_als_xz_bitwise(bb):
     """ALS-XZ: Two Almost Locked Sets connected by a Restricted Common Candidate.
 
-    Given ALS A and ALS B that share at least 2 common candidate digits:
-      - If digit X is a Restricted Common Candidate (every cell holding X in A
-        sees every cell holding X in B), then for any other common digit Z,
-        Z can be eliminated from any cell outside both ALS that sees ALL
-        Z-cells in A and B.
-
-    Uses 81-bit cell masks and 9-bit candidate masks throughout.
+    JIT-accelerated version — find all ALS + check RCC pairs in compiled code.
 
     Returns list of (pos, digit) elimination tuples.
     """
-    als_list = find_all_als_bitwise(bb, max_size=5)
-    n = len(als_list)
-    if n < 2:
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    elim_arr, n_elims = _find_and_check_als_xz_jit(
+        board_arr, cands_arr, NP_SEES, NP_UNIT_CELLS, NP_POPCOUNT)
+
+    if n_elims == 0:
         return []
-
-    cands = bb.cands
-    eliminations = []
-    elim_set = set()  # dedup: (pos, digit)
-
-    for i in range(n):
-        cells_a, cands_a, _ = als_list[i]
-        for j in range(i + 1, n):
-            cells_b, cands_b, _ = als_list[j]
-
-            # ── Non-overlapping check ──
-            if cells_a & cells_b:
-                continue
-
-            # ── Need at least 2 common digits ──
-            common = cands_a & cands_b
-            if POPCOUNT[common] < 2:
-                continue
-
-            # ── Precompute cell lists for each ALS ──
-            a_cells_list = list(iter_bits81(cells_a))
-            b_cells_list = list(iter_bits81(cells_b))
-
-            # ── Try each common digit X as the RCC ──
-            for x in iter_bits9(common):
-                x_bit = BIT[x]
-
-                # Cells in A that have digit X
-                x_in_a = []
-                for pos in a_cells_list:
-                    if cands[pos] & x_bit:
-                        x_in_a.append(pos)
-                if not x_in_a:
-                    continue
-
-                # Cells in B that have digit X
-                x_in_b = []
-                for pos in b_cells_list:
-                    if cands[pos] & x_bit:
-                        x_in_b.append(pos)
-                if not x_in_b:
-                    continue
-
-                # ── RCC test: every X-cell in A must see every X-cell in B ──
-                rcc = True
-                for pa in x_in_a:
-                    pa_peers = PEER_81[pa]
-                    for pb in x_in_b:
-                        if not (pa_peers & (1 << pb)):
-                            rcc = False
-                            break
-                    if not rcc:
-                        break
-                if not rcc:
-                    continue
-
-                # ── Found RCC digit X — now check each other common digit Z ──
-                other = common ^ x_bit  # remaining common digits (without X)
-                both_cells = cells_a | cells_b
-
-                for z in iter_bits9(other):
-                    z_bit = BIT[z]
-                    z_digit = z + 1  # 1-indexed digit for output
-
-                    # Z-cells in A
-                    z_in_a = []
-                    for pos in a_cells_list:
-                        if cands[pos] & z_bit:
-                            z_in_a.append(pos)
-
-                    # Z-cells in B
-                    z_in_b = []
-                    for pos in b_cells_list:
-                        if cands[pos] & z_bit:
-                            z_in_b.append(pos)
-
-                    all_z = z_in_a + z_in_b
-                    if not all_z:
-                        continue
-
-                    # ── Common peers of ALL Z-cells (81-bit intersection) ──
-                    z_common_peers = PEER_81[all_z[0]]
-                    for k in range(1, len(all_z)):
-                        z_common_peers &= PEER_81[all_z[k]]
-                    if not z_common_peers:
-                        continue
-
-                    # Remove cells that belong to either ALS
-                    z_common_peers &= ~both_cells
-
-                    # Intersect with cells that actually have digit Z as candidate
-                    z_common_peers &= bb.cross[z]
-
-                    # ── Emit eliminations ──
-                    for pos in iter_bits81(z_common_peers):
-                        key = pos * 9 + z
-                        if key not in elim_set:
-                            elim_set.add(key)
-                            eliminations.append((pos, z_digit))
-
-            # Early return on first batch of eliminations found
-            if eliminations:
-                return eliminations
-
-    return eliminations
+    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
 
 
 # ══════════════════════════════════════════════════════════════════════
 # ALIGNED PAIR EXCLUSION — bitwise implementation
 # ══════════════════════════════════════════════════════════════════════
 
-def detect_aligned_pair_exclusion_bitwise(bb):
-    """Aligned Pair Exclusion: for each pair of aligned (mutually visible)
-    unsolved cells, enumerate digit combinations (a, b) with a != b.
-    A combo is INVALID if:
-      (a) any common peer cell becomes empty after removing a and b, or
-      (b) any ALS among common peers breaks (remaining digits < cell count).
-    Any candidate that participates in zero valid combos is eliminated.
-
-    Returns list of (pos, digit) eliminations.  Pure Python + bitwise ops.
-    """
-    cands = bb.cands
-    board = bb.board
-    eliminations = []
-    elim_seen = set()  # (pos, digit) dedup
+@nb.njit(cache=True)
+def _aligned_pair_exclusion_jit(board, cands, sees, peers, unit_cells, popcount_lut):
+    """JIT Aligned Pair Exclusion."""
+    elim_out = np.zeros((200, 2), dtype=np.int32)
+    n_elims = 0
+    elim_seen = np.zeros(729, dtype=np.bool_)
 
     for c1 in range(81):
         if board[c1] != 0:
             continue
         m1 = cands[c1]
-        if POPCOUNT[m1] < 2:
+        if popcount_lut[m1] < 2:
             continue
-        peers1_81 = PEER_81[c1]
 
-        # Iterate peers with c2 > c1 to avoid duplicate pairs
-        for c2 in PEERS[c1]:
+        for pi in range(20):
+            c2 = peers[c1, pi]
             if c2 <= c1:
                 continue
             if board[c2] != 0:
                 continue
             m2 = cands[c2]
-            if POPCOUNT[m2] < 2:
+            if popcount_lut[m2] < 2:
                 continue
 
-            # ── Common peers: cells that see BOTH c1 and c2, unsolved ──
-            common_81 = peers1_81 & PEER_81[c2]
-            # Collect common peer cells and their candidates
-            cp_cells = []
-            cp_cands = []
-            tmp = common_81
-            while tmp:
-                lb = tmp & -tmp
-                p = lb.bit_length() - 1
-                tmp ^= lb
-                if board[p] == 0 and cands[p]:
-                    cp_cells.append(p)
-                    cp_cands.append(cands[p])
-            if not cp_cells:
+            # Common peers: unsolved cells that see both c1 and c2
+            cp_cands_arr = np.zeros(20, dtype=np.int32)
+            n_cp = 0
+            for pos in range(81):
+                if pos == c1 or pos == c2:
+                    continue
+                if board[pos] != 0 or cands[pos] == 0:
+                    continue
+                if sees[c1, pos] and sees[c2, pos]:
+                    cp_cands_arr[n_cp] = cands[pos]
+                    n_cp += 1
+            if n_cp == 0:
                 continue
-            n_cp = len(cp_cells)
 
-            # ── Build small ALS (1-3 cells) from common peers within units ──
-            # als_list entries: (cells_count, cands_mask)
-            als_list = []
-            als_seen = set()
+            # Build small ALS from common peers within units (just cands masks)
+            als_ncells_arr = np.zeros(200, dtype=np.int32)
+            als_cands_arr = np.zeros(200, dtype=np.int32)
+            n_als_local = 0
 
-            # 1-cell ALS: bivalue cells (N=1, N+1=2 digits)
-            for i in range(n_cp):
-                if POPCOUNT[cp_cands[i]] == 2:
-                    key = (1 << cp_cells[i], cp_cands[i])
-                    if key not in als_seen:
-                        als_seen.add(key)
-                        als_list.append((1, cp_cands[i]))
-
-            # 2-cell and 3-cell ALS: cells must share a unit
-            # Group common-peer cells by unit membership
+            # Gather common peer cells per unit for ALS building
             for ui in range(27):
-                unit_set = set(UNITS[ui])
-                # Cells that are common peers AND in this unit
-                uc = []
-                uc_cands_list = []
-                for i in range(n_cp):
-                    if cp_cells[i] in unit_set:
-                        uc.append(cp_cells[i])
-                        uc_cands_list.append(cp_cands[i])
-                n_uc = len(uc)
+                uc_cands = np.zeros(9, dtype=np.int32)
+                n_uc = 0
+                for ci in range(9):
+                    upos = unit_cells[ui, ci]
+                    if board[upos] != 0 or cands[upos] == 0:
+                        continue
+                    if upos == c1 or upos == c2:
+                        continue
+                    if sees[c1, upos] and sees[c2, upos]:
+                        uc_cands[n_uc] = cands[upos]
+                        n_uc += 1
 
-                # 2-cell ALS: union must have exactly 3 digits
+                # 1-cell ALS (bivalue)
+                for i in range(n_uc):
+                    if popcount_lut[uc_cands[i]] == 2 and n_als_local < 200:
+                        als_ncells_arr[n_als_local] = 1
+                        als_cands_arr[n_als_local] = uc_cands[i]
+                        n_als_local += 1
+
+                # 2-cell ALS
                 for i in range(n_uc - 1):
-                    ci = uc_cands_list[i]
                     for j in range(i + 1, n_uc):
-                        union = ci | uc_cands_list[j]
-                        if POPCOUNT[union] == 3:
-                            cells_key = (1 << uc[i]) | (1 << uc[j])
-                            key = (cells_key, union)
-                            if key not in als_seen:
-                                als_seen.add(key)
-                                als_list.append((2, union))
+                        union = uc_cands[i] | uc_cands[j]
+                        if popcount_lut[union] == 3 and n_als_local < 200:
+                            als_ncells_arr[n_als_local] = 2
+                            als_cands_arr[n_als_local] = union
+                            n_als_local += 1
 
-                # 3-cell ALS: union must have exactly 4 digits
-                if n_uc >= 3:
-                    for i in range(n_uc - 2):
-                        ci = uc_cands_list[i]
-                        for j in range(i + 1, n_uc - 1):
-                            cij = ci | uc_cands_list[j]
-                            if POPCOUNT[cij] > 4:
-                                continue  # early exit
-                            for k in range(j + 1, n_uc):
-                                union = cij | uc_cands_list[k]
-                                if POPCOUNT[union] == 4:
-                                    cells_key = (1 << uc[i]) | (1 << uc[j]) | (1 << uc[k])
-                                    key = (cells_key, union)
-                                    if key not in als_seen:
-                                        als_seen.add(key)
-                                        als_list.append((3, union))
+                # 3-cell ALS
+                for i in range(n_uc - 2):
+                    for j in range(i + 1, n_uc - 1):
+                        cij = uc_cands[i] | uc_cands[j]
+                        if popcount_lut[cij] > 4:
+                            continue
+                        for k in range(j + 1, n_uc):
+                            union = cij | uc_cands[k]
+                            if popcount_lut[union] == 4 and n_als_local < 200:
+                                als_ncells_arr[n_als_local] = 3
+                                als_cands_arr[n_als_local] = union
+                                n_als_local += 1
 
-            # ── Check all (a, b) combinations ──
-            # Track which digits in c1 / c2 appear in at least one valid combo
-            valid_c1 = 0  # 9-bit: bit d set if digit d+1 in c1 has a valid combo
-            valid_c2 = 0  # 9-bit: bit d set if digit d+1 in c2 has a valid combo
+            # Check all (a, b) digit combinations
+            valid_c1 = 0
+            valid_c2 = 0
+            ALL = 0x1FF
 
             d1 = m1
             while d1:
-                lb1 = d1 & -d1
-                a = lb1.bit_length() - 1  # 0-indexed digit
-                a_bit = lb1
+                a_bit = d1 & (-d1)
+                d1 ^= a_bit
                 d2 = m2
                 while d2:
-                    lb2 = d2 & -d2
-                    b = lb2.bit_length() - 1
-                    d2 ^= lb2
-                    if a == b:
+                    b_bit = d2 & (-d2)
+                    d2_copy = d2
+                    d2 ^= b_bit
+                    if a_bit == b_bit:
                         continue
-                    keep_mask = ALL_DIGITS & ~(a_bit | lb2)
+                    keep = ALL & ~(a_bit | b_bit)
 
-                    # ── Check 1: single-cell emptying ──
                     broken = False
                     for i in range(n_cp):
-                        if (cp_cands[i] & keep_mask) == 0:
+                        if (cp_cands_arr[i] & keep) == 0:
                             broken = True
                             break
 
-                    # ── Check 2: ALS breaking ──
                     if not broken:
-                        for als_ncells, als_cands_mask in als_list:
-                            remaining = als_cands_mask & keep_mask
-                            if POPCOUNT[remaining] < als_ncells:
+                        for i in range(n_als_local):
+                            remaining = als_cands_arr[i] & keep
+                            if popcount_lut[remaining] < als_ncells_arr[i]:
                                 broken = True
                                 break
 
                     if not broken:
-                        # Valid combo — mark digits
                         valid_c1 |= a_bit
-                        valid_c2 |= lb2
+                        valid_c2 |= b_bit
 
-                d1 ^= lb1
-
-            # ── Eliminations: digits with NO valid combos ──
-            # Digits in c1 that never appeared in a valid combo
+            # Eliminations
             kill_c1 = m1 & ~valid_c1
             kill_c2 = m2 & ~valid_c2
 
             while kill_c1:
-                lb = kill_c1 & -kill_c1
-                d = lb.bit_length()  # 1-indexed digit
+                lb = kill_c1 & (-kill_c1)
                 kill_c1 ^= lb
-                if (c1, d) not in elim_seen:
-                    elim_seen.add((c1, d))
-                    eliminations.append((c1, d))
+                d = 0
+                tmp = lb
+                while tmp > 1:
+                    d += 1
+                    tmp >>= 1
+                key = c1 * 9 + d
+                if not elim_seen[key]:
+                    elim_seen[key] = True
+                    if n_elims < 200:
+                        elim_out[n_elims, 0] = c1
+                        elim_out[n_elims, 1] = d + 1
+                        n_elims += 1
 
             while kill_c2:
-                lb = kill_c2 & -kill_c2
-                d = lb.bit_length()  # 1-indexed digit
+                lb = kill_c2 & (-kill_c2)
                 kill_c2 ^= lb
-                if (c2, d) not in elim_seen:
-                    elim_seen.add((c2, d))
-                    eliminations.append((c2, d))
+                d = 0
+                tmp = lb
+                while tmp > 1:
+                    d += 1
+                    tmp >>= 1
+                key = c2 * 9 + d
+                if not elim_seen[key]:
+                    elim_seen[key] = True
+                    if n_elims < 200:
+                        elim_out[n_elims, 0] = c2
+                        elim_out[n_elims, 1] = d + 1
+                        n_elims += 1
 
-            if eliminations:
-                return eliminations
+            if n_elims > 0:
+                return elim_out[:n_elims], n_elims
 
-    return eliminations
+    return elim_out[:n_elims], n_elims
+
+
+def detect_aligned_pair_exclusion_bitwise(bb):
+    """Aligned Pair Exclusion — JIT-accelerated.
+    Returns list of (pos, digit) eliminations.
+    """
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    elim_arr, n_elims = _aligned_pair_exclusion_jit(
+        board_arr, cands_arr, NP_SEES, NP_PEERS, NP_UNIT_CELLS, NP_POPCOUNT)
+
+    if n_elims == 0:
+        return []
+    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -5734,354 +6299,304 @@ def detect_sue_de_coq_bitwise(bb):
 def detect_als_xy_wing_bitwise(bb):
     """ALS-XY Wing: Three Almost Locked Sets — pivot C with wings A and B.
 
-    C shares Restricted Common Candidate X with A (not shared with B as RCC).
-    C shares a different RCC digit Y with B (not shared with A as RCC).
-    A and B share a common digit Z (that is NOT X and NOT Y).
-    Z is eliminated from cells seeing ALL Z-cells in both A and B.
-
-    Optimization: Pre-build an RCC adjacency map so we only explore
-    triples where C connects to both A and B via valid RCC digits.
-
+    JIT-accelerated version.
     Returns list of (pos, digit) elimination tuples.
-    Pure Python + bitwise ops.
     """
-    als_list = find_all_als_bitwise(bb, max_size=5)
-    n = len(als_list)
-    if n < 3:
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    als_cells, als_ncells, als_cands, n_als = _find_all_als_jit(
+        board_arr, cands_arr, NP_UNIT_CELLS, NP_POPCOUNT)
+    if n_als < 3:
         return []
 
-    cands = bb.cands
+    elim_arr, n_elims = _als_xy_wing_jit(
+        als_cells, als_ncells, als_cands, n_als,
+        cands_arr, NP_SEES, NP_POPCOUNT)
 
-    # ── Pre-compute cell lists for each ALS ──
-    als_cells_list = [list(iter_bits81(als_list[i][0])) for i in range(n)]
-
-    # ── Pre-build digit-cell 81-bit masks per ALS per digit ──
-    # als_dcells[i][d] = 81-bit mask of cells in ALS i that have digit d
-    als_dcells = []
-    for i in range(n):
-        dcells = [0] * 9
-        for pos in als_cells_list[i]:
-            m = cands[pos]
-            while m:
-                b = m & -m
-                d = b.bit_length() - 1
-                dcells[d] |= 1 << pos
-                m ^= b
-            # end while
-        als_dcells.append(dcells)
-
-    # ── Build RCC adjacency map ──
-    # rcc_map[(i, j)] = 9-bit mask of digits that are valid RCCs between ALS i and j
-    # A digit X is an RCC between ALS i and j if:
-    #   1. Both ALS contain digit X
-    #   2. Every X-cell in i sees every X-cell in j (mutual visibility)
-    rcc_map = {}
-    # adj[i] = list of ALS indices j that have at least one RCC with i
-    adj = [[] for _ in range(n)]
-
-    for i in range(n):
-        cells_i, cands_i, _ = als_list[i]
-        for j in range(i + 1, n):
-            cells_j, cands_j, _ = als_list[j]
-
-            # Non-overlapping check
-            if cells_i & cells_j:
-                continue
-
-            # Common digits between ALS i and j
-            common = cands_i & cands_j
-            if not common:
-                continue
-
-            # Test each common digit for RCC
-            rcc_mask = 0
-            for x in iter_bits9(common):
-                x_cells_i = als_dcells[i][x]
-                x_cells_j = als_dcells[j][x]
-                if not x_cells_i or not x_cells_j:
-                    continue
-
-                # RCC test: every X-cell in i sees every X-cell in j
-                is_rcc = True
-                tmp_i = x_cells_i
-                while tmp_i:
-                    lb_i = tmp_i & -tmp_i
-                    pa = lb_i.bit_length() - 1
-                    pa_peers = PEER_81[pa]
-                    tmp_j = x_cells_j
-                    while tmp_j:
-                        lb_j = tmp_j & -tmp_j
-                        pb = lb_j.bit_length() - 1
-                        if not (pa_peers & lb_j):
-                            is_rcc = False
-                            break
-                        tmp_j ^= lb_j
-                    if not is_rcc:
-                        break
-                    tmp_i ^= lb_i
-
-                if is_rcc:
-                    rcc_mask |= BIT[x]
-
-            if rcc_mask:
-                rcc_map[(i, j)] = rcc_mask
-                rcc_map[(j, i)] = rcc_mask
-                adj[i].append(j)
-                adj[j].append(i)
-
-    # ── Search for triples: pivot C, wings A and B ──
-    eliminations = []
-    elim_set = set()  # dedup: pos * 9 + digit_0idx
-
-    for ci in range(n):
-        neighbours = adj[ci]
-        n_adj = len(neighbours)
-        if n_adj < 2:
-            continue
-
-        cells_c = als_list[ci][0]
-
-        for ni in range(n_adj):
-            ai = neighbours[ni]
-            cells_a, cands_a, _ = als_list[ai]
-
-            # RCC digits between C and A
-            rcc_ca = rcc_map[(ci, ai)]
-
-            for nj in range(ni + 1, n_adj):
-                bi = neighbours[nj]
-                cells_b, cands_b, _ = als_list[bi]
-
-                # A and B must not overlap
-                if cells_a & cells_b:
-                    continue
-
-                # RCC digits between C and B
-                rcc_cb = rcc_map[(ci, bi)]
-
-                # Common digits between A and B (potential Z digits)
-                common_ab = cands_a & cands_b
-
-                # ── Try each pair (X from rcc_ca, Y from rcc_cb) ──
-                for x in iter_bits9(rcc_ca):
-                    x_bit = BIT[x]
-
-                    # Y must be different from X
-                    rcc_cb_no_x = rcc_cb & ~x_bit
-                    if not rcc_cb_no_x:
-                        continue
-
-                    for y in iter_bits9(rcc_cb_no_x):
-                        y_bit = BIT[y]
-
-                        # Z candidates: digits common to A and B, not X or Y
-                        z_cands = common_ab & ~x_bit & ~y_bit
-                        if not z_cands:
-                            continue
-
-                        all_cells = cells_a | cells_b | cells_c
-
-                        for z in iter_bits9(z_cands):
-                            # Z-cells in A and B
-                            z_in_a = als_dcells[ai][z]
-                            z_in_b = als_dcells[bi][z]
-
-                            all_z_mask = z_in_a | z_in_b
-                            if not all_z_mask:
-                                continue
-
-                            # Common peers of ALL Z-cells (81-bit intersection)
-                            z_common_peers = (1 << 81) - 1  # all bits set
-                            tmp = all_z_mask
-                            while tmp:
-                                lb = tmp & -tmp
-                                pos = lb.bit_length() - 1
-                                z_common_peers &= PEER_81[pos]
-                                tmp ^= lb
-                            if not z_common_peers:
-                                continue
-
-                            # Remove cells in any of the three ALS
-                            z_common_peers &= ~all_cells
-
-                            # Intersect with cells that have digit Z as candidate
-                            z_common_peers &= bb.cross[z]
-
-                            # Emit eliminations
-                            z_digit = z + 1
-                            for pos in iter_bits81(z_common_peers):
-                                key = pos * 9 + z
-                                if key not in elim_set:
-                                    elim_set.add(key)
-                                    eliminations.append((pos, z_digit))
-
-                        # Early return on first batch found
-                        if eliminations:
-                            return eliminations
-
-    return eliminations
+    if n_elims == 0:
+        return []
+    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
 
 
 # ══════════════════════════════════════════════════════════════════════
 # DEATH BLOSSOM — stem cell + ALS petals via Restricted Common Candidates
 # ══════════════════════════════════════════════════════════════════════
 
-def detect_death_blossom_bitwise(bb):
-    """Death Blossom: a stem cell with 2-3 candidates, each candidate
-    connected to a distinct ALS petal via a Restricted Common Candidate.
+@nb.njit(cache=True)
+def _death_blossom_jit(board, cands, als_cells, als_ncells, als_cands, n_als,
+                       sees, popcount_lut):
+    """JIT Death Blossom: stem cell + ALS petals."""
+    elim_out = np.zeros((200, 2), dtype=np.int32)
+    n_elims = 0
+    elim_seen = np.zeros(729, dtype=np.bool_)
 
-    Algorithm:
-      1. Find stem cells (empty, 2-3 candidates).
-      2. For each stem cell, for each candidate digit D:
-         - Find ALS "petals" where D is in the ALS candidates AND every
-           cell in the ALS that contains digit D sees the stem cell.
-      3. Assign one petal per stem candidate with non-overlapping petal cells.
-      4. For digits Z that appear in ALL petals (but are not the RCC digit
-         for any petal), eliminate Z from cells outside all petals that see
-         ALL Z-cells across all petals.
-
-    Uses 81-bit cell masks and 9-bit candidate masks throughout.
-    Returns list of (pos, digit) elimination tuples (digit is 1-indexed).
-    """
-    als_list = find_all_als_bitwise(bb, max_size=5)
-    if not als_list:
-        return []
-
-    cands = bb.cands
-    board = bb.board
-    n_als = len(als_list)
-
-    # Precompute per-ALS: per-digit the 81-bit mask of cells within the
-    # ALS that hold that digit
-    als_digit_cells = []
+    # Precompute per-ALS per-digit: which cells in the ALS have each digit
+    # als_dcells[ai, d, k] = cell position, als_dcnt[ai, d] = count
+    als_dcells = np.zeros((n_als, 9, 5), dtype=np.int32)
+    als_dcnt = np.zeros((n_als, 9), dtype=np.int32)
     for ai in range(n_als):
-        cells_mask, cands_mask, _ = als_list[ai]
-        dc = [0] * 9
-        for pos in iter_bits81(cells_mask):
-            c = cands[pos]
-            for d in iter_bits9(c & cands_mask):
-                dc[d] |= 1 << pos
-        als_digit_cells.append(dc)
+        nc = als_ncells[ai]
+        for ci in range(nc):
+            pos = als_cells[ai, ci]
+            m = cands[pos] & als_cands[ai]
+            for d in range(9):
+                if m & (1 << d):
+                    idx = als_dcnt[ai, d]
+                    if idx < 5:
+                        als_dcells[ai, d, idx] = pos
+                        als_dcnt[ai, d] = idx + 1
 
     for stem in range(81):
         if board[stem] != 0:
             continue
         stem_cands = cands[stem]
-        n_stem = POPCOUNT[stem_cands]
+        n_stem = popcount_lut[stem_cands]
         if n_stem < 2 or n_stem > 3:
             continue
 
-        stem_bit = 1 << stem
-        stem_peers = PEER_81[stem]
+        # Extract stem digits
+        stem_digits = np.zeros(3, dtype=np.int32)
+        n_sd = 0
+        tmp = stem_cands
+        for d in range(9):
+            if tmp & (1 << d):
+                stem_digits[n_sd] = d
+                n_sd += 1
 
-        # ── For each candidate D in the stem, collect valid petal ALS indices ──
-        stem_digits = list(iter_bits9(stem_cands))  # 0-indexed digits
-        petal_lists = []
+        # For each stem digit, find valid petal ALS indices
+        petal_lists = np.zeros((3, n_als), dtype=np.int32)
+        petal_counts = np.zeros(3, dtype=np.int32)
         skip_stem = False
 
-        for d in stem_digits:
-            d_bit = BIT[d]
-            valid = []
+        for si in range(n_sd):
+            d = stem_digits[si]
+            d_bit = 1 << d
+            cnt = 0
             for ai in range(n_als):
-                cells_mask, cands_mask, _ = als_list[ai]
-
-                # ALS must not contain the stem cell
-                if cells_mask & stem_bit:
+                # ALS must not contain stem
+                contains_stem = False
+                nc = als_ncells[ai]
+                for ci in range(nc):
+                    if als_cells[ai, ci] == stem:
+                        contains_stem = True
+                        break
+                if contains_stem:
                     continue
 
-                # ALS must have digit D as a candidate
-                if not (cands_mask & d_bit):
+                if not (als_cands[ai] & d_bit):
                     continue
 
-                # Every cell in ALS that has digit D must see the stem cell
-                d_cells_mask = als_digit_cells[ai][d]
-                if not d_cells_mask:
+                # Every D-cell in ALS must see stem
+                n_dc = als_dcnt[ai, d]
+                if n_dc == 0:
                     continue
-                if d_cells_mask & ~stem_peers:
-                    continue
-
-                valid.append(ai)
-
-            if not valid:
+                all_see = True
+                for k in range(n_dc):
+                    if not sees[als_dcells[ai, d, k], stem]:
+                        all_see = False
+                        break
+                if all_see:
+                    petal_lists[si, cnt] = ai
+                    cnt += 1
+            petal_counts[si] = cnt
+            if cnt == 0:
                 skip_stem = True
                 break
-            petal_lists.append(valid)
 
         if skip_stem:
             continue
 
-        # ── Try all petal combinations (one per stem digit, non-overlapping) ──
-        for combo in itertools.product(*petal_lists):
-            # Check all petals are distinct ALS indices
-            if len(set(combo)) != len(combo):
-                continue
-
-            # Check non-overlapping petal cells (and not containing stem)
-            all_petal_cells = 0
-            overlap = False
-            for ai in combo:
-                cm = als_list[ai][0]
-                if all_petal_cells & cm:
-                    overlap = True
-                    break
-                all_petal_cells |= cm
-            if overlap:
-                continue
-
-            # ── Find common non-RCC digits across all petals ──
-            rcc_mask = 0
-            for d in stem_digits:
-                rcc_mask |= BIT[d]
-
-            # common_z: digits present in ALL petals that are NOT RCC digits
-            common_z = ALL_DIGITS
-            for ai in combo:
-                common_z &= als_list[ai][1]
-            common_z &= ~rcc_mask
-            if not common_z:
-                continue
-
-            # ── For each common Z digit, find eliminations ──
-            elims = []
-            elim_set = set()
-
-            for z in iter_bits9(common_z):
-                z_digit = z + 1
-
-                # Collect all Z-cells across all petals
-                all_z_cells = []
-                for ai in combo:
-                    z_in_petal = als_digit_cells[ai][z]
-                    for pos in iter_bits81(z_in_petal):
-                        all_z_cells.append(pos)
-
-                if not all_z_cells:
+        # Try petal combos (2 or 3 petals)
+        for p0 in range(petal_counts[0]):
+            ai0 = petal_lists[0, p0]
+            for p1 in range(petal_counts[1]):
+                ai1 = petal_lists[1, p1]
+                if ai1 == ai0:
                     continue
 
-                # Common peers of ALL Z-cells (81-bit intersection)
-                z_common_peers = PEER_81[all_z_cells[0]]
-                for k in range(1, len(all_z_cells)):
-                    z_common_peers &= PEER_81[all_z_cells[k]]
-                if not z_common_peers:
+                # Check overlap between petal 0 and 1
+                overlap01 = False
+                for a in range(als_ncells[ai0]):
+                    for b in range(als_ncells[ai1]):
+                        if als_cells[ai0, a] == als_cells[ai1, b]:
+                            overlap01 = True
+                            break
+                    if overlap01:
+                        break
+                if overlap01:
                     continue
 
-                # Remove petal cells and stem cell
-                z_common_peers &= ~(all_petal_cells | stem_bit)
+                if n_sd == 2:
+                    # 2-petal combo
+                    rcc_mask = (1 << stem_digits[0]) | (1 << stem_digits[1])
+                    common_z = als_cands[ai0] & als_cands[ai1] & ~rcc_mask & 0x1FF
+                    if not common_z:
+                        continue
 
-                # Intersect with cells that actually have digit Z
-                z_common_peers &= bb.cross[z]
+                    combo = np.array([ai0, ai1], dtype=np.int32)
+                    n_combo = 2
 
-                # Emit eliminations
-                for pos in iter_bits81(z_common_peers):
-                    key = pos * 9 + z
-                    if key not in elim_set:
-                        elim_set.add(key)
-                        elims.append((pos, z_digit))
+                    z_m = common_z
+                    while z_m:
+                        z_bit = z_m & (-z_m)
+                        z_m ^= z_bit
+                        z = 0
+                        zt = z_bit
+                        while zt > 1:
+                            z += 1
+                            zt >>= 1
 
-            if elims:
-                return elims
+                        all_z = np.zeros(10, dtype=np.int32)
+                        n_z = 0
+                        for ci in range(n_combo):
+                            ai = combo[ci]
+                            for k in range(als_dcnt[ai, z]):
+                                all_z[n_z] = als_dcells[ai, z, k]
+                                n_z += 1
+                        if n_z == 0:
+                            continue
 
-    return []
+                        for pos in range(81):
+                            if pos == stem:
+                                continue
+                            if not (cands[pos] & z_bit):
+                                continue
+                            in_any = False
+                            for ci in range(n_combo):
+                                ai = combo[ci]
+                                for k in range(als_ncells[ai]):
+                                    if pos == als_cells[ai, k]:
+                                        in_any = True
+                                        break
+                                if in_any:
+                                    break
+                            if in_any:
+                                continue
+                            sees_all = True
+                            for zi in range(n_z):
+                                if not sees[pos, all_z[zi]]:
+                                    sees_all = False
+                                    break
+                            if sees_all:
+                                key = pos * 9 + z
+                                if not elim_seen[key]:
+                                    elim_seen[key] = True
+                                    if n_elims < 200:
+                                        elim_out[n_elims, 0] = pos
+                                        elim_out[n_elims, 1] = z + 1
+                                        n_elims += 1
+
+                    if n_elims > 0:
+                        return elim_out[:n_elims], n_elims
+
+                else:
+                    # 3-petal combo
+                    for p2 in range(petal_counts[2]):
+                        ai2 = petal_lists[2, p2]
+                        if ai2 == ai0 or ai2 == ai1:
+                            continue
+
+                        overlap2 = False
+                        for a in range(als_ncells[ai2]):
+                            for b in range(als_ncells[ai0]):
+                                if als_cells[ai2, a] == als_cells[ai0, b]:
+                                    overlap2 = True
+                                    break
+                            if overlap2:
+                                break
+                            for b in range(als_ncells[ai1]):
+                                if als_cells[ai2, a] == als_cells[ai1, b]:
+                                    overlap2 = True
+                                    break
+                            if overlap2:
+                                break
+                        if overlap2:
+                            continue
+
+                        rcc_mask = (1 << stem_digits[0]) | (1 << stem_digits[1]) | (1 << stem_digits[2])
+                        common_z = als_cands[ai0] & als_cands[ai1] & als_cands[ai2] & ~rcc_mask & 0x1FF
+                        if not common_z:
+                            continue
+
+                        combo3 = np.array([ai0, ai1, ai2], dtype=np.int32)
+                        n_combo3 = 3
+
+                        z_m = common_z
+                        while z_m:
+                            z_bit = z_m & (-z_m)
+                            z_m ^= z_bit
+                            z = 0
+                            zt = z_bit
+                            while zt > 1:
+                                z += 1
+                                zt >>= 1
+
+                            all_z = np.zeros(15, dtype=np.int32)
+                            n_z = 0
+                            for ci in range(n_combo3):
+                                ai = combo3[ci]
+                                for k in range(als_dcnt[ai, z]):
+                                    all_z[n_z] = als_dcells[ai, z, k]
+                                    n_z += 1
+                            if n_z == 0:
+                                continue
+
+                            for pos in range(81):
+                                if pos == stem:
+                                    continue
+                                if not (cands[pos] & z_bit):
+                                    continue
+                                in_any = False
+                                for ci in range(n_combo3):
+                                    ai = combo3[ci]
+                                    for k in range(als_ncells[ai]):
+                                        if pos == als_cells[ai, k]:
+                                            in_any = True
+                                            break
+                                    if in_any:
+                                        break
+                                if in_any:
+                                    continue
+                                sees_all = True
+                                for zi in range(n_z):
+                                    if not sees[pos, all_z[zi]]:
+                                        sees_all = False
+                                        break
+                                if sees_all:
+                                    key = pos * 9 + z
+                                    if not elim_seen[key]:
+                                        elim_seen[key] = True
+                                        if n_elims < 200:
+                                            elim_out[n_elims, 0] = pos
+                                            elim_out[n_elims, 1] = z + 1
+                                            n_elims += 1
+
+                        if n_elims > 0:
+                            return elim_out[:n_elims], n_elims
+
+    return elim_out[:n_elims], n_elims
+
+
+def detect_death_blossom_bitwise(bb):
+    """Death Blossom — JIT-accelerated.
+    Returns list of (pos, digit) elimination tuples (digit is 1-indexed).
+    """
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    als_cells, als_ncells, als_cands, n_als = _find_all_als_jit(
+        board_arr, cands_arr, NP_UNIT_CELLS, NP_POPCOUNT)
+    if n_als == 0:
+        return []
+
+    elim_arr, n_elims = _death_blossom_jit(
+        board_arr, cands_arr, als_cells, als_ncells, als_cands, n_als,
+        NP_SEES, NP_POPCOUNT)
+
+    if n_elims == 0:
+        return []
+    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -6572,10 +7087,182 @@ def _build_trial(prop_board, prop_cands):
     return trial
 
 
-def detect_deep_resonance(bb, mode='all'):
-    """Deep Resonance (Oracle-Free): proof-by-contradiction via structural logic.
+@nb.njit(cache=True)
+def _deep_resonance_jit(board, cands, peers, peer_len, units, box_of, popcount_lut,
+                         np_peers_20, unit_cells, use_deep):
+    """Mega-JIT Deep Resonance: all phases in compiled code.
+    Phase 1: L1+L2 propagation contradiction
+    Phase 2: Chain following contradiction
+    Phase 3: ForcingChain on propagated state
+    Phase 4 (if use_deep): Cascade depth 2-3
+    Returns: elim_out array, n_elims
+    """
+    elim_out = np.zeros((20, 2), dtype=np.int32)
+    n_elims = 0
 
-    NO solution comparison. All contradictions found by pure Sudoku law.
+    # Collect cells (2-4 candidates), sort by candidate count
+    cell_arr = np.zeros(81, dtype=np.int32)
+    cell_pc = np.zeros(81, dtype=np.int32)
+    n_cells = 0
+    for pos in range(81):
+        if board[pos] != 0:
+            continue
+        pc = popcount_lut[cands[pos]]
+        if 2 <= pc <= 4:
+            cell_arr[n_cells] = pos
+            cell_pc[n_cells] = pc
+            n_cells += 1
+
+    # Insertion sort by pc
+    for i in range(1, n_cells):
+        kp = cell_arr[i]
+        kpc = cell_pc[i]
+        j = i - 1
+        while j >= 0 and cell_pc[j] > kpc:
+            cell_arr[j + 1] = cell_arr[j]
+            cell_pc[j + 1] = cell_pc[j]
+            j -= 1
+        cell_arr[j + 1] = kp
+        cell_pc[j + 1] = kpc
+
+    # Scratch arrays
+    b1 = np.empty(81, dtype=np.int32)
+    c1 = np.empty(81, dtype=np.int32)
+    b2 = np.empty(81, dtype=np.int32)
+    c2 = np.empty(81, dtype=np.int32)
+
+    for ci in range(n_cells):
+        pos = cell_arr[ci]
+        m = cands[pos]
+        digits = np.zeros(4, dtype=np.int32)
+        n_d = 0
+        for d in range(9):
+            if m & (1 << d):
+                digits[n_d] = d
+                n_d += 1
+
+        elim_digits = np.zeros(4, dtype=np.bool_)
+
+        for di in range(n_d):
+            d = digits[di]
+            dval = d + 1
+            contradiction = False
+
+            # Phase 1: L1+L2 propagation
+            for i in range(81):
+                b1[i] = board[i]
+                c1[i] = cands[i]
+            contra = _fast_prop_jit(b1, c1, np.int32(pos), np.int32(dval),
+                                     peers, peer_len, units, box_of, popcount_lut)
+            if contra:
+                elim_digits[di] = True
+                continue
+
+            # Phase 2: Chain following on propagated state
+            if _follow_chain_contra_jit(b1.copy(), c1.copy(), np.int32(pos), np.int32(dval),
+                                         peers, peer_len, units, popcount_lut):
+                elim_digits[di] = True
+                continue
+
+            # Phase 3: ForcingChain on propagated state
+            fc_out, n_fc = _detect_forcing_chain_jit(b1, c1, np_peers_20, unit_cells, popcount_lut)
+            for fi in range(n_fc):
+                p = fc_out[fi, 0]
+                v = fc_out[fi, 1]
+                if b1[p] == 0:
+                    for i in range(81):
+                        b2[i] = b1[i]
+                        c2[i] = c1[i]
+                    if _fast_prop_jit(b2, c2, np.int32(p), np.int32(v),
+                                       peers, peer_len, units, box_of, popcount_lut):
+                        contradiction = True
+                        break
+
+            if contradiction:
+                elim_digits[di] = True
+                continue
+
+            # Phase 4 (deep): Cascade depth 2-3
+            if use_deep:
+                fc_out2, n_fc2 = _detect_forcing_chain_jit(b1, c1, np_peers_20, unit_cells, popcount_lut)
+                for fi in range(n_fc2):
+                    p = fc_out2[fi, 0]
+                    v = fc_out2[fi, 1]
+                    if b1[p] == 0:
+                        for i in range(81):
+                            b2[i] = b1[i]
+                            c2[i] = c1[i]
+                        if _fast_prop_jit(b2, c2, np.int32(p), np.int32(v),
+                                           peers, peer_len, units, box_of, popcount_lut):
+                            contradiction = True
+                            break
+                        # Depth 2: chain follow
+                        if _follow_chain_contra_jit(b2.copy(), c2.copy(), np.int32(p), np.int32(v),
+                                                     peers, peer_len, units, popcount_lut):
+                            contradiction = True
+                            break
+                        # Depth 3: ForcingChain
+                        fc_out3, n_fc3 = _detect_forcing_chain_jit(b2, c2, np_peers_20, unit_cells, popcount_lut)
+                        for fi3 in range(n_fc3):
+                            p3 = fc_out3[fi3, 0]
+                            v3 = fc_out3[fi3, 1]
+                            if b2[p3] == 0:
+                                b3 = b2.copy()
+                                c3 = c2.copy()
+                                if _fast_prop_jit(b3, c3, np.int32(p3), np.int32(v3),
+                                                   peers, peer_len, units, box_of, popcount_lut):
+                                    contradiction = True
+                                    break
+                        if contradiction:
+                            break
+
+                if contradiction:
+                    elim_digits[di] = True
+                    continue
+
+        # Check if we found any eliminations for this cell
+        n_elim_d = 0
+        n_surv = 0
+        for di in range(n_d):
+            if elim_digits[di]:
+                n_elim_d += 1
+            else:
+                n_surv += 1
+
+        if n_elim_d > 0 and n_surv > 0:
+            for di in range(n_d):
+                if elim_digits[di]:
+                    if n_elims < 20:
+                        elim_out[n_elims, 0] = pos
+                        elim_out[n_elims, 1] = digits[di] + 1  # 1-indexed
+                        n_elims += 1
+            return elim_out[:n_elims], n_elims
+
+    return elim_out[:n_elims], n_elims
+
+
+def detect_deep_resonance(bb, mode='all'):
+    """Deep Resonance (Oracle-Free) — mega-JIT accelerated.
+    Proof-by-contradiction via structural logic. Zero Python boundary crossings.
+
+    Modes: 'base', 'deep', 'cross', 'all' (default)."""
+    use_deep = mode in ('deep', 'cross', 'all')
+
+    board_arr = np.array(bb.board, dtype=np.int32)
+    cands_arr = np.array(bb.cands, dtype=np.int32)
+
+    elim_arr, n_elims = _deep_resonance_jit(
+        board_arr, cands_arr,
+        _NB_PEERS, _NB_PEER_LEN, _NB_UNITS, _NB_BOX_OF, _NB_POPCOUNT,
+        NP_PEERS, NP_UNIT_CELLS, use_deep)
+
+    if n_elims == 0:
+        return []
+    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
+
+
+def _detect_deep_resonance_legacy(bb, mode='all'):
+    """Legacy Deep Resonance — kept for reference/fallback.
 
     Modes (cumulative — each includes all previous):
       'base'     — Phase 1 (L1+L2 propagation) + Phase 2 (chain following)
@@ -6607,6 +7294,10 @@ def detect_deep_resonance(bb, mode='all'):
 
     # Phase 5 (cross-candidate) needs all propagation results per cell
     # so we collect them when use_cross is on
+    # Pre-convert board/cands to numpy once for all cells
+    bb_board_np = np.array(bb.board, dtype=np.int32)
+    bb_cands_np = np.array(bb.cands, dtype=np.int32)
+
     for pos, _ in cells:
         digits = list(iter_bits9(bb.cands[pos]))
         elim_digits = []
@@ -6617,7 +7308,7 @@ def detect_deep_resonance(bb, mode='all'):
             contradiction = False
 
             # Phase 1: L1+L2 propagation — structural contradiction
-            prop_board, prop_cands = fast_propagate_full(bb.board, bb.cands, pos, dval)
+            prop_board, prop_cands = fast_propagate_full(bb_board_np, bb_cands_np, pos, dval, return_np=True)
             if prop_board is None:
                 elim_digits.append(d)
                 continue
@@ -6629,41 +7320,42 @@ def detect_deep_resonance(bb, mode='all'):
             if follow_chain_contra(prop_board, prop_cands, pos, dval):
                 contradiction = True
 
-            # Phase 3: ForcingChain on propagated state
+            # Phase 3: ForcingChain on propagated state (direct JIT)
             if not contradiction:
-                trial = _build_trial(prop_board, prop_cands)
-                fc = detect_forcing_chain_bitwise(trial)
-                for p, v, _ in fc:
-                    if trial.board[p] == 0:
-                        fc_board, fc_cands = fast_propagate_full(
-                            trial.board, trial.cands, p, v)
-                        if fc_board is None:
+                pb = prop_board if isinstance(prop_board, np.ndarray) else np.array(prop_board, dtype=np.int32)
+                pc = prop_cands if isinstance(prop_cands, np.ndarray) else np.array(prop_cands, dtype=np.int32)
+                fc_out, n_fc = _detect_forcing_chain_jit(pb, pc, NP_PEERS, NP_UNIT_CELLS, NP_POPCOUNT)
+                for fi in range(n_fc):
+                    p, v = int(fc_out[fi, 0]), int(fc_out[fi, 1])
+                    if pb[p] == 0:
+                        fc_b, fc_c = fast_propagate_full(pb, pc, p, v, return_np=True)
+                        if fc_b is None:
                             contradiction = True
                             break
 
             # Phase 4 (deep): Cascade — propagate deeper (depth 2-3)
             if not contradiction and use_deep:
-                trial = _build_trial(prop_board, prop_cands)
-                fc = detect_forcing_chain_bitwise(trial)
-                for p, v, _ in fc:
-                    if trial.board[p] == 0:
-                        d2_board, d2_cands = fast_propagate_full(
-                            trial.board, trial.cands, p, v)
-                        if d2_board is None:
+                pb = prop_board if isinstance(prop_board, np.ndarray) else np.array(prop_board, dtype=np.int32)
+                pc = prop_cands if isinstance(prop_cands, np.ndarray) else np.array(prop_cands, dtype=np.int32)
+                fc_out, n_fc = _detect_forcing_chain_jit(pb, pc, NP_PEERS, NP_UNIT_CELLS, NP_POPCOUNT)
+                for fi in range(n_fc):
+                    p, v = int(fc_out[fi, 0]), int(fc_out[fi, 1])
+                    if pb[p] == 0:
+                        d2_b, d2_c = fast_propagate_full(pb, pc, p, v, return_np=True)
+                        if d2_b is None:
                             contradiction = True
                             break
                         # Depth 2: chain follow on cascaded state
-                        if follow_chain_contra(d2_board, d2_cands, p, v):
+                        if follow_chain_contra(d2_b, d2_c, p, v):
                             contradiction = True
                             break
                         # Depth 3: ForcingChain again on cascaded state
-                        trial2 = _build_trial(d2_board, d2_cands)
-                        fc2 = detect_forcing_chain_bitwise(trial2)
-                        for p2, v2, _ in fc2:
-                            if trial2.board[p2] == 0:
-                                d3_board, _ = fast_propagate_full(
-                                    trial2.board, trial2.cands, p2, v2)
-                                if d3_board is None:
+                        fc2_out, n_fc2 = _detect_forcing_chain_jit(d2_b, d2_c, NP_PEERS, NP_UNIT_CELLS, NP_POPCOUNT)
+                        for fi2 in range(n_fc2):
+                            p2, v2 = int(fc2_out[fi2, 0]), int(fc2_out[fi2, 1])
+                            if d2_b[p2] == 0:
+                                d3_b, _ = fast_propagate_full(d2_b, d2_c, p2, v2, return_np=True)
+                                if d3_b is None:
                                     contradiction = True
                                     break
                         if contradiction:
