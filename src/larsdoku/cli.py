@@ -3187,7 +3187,7 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
-    parser.add_argument('--version', action='version', version='larsdoku 1.8.5')
+    parser.add_argument('--version', action='version', version='larsdoku 1.8.7')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
@@ -3300,6 +3300,12 @@ presets:
                        help='Number of forged puzzles to solve (default 5)')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
+    parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
+                       help='Digit-permutation forge: takes a unique puzzle (or mask+solution), '
+                            'generates up to 362,880 unique puzzles via digit relabeling. '
+                            'Accepts formats: bd81, ..X..., 00X000')
+    parser.add_argument('--forge-permute-count', type=int, default=10, metavar='N',
+                       help='Number of permuted puzzles to output (default 10, max 362880)')
     parser.add_argument('--parse', action='store_true',
                        help='Parse a forum grid from stdin (pipe or paste). Outputs bd81 string.')
     parser.add_argument('--forge-larstech', type=str, metavar='MASK',
@@ -4176,6 +4182,85 @@ presets:
         mask = ''.join('X' if c != '0' and c != '.' else '0' for c in puzzle)
         n_clues = sum(1 for c in mask if c == 'X')
         print(f'  Mask ({n_clues} clues): {mask}')
+        return
+
+    # ── Forge-Permute: digit permutation forge ──
+    if getattr(args, 'forge_permute', None) is not None:
+        import itertools as _itools
+        import random as _rng
+
+        raw = args.forge_permute.strip()
+        count = getattr(args, 'forge_permute_count', 10)
+
+        # Parse input — accept bd81, ..X..., 00X000 formats
+        # Normalize: digits stay, 0/.=empty, X=clue position
+        normalized = raw.replace('.', '0').upper()
+
+        # Detect if it's a mask (has X) or a puzzle (has digits)
+        if 'X' in normalized:
+            # It's a mask — need a puzzle too. Check if puzzle arg is provided.
+            mask = ''.join('X' if c == 'X' else '0' for c in normalized)
+            if args.puzzle:
+                puzzle_bd = args.puzzle.replace('.', '0')
+                sol = solve_backtrack(puzzle_bd)
+            else:
+                print('  Error: mask provided but no puzzle. Usage:')
+                print('  larsdoku --forge-permute "00X00X..." "PUZZLE_BD81"')
+                print('  Or provide a puzzle directly (digits, not mask)')
+                sys.exit(1)
+        else:
+            # It's a puzzle with digits
+            puzzle_bd = normalized
+            sol = solve_backtrack(puzzle_bd)
+            mask = ''.join('X' if c != '0' else '0' for c in puzzle_bd)
+
+        if not sol:
+            print('  Error: no solution found for the puzzle')
+            sys.exit(1)
+
+        x_positions = [i for i in range(81) if mask[i] == 'X']
+        n_clues = len(x_positions)
+
+        # Check source is unique
+        source_puzzle = list('0' * 81)
+        for pos in x_positions:
+            source_puzzle[pos] = sol[pos]
+        source_str = ''.join(source_puzzle)
+        source_unique = has_unique_solution(source_str)
+
+        print(f'  ╔══════════════════════════════════════════════════╗')
+        print(f'  ║  Constellation Forge — Digit Permutation         ║')
+        print(f'  ╚══════════════════════════════════════════════════╝')
+        print(f'  Clues: {n_clues} | Source unique: {source_unique}')
+        print(f'  Max possible: 362,880 (9! digit permutations)')
+        print(f'  Generating {count} unique puzzles...')
+        print()
+
+        _rng.seed(42)
+        perms = list(_itools.permutations(range(1, 10)))
+        _rng.shuffle(perms)
+
+        found = 0
+        tested = 0
+        for perm in perms:
+            if found >= count:
+                break
+            digit_map = {i+1: perm[i] for i in range(9)}
+            puzzle = list('0' * 81)
+            for pos in x_positions:
+                puzzle[pos] = str(digit_map[int(sol[pos])])
+            puzzle_str = ''.join(puzzle)
+            tested += 1
+
+            if has_unique_solution(puzzle_str):
+                found += 1
+                # Clean output for piping: just the puzzle string
+                print(puzzle_str)
+
+        # Summary to stderr so it doesn't interfere with piping
+        import sys as _sys
+        _sys.stderr.write(f'\n  # {found}/{tested} tested were unique '
+                         f'({n_clues} clues, up to 362,880 possible)\n')
         return
 
     # ── Forge-Larstech mode: hunt for forged puzzles that need WSRF techniques ──
