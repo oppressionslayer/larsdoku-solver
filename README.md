@@ -15,6 +15,8 @@
 
 **New techniques `--preset larstech` from:** [wsrf-sudoku-solved-series](https://github.com/oppressionslayer/wsrf-sudoku-solved-series)
 
+**Sittin' on the Throne of Euler:** [Listen Now!](https://suno.com/s/JZVHZEsLrfEEM3VI)  
+
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
 
 ** USE --preset expert  first, and --preset larstech for the new techniques listed at the gihub New Techniques site! 
