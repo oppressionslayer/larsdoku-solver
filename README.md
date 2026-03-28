@@ -21,8 +21,11 @@ Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduc
 
 ** --preset larstech are new techniques i created that the community should review and comment on before i put them in as expert techniques
 
+
 ```
+# Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
 pip install larsdoku
+larsdoku --warmup 
 ```
 
 ### Troubleshooting
