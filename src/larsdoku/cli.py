@@ -3298,6 +3298,11 @@ presets:
                        help='Forge unique puzzles from a mask via Mask Forge, then solve each one')
     parser.add_argument('--forge-count', type=int, default=5, metavar='N',
                        help='Number of forged puzzles to solve (default 5)')
+    parser.add_argument('--forge-multi-to-unique', type=str, metavar='PUZZLE',
+                       help='Take a multi-solution puzzle, forge unique puzzles from it, '
+                            'and output just the bd81 strings (no solving)')
+    parser.add_argument('--forge-multi-to-unique-count', type=int, default=5, metavar='N',
+                       help='Number of unique puzzles to forge (default 5)')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
     parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
@@ -4333,6 +4338,47 @@ presets:
             print(f'  Try more attempts: --forge-larstech-attempts 200')
         print(f'\n  Total forge time: {total_forge_time:.0f}ms')
         print()
+        return
+
+    # ── Forge Multi-to-Unique: forge unique puzzles, output bd81 only ──
+    if args.forge_multi_to_unique is not None:
+        from .mask_forge import parse_mask, forge_unique
+        import time as _time
+
+        puzzle_str = args.forge_multi_to_unique
+        n_wanted = args.forge_multi_to_unique_count
+
+        mask = parse_mask(puzzle_str)
+        n_clues = sum(mask)
+
+        # Forge seed
+        t0 = _time.perf_counter()
+        seed_puzzle, seed_solution, checks, _elapsed = forge_unique(mask, verbose=False)
+        forge_ms = (_time.perf_counter() - t0) * 1000
+
+        if seed_puzzle is None:
+            print(f'  Forge FAILED — no unique puzzle found for this mask.')
+            sys.exit(1)
+
+        # Generate variants via digit permutation
+        digits = list(range(1, 10))
+        puzzles = [seed_puzzle]
+        rng = __import__('random').Random(42)
+        seen = {seed_puzzle}
+        attempts = 0
+        while len(puzzles) < n_wanted and attempts < 1000:
+            perm = list(digits)
+            rng.shuffle(perm)
+            mapping = {str(d): str(perm[d - 1]) for d in digits}
+            variant = ''.join(mapping.get(c, '0') for c in seed_puzzle)
+            if variant not in seen:
+                seen.add(variant)
+                puzzles.append(variant)
+            attempts += 1
+
+        print(f'# {len(puzzles)} unique puzzles forged from {n_clues}-clue mask ({checks} checks, {forge_ms:.0f}ms)')
+        for p in puzzles:
+            print(p)
         return
 
     # ── Forge-Solve mode: forge unique puzzles from mask, then solve ──
