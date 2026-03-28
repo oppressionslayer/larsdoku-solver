@@ -339,6 +339,91 @@ class LarsForge:
 
         return puzzles, elapsed, rate
 
+    @staticmethod
+    def lars_ignite(multi_puzzle, count=10, seed=42, max_forge_seconds=30):
+        """Ignite: take a multi-solution puzzle, forge unique puzzles from it.
+
+        Steps:
+          1. Extract mask from the multi-solution puzzle (17+ clues required)
+          2. Find a unique seed puzzle with that mask via constraint-guided DFS
+          3. Digit-permute from the unique seed → N guaranteed-unique puzzles
+
+        Multi-solution in → unique puzzles out. No backtracker in the output.
+
+        Args:
+            multi_puzzle: 81-char puzzle string (may have multiple solutions)
+            count: number of unique puzzles to generate (default 10)
+            seed: random seed for permutation reproducibility
+            max_forge_seconds: max time to search for unique seed (default 30)
+
+        Returns:
+            dict with:
+              success: bool
+              seed_puzzle: the unique seed found (or None)
+              puzzles: list of unique puzzle strings
+              forge_ms: time to find seed
+              total_ms: total time
+              forge_checks: number of DFS checks to find seed
+        """
+        import random
+
+        multi = multi_puzzle.replace('.', '0')
+        if len(multi) != 81:
+            return {'success': False, 'error': 'Puzzle must be 81 characters'}
+
+        # Extract mask
+        mask = [1 if c != '0' else 0 for c in multi]
+        n_clues = sum(mask)
+
+        if n_clues < 17:
+            return {'success': False, 'error': f'Need at least 17 clues, got {n_clues}'}
+
+        t0 = time.perf_counter()
+
+        # Step 1: Find a unique seed using mask forge (constraint-guided DFS)
+        from .mask_forge import forge_unique
+        seed_puzzle, seed_solution, checks, forge_elapsed = forge_unique(
+            mask, max_seconds=max_forge_seconds, verbose=False)
+
+        forge_ms = (time.perf_counter() - t0) * 1000
+
+        if seed_puzzle is None:
+            return {
+                'success': False,
+                'error': f'Could not find unique seed for this mask after {max_forge_seconds}s',
+                'forge_ms': forge_ms,
+                'forge_checks': checks,
+            }
+
+        # Step 2: Create a LarsForge from the unique seed and permute
+        forge = LarsForge(seed_puzzle, seed_solution=seed_solution)
+
+        rng = random.Random(seed)
+        digits = list(range(1, 10))
+        puzzles = [seed_puzzle]  # seed itself is the first puzzle
+        seen = {seed_puzzle}
+
+        while len(puzzles) < count:
+            perm = digits[:]
+            rng.shuffle(perm)
+            new_puzzle = forge.lars_permute(perm)
+            if new_puzzle not in seen:
+                seen.add(new_puzzle)
+                puzzles.append(new_puzzle)
+
+        total_ms = (time.perf_counter() - t0) * 1000
+
+        return {
+            'success': True,
+            'seed_puzzle': seed_puzzle,
+            'puzzles': puzzles,
+            'n_clues': n_clues,
+            'forge_ms': forge_ms,
+            'forge_checks': checks,
+            'total_ms': total_ms,
+            'count': len(puzzles),
+        }
+
     def lars_zone_report(self):
         """Print a zone analysis report for the seed puzzle."""
         print(f'LarsForge Zone Report')

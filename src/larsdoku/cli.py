@@ -3318,6 +3318,8 @@ presets:
                        help='LarsForge Oracle Scan: count non-isomorphic classes from all 362,880 permutations')
     parser.add_argument('--lars-forge-benchmark', type=str, metavar='PUZZLE',
                        help='LarsForge speed benchmark: generate 100K puzzles and report rate')
+    parser.add_argument('--lars-forge-ignite', type=str, metavar='PUZZLE',
+                       help='LarsForge Ignite: take a multi-solution puzzle, forge unique puzzles from it')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
     parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
@@ -4460,6 +4462,35 @@ presets:
         print(f'  Traditional backtracker: ~50 puzzles/sec')
         print(f'  LarsForge:              ~150,000 puzzles/sec')
         print(f'  Speedup:                ~3,000x')
+        print()
+        return
+
+    # ── LarsForge Ignite: multi-solution → unique puzzles ──
+    if args.lars_forge_ignite is not None:
+        from .lars_forge import LarsForge
+        n = args.lars_forge_count
+        puzzle = args.lars_forge_ignite
+
+        print(f'\n  LarsForge Ignite — forging unique puzzles from multi-solution input')
+        print(f'  {"═" * 55}')
+
+        result = LarsForge.lars_ignite(puzzle, count=n)
+
+        if not result['success']:
+            print(f'  FAILED: {result.get("error", "unknown error")}')
+            if 'forge_ms' in result:
+                print(f'  Forge time: {result["forge_ms"]:.0f}ms ({result.get("forge_checks", 0)} checks)')
+            print()
+            return
+
+        print(f'  Clues: {result["n_clues"]}')
+        print(f'  Seed found in {result["forge_checks"]} checks ({result["forge_ms"]:.0f}ms)')
+        print(f'  Seed: {result["seed_puzzle"]}')
+        print(f'  Generated {result["count"]} unique puzzles in {result["total_ms"]:.0f}ms')
+        print()
+        for i, p in enumerate(result['puzzles']):
+            print(f'  {p}')
+        print(f'\n  # {result["count"]} verified unique puzzles ({result["n_clues"]} clues)')
         print()
         return
 
