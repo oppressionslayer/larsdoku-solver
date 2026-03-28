@@ -196,13 +196,38 @@ for _ui in range(27):
 
 
 @nb.njit(cache=True)
+def _als_is_dup(als_cells, als_ncells, n_als, new_cells, new_nc):
+    """Check if an ALS with these cells already exists."""
+    for i in range(n_als):
+        if als_ncells[i] != new_nc:
+            continue
+        match = True
+        for k in range(new_nc):
+            found = False
+            for j in range(new_nc):
+                if als_cells[i, j] == new_cells[k]:
+                    found = True
+                    break
+            if not found:
+                match = False
+                break
+        if match:
+            return True
+    return False
+
+
+@nb.njit(cache=True)
 def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
-    """JIT: find all ALS up to size 5. Returns als_cells, als_ncells, als_cands, n_als."""
+    """JIT: find all ALS up to size 5. Returns als_cells, als_ncells, als_cands, n_als.
+    Deduplicates by cell set (same cells from different units = one ALS)."""
     MAX_ALS = 4000
     als_cells = np.zeros((MAX_ALS, 5), dtype=np.int32)
     als_ncells = np.zeros(MAX_ALS, dtype=np.int32)
     als_cands = np.zeros(MAX_ALS, dtype=np.int32)
     n_als = 0
+
+    # Temp array for dedup check
+    tmp_cells = np.zeros(5, dtype=np.int32)
 
     for ui in range(27):
         ucells = np.zeros(9, dtype=np.int32)
@@ -218,23 +243,28 @@ def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
         for i in range(n_uc):
             m = cands[ucells[i]]
             if popcount_lut[m] == 2:
-                if n_als < MAX_ALS:
-                    als_cells[n_als, 0] = ucells[i]
-                    als_ncells[n_als] = 1
-                    als_cands[n_als] = m
-                    n_als += 1
+                tmp_cells[0] = ucells[i]
+                if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 1):
+                    if n_als < MAX_ALS:
+                        als_cells[n_als, 0] = ucells[i]
+                        als_ncells[n_als] = 1
+                        als_cands[n_als] = m
+                        n_als += 1
 
         for i in range(n_uc - 1):
             ca = cands[ucells[i]]
             for j in range(i + 1, n_uc):
                 union = ca | cands[ucells[j]]
                 if popcount_lut[union] == 3:
-                    if n_als < MAX_ALS:
-                        als_cells[n_als, 0] = ucells[i]
-                        als_cells[n_als, 1] = ucells[j]
-                        als_ncells[n_als] = 2
-                        als_cands[n_als] = union
-                        n_als += 1
+                    tmp_cells[0] = ucells[i]
+                    tmp_cells[1] = ucells[j]
+                    if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 2):
+                        if n_als < MAX_ALS:
+                            als_cells[n_als, 0] = ucells[i]
+                            als_cells[n_als, 1] = ucells[j]
+                            als_ncells[n_als] = 2
+                            als_cands[n_als] = union
+                            n_als += 1
 
         for i in range(n_uc - 2):
             ca = cands[ucells[i]]
@@ -245,13 +275,17 @@ def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
                 for k in range(j + 1, n_uc):
                     union = cab | cands[ucells[k]]
                     if popcount_lut[union] == 4:
-                        if n_als < MAX_ALS:
-                            als_cells[n_als, 0] = ucells[i]
-                            als_cells[n_als, 1] = ucells[j]
-                            als_cells[n_als, 2] = ucells[k]
-                            als_ncells[n_als] = 3
-                            als_cands[n_als] = union
-                            n_als += 1
+                        tmp_cells[0] = ucells[i]
+                        tmp_cells[1] = ucells[j]
+                        tmp_cells[2] = ucells[k]
+                        if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 3):
+                            if n_als < MAX_ALS:
+                                als_cells[n_als, 0] = ucells[i]
+                                als_cells[n_als, 1] = ucells[j]
+                                als_cells[n_als, 2] = ucells[k]
+                                als_ncells[n_als] = 3
+                                als_cands[n_als] = union
+                                n_als += 1
 
         for i in range(n_uc - 3):
             ca = cands[ucells[i]]
@@ -266,14 +300,19 @@ def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
                     for l in range(k + 1, n_uc):
                         union = cabc | cands[ucells[l]]
                         if popcount_lut[union] == 5:
-                            if n_als < MAX_ALS:
-                                als_cells[n_als, 0] = ucells[i]
-                                als_cells[n_als, 1] = ucells[j]
-                                als_cells[n_als, 2] = ucells[k]
-                                als_cells[n_als, 3] = ucells[l]
-                                als_ncells[n_als] = 4
-                                als_cands[n_als] = union
-                                n_als += 1
+                            tmp_cells[0] = ucells[i]
+                            tmp_cells[1] = ucells[j]
+                            tmp_cells[2] = ucells[k]
+                            tmp_cells[3] = ucells[l]
+                            if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 4):
+                                if n_als < MAX_ALS:
+                                    als_cells[n_als, 0] = ucells[i]
+                                    als_cells[n_als, 1] = ucells[j]
+                                    als_cells[n_als, 2] = ucells[k]
+                                    als_cells[n_als, 3] = ucells[l]
+                                    als_ncells[n_als] = 4
+                                    als_cands[n_als] = union
+                                    n_als += 1
 
         for i in range(n_uc - 4):
             ca = cands[ucells[i]]
@@ -292,15 +331,21 @@ def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
                         for m in range(l + 1, n_uc):
                             union = cabcd | cands[ucells[m]]
                             if popcount_lut[union] == 6:
-                                if n_als < MAX_ALS:
-                                    als_cells[n_als, 0] = ucells[i]
-                                    als_cells[n_als, 1] = ucells[j]
-                                    als_cells[n_als, 2] = ucells[k]
-                                    als_cells[n_als, 3] = ucells[l]
-                                    als_cells[n_als, 4] = ucells[m]
-                                    als_ncells[n_als] = 5
-                                    als_cands[n_als] = union
-                                    n_als += 1
+                                tmp_cells[0] = ucells[i]
+                                tmp_cells[1] = ucells[j]
+                                tmp_cells[2] = ucells[k]
+                                tmp_cells[3] = ucells[l]
+                                tmp_cells[4] = ucells[m]
+                                if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 5):
+                                    if n_als < MAX_ALS:
+                                        als_cells[n_als, 0] = ucells[i]
+                                        als_cells[n_als, 1] = ucells[j]
+                                        als_cells[n_als, 2] = ucells[k]
+                                        als_cells[n_als, 3] = ucells[l]
+                                        als_cells[n_als, 4] = ucells[m]
+                                        als_ncells[n_als] = 5
+                                        als_cands[n_als] = union
+                                        n_als += 1
 
     return als_cells, als_ncells, als_cands, n_als
 
