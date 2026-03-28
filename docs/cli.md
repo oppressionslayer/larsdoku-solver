@@ -97,11 +97,13 @@ Use these short names with `--only` and `--exclude`:
 | `template` | Template |
 | `bowman` | BowmanBingo |
 
-### Mask Tools
+### Mask & Forge Tools
 
 | Flag | Description |
 |---|---|
 | `--to-mask PUZZLE` | Convert a puzzle string to its mask (`0` → `0`, nonzero → `X`) |
+| `--forge-permute PUZZLE` | Constellation Forge: digit-permutation forge from a unique puzzle. Generates up to 362,880 unique puzzles by relabeling digits 1-9. Accepts bd81, `..X...`, or `00X000` formats |
+| `--forge-permute-count N` | Number of permuted puzzles to output (default 10, max 362,880) |
 | `--forge-solve MASK` | Forge guaranteed-unique puzzles from a mask, then solve each one |
 | `--forge-count N` | Number of forged puzzles to solve (default 5) |
 | `--test-mask MASK` | Test a mask: generate 25 puzzles + 25 shuffled variants, report solve rates |
@@ -165,6 +167,21 @@ larsdoku --inspector R6C2 "980700600700000090006050000..."
 ```bash
 larsdoku --cascade --batch 20 "980700600700000090006050000..."
 ```
+
+**Constellation Forge — generate 362,880 unique puzzles from one:**
+
+```bash
+# Generate 10 unique puzzles via digit permutation
+larsdoku --forge-permute "000060010000300007000001300007000080020400006100005900003050060800009500040200091"
+
+# Generate 1000 and pipe to file
+larsdoku --forge-permute "000060010000300007..." --forge-permute-count 1000 >> puzzles.txt
+
+# Generate ALL 362,880 permutations
+larsdoku --forge-permute "000060010000300007..." --forge-permute-count 362880 >> all_362k.txt
+```
+
+Every output puzzle is guaranteed unique. The summary goes to stderr so piping stays clean.
 
 **Watch the engine solve step by step:**
 

@@ -83,3 +83,29 @@ Each step shows:
 - Notes before → placed (with strikethrough on eliminated candidates)
 - Technique-specific reason
 - Oracle save warnings
+
+## Constellation Forge
+
+The `--forge-permute` command generates unique puzzles from any unique puzzle by relabeling digits 1-9. Every permutation of the digit mapping produces a structurally identical puzzle with different numbers.
+
+```bash
+# From a unique puzzle, generate 10 unique variants
+larsdoku --forge-permute "000060010000300007000001300..." --forge-permute-count 10
+
+# Generate all 362,880 (9!) permutations — pipe to file
+larsdoku --forge-permute "000060010000300007000001300..." --forge-permute-count 362880 >> all.txt
+```
+
+**Key finding:** For well-formed masks (23-24 clues), **100% of digit permutations produce unique puzzles**. That's 362,880 unique puzzles from a single source puzzle, generated in under 8 minutes.
+
+The HYPERSIRO Research HTML also includes a **Mask Forge** button in the Forge & Shuffle panel. Enter an 81-character mask (or leave empty to use the current puzzle's mask) and generate permuted puzzles instantly in the browser.
+
+### The 135 Rule
+
+Zone position sums across a solved board follow a strict mathematical identity:
+
+- Each **row** of zone sums (TL+TC+TR, ML+MC+MR, BL+BC+BR) = **135**
+- Each **column** of zone sums (TL+ML+BL, TC+MC+BC, TR+MR+BR) = **135**
+- Total of all 9 zone sums = **405**
+
+This holds for EVERY valid Sudoku — it's a mathematical guarantee (3 × 45 = 135). The individual zone sums vary per puzzle, but the row/column totals are invariant. This constraint can validate predictions and detect errors in HYPERSIRO cascades.
