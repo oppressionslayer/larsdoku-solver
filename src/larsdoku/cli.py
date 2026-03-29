@@ -3337,6 +3337,8 @@ presets:
                        help='Target zone sum spread for grid generation (2=easy, 15=medium, 25=hard, 30+=extreme)')
     parser.add_argument('--lars-forge-zone', type=str, metavar='ZONE=VALUE',
                        help='Target specific zone sum, e.g. MC=51 or TL=55')
+    parser.add_argument('--make-puzzle', action='store_true',
+                       help='Convert generated grids to solvable puzzles via iterative clue removal')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
     parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
@@ -4653,11 +4655,36 @@ presets:
                 seen.add(new_grid)
                 results.append((new_grid, zs))
 
-        print()
-        for g, zs in results:
-            spread = max(zs) - min(zs)
-            print(f'  {g}  spread={spread}')
-        print(f'\n  # {len(results)} grids generated')
+        if args.make_puzzle:
+            # Convert grids to unique puzzles via iterative removal
+            from .engine import has_unique_solution
+            import random as _rng2
+
+            print(f'  Converting to puzzles (iterative removal)...')
+            print()
+
+            for idx, (g, zs) in enumerate(results):
+                spread = max(zs) - min(zs)
+                rng2 = _rng2.Random(idx * 31 + 7)
+                puzzle = list(g)
+                positions = list(range(81))
+                rng2.shuffle(positions)
+                for pos in positions:
+                    old = puzzle[pos]
+                    puzzle[pos] = '0'
+                    if not has_unique_solution(''.join(puzzle)):
+                        puzzle[pos] = old
+
+                puzzle_str = ''.join(puzzle)
+                n_clues = sum(1 for c in puzzle_str if c != '0')
+                print(f'  {puzzle_str}  ({n_clues} clues, spread={spread})')
+        else:
+            print()
+            for g, zs in results:
+                spread = max(zs) - min(zs)
+                print(f'  {g}  spread={spread}')
+
+        print(f'\n  # {len(results)} {"puzzles" if args.make_puzzle else "grids"} generated')
         print()
         return
 
