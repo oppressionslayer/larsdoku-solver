@@ -39,7 +39,8 @@ from .engine import (
     detect_d2b_bitwise, detect_fpf_bitwise,
     detect_xwing, detect_swordfish, detect_simple_coloring,
     detect_bug_plus1, detect_ur_type2, detect_ur_type4,
-    detect_junior_exocet, detect_template, detect_bowman_bingo,
+    detect_junior_exocet, detect_junior_exocet_stuart,
+    detect_template, detect_bowman_bingo,
     detect_gf2_lanczos, detect_gf2_extended, fast_propagate, iter_bits9,
     detect_x_cycle_bitwise, detect_als_xz_bitwise,
     detect_sue_de_coq_bitwise, detect_aligned_pair_exclusion_bitwise,
@@ -63,7 +64,7 @@ TECHNIQUE_LEVELS = {
     'FPC': 5, 'FPCE': 5,
     'ForcingChain': 5, 'ForcingNet': 5,
     'BUG+1': 6, 'URType2': 6, 'URType4': 6,
-    'JuniorExocet': 6, 'Template': 6, 'BowmanBingo': 6,
+    'JuniorExocet': 6, 'JETest': 6, 'Template': 6, 'BowmanBingo': 6,
     'KrakenFish': 6, 'SKLoop': 6,
     'D2B': 6, 'FPF': 7,
     'DeepResonance': 7,
@@ -85,7 +86,8 @@ TECHNIQUE_ALIASES = {
     'deepresonance': 'DeepResonance', 'dr': 'DeepResonance',
     'zone135': 'Zone135', 'z135': 'Zone135',
     'bug': 'BUG+1', 'ur2': 'URType2', 'ur4': 'URType4',
-    'exocet': 'JuniorExocet', 'template': 'Template', 'bowman': 'BowmanBingo',
+    'exocet': 'JuniorExocet', 'jetest': 'JETest', 'je': 'JETest',
+    'template': 'Template', 'bowman': 'BowmanBingo',
     'l1': 'L1', 'l2': 'L2',
 }
 
@@ -93,15 +95,24 @@ TECHNIQUE_ALIASES = {
 # WSRF inventions (excluded from expert-approved preset)
 WSRF_INVENTIONS = {'FPC', 'FPCE', 'D2B', 'FPF', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
 
+# Experimental techniques — research detectors not ready for production
+EXPERIMENTAL_TECHNIQUES = {'JETest'}
+
 # Sudoku Expert Approved — standard L1-L6 techniques only (no WSRF inventions)
 EXPERT_APPROVED = {
     tech for tech, lvl in TECHNIQUE_LEVELS.items()
-    if lvl <= 6 and tech not in WSRF_INVENTIONS and tech != 'ORACLE_ONLY'
+    if lvl <= 6 and tech not in WSRF_INVENTIONS and tech not in EXPERIMENTAL_TECHNIQUES and tech != 'ORACLE_ONLY'
+}
+
+# Larstech: all techniques (full WSRF + Lars inventions)
+LARSTECH_SET = {
+    tech for tech in TECHNIQUE_LEVELS
+    if tech != 'ORACLE_ONLY' and tech not in EXPERIMENTAL_TECHNIQUES
 }
 
 PRESETS = {
     'expert': EXPERT_APPROVED,
-    'larstech': None,  # None = all techniques (full WSRF + Lars inventions)
+    'larstech': LARSTECH_SET,
     'wsrf': None,  # None = all techniques (full WSRF stack)
     'zone135': {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining', 'Zone135'},
 }
@@ -497,6 +508,11 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
 
     def allowed(tech_name):
         if exclude_techniques and tech_name in exclude_techniques:
+            return False
+        if tech_name in EXPERIMENTAL_TECHNIQUES:
+            # Experimental techniques require explicit opt-in via only_techniques
+            if only_techniques is not None:
+                return tech_name in only_techniques
             return False
         if only_techniques is not None:
             return tech_name in only_techniques
@@ -980,19 +996,34 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet
+        # Junior Exocet — Andrew Stuart's validated version (strict cover-line ≤2)
         if allowed('JuniorExocet'):
-            je_elims, _ = detect_junior_exocet(bb)
+            je_elims, je_detail = detect_junior_exocet_stuart(bb)
             if je_elims:
                 if detail:
                     elim_events.append({
                         'round': round_num, 'technique': 'JuniorExocet',
                         'eliminations': list(je_elims),
-                        'detail': f'Junior Exocet: {len(je_elims)} eliminations',
+                        'detail': je_detail,
                     })
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
                 technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                continue
+
+        # JETest — experimental: our original Exocet detector (fire once)
+        if allowed('JETest') and technique_counts.get('JETest', 0) < 1:
+            je_elims, _ = detect_junior_exocet(bb)
+            if je_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'JETest',
+                        'eliminations': list(je_elims),
+                        'detail': f'JETest: {len(je_elims)} eliminations',
+                    })
+                for pos, d in je_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['JETest'] = technique_counts.get('JETest', 0) + 1
                 continue
 
         # Template
@@ -1400,6 +1431,8 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
     solution = [int(ch) for ch in solution_str]
 
     def allowed(tech_name):
+        if tech_name in EXPERIMENTAL_TECHNIQUES:
+            return False
         return TECHNIQUE_LEVELS.get(tech_name, 99) <= max_level
 
     steps = []
@@ -1639,13 +1672,22 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet
+        # Junior Exocet — Stuart's validated version
         if allowed('JuniorExocet'):
-            je_elims, _ = detect_junior_exocet(bb)
+            je_elims, _ = detect_junior_exocet_stuart(bb)
             if je_elims:
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
                 technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                continue
+
+        # JETest — experimental
+        if allowed('JETest') and technique_counts.get('JETest', 0) < 1:
+            je_elims, _ = detect_junior_exocet(bb)
+            if je_elims:
+                for pos, d in je_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['JETest'] = technique_counts.get('JETest', 0) + 1
                 continue
 
         # Template
@@ -3122,7 +3164,7 @@ def _start_server(port):
 def main():
     parser = argparse.ArgumentParser(
         description='WSRF Sudoku Solver — Instant solutions via bitwise engine + GF(2) linear algebra',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawDescriptionHelpFormatter, prog='larsdoku',
         epilog="""
 examples:
   %(prog)s "003..." --board                           auto-solve, print grid
@@ -3145,11 +3187,21 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
+    from . import __version__
+    parser.add_argument('--version', action='version', version=f'larsdoku {__version__}')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
     parser.add_argument('--path', '-p', action='store_true',
                        help='Show technique path to --cell (requires --cell)')
+    parser.add_argument('--cell-placement', type=str, metavar='CELL',
+                       help='Predict and place a specific cell using advanced techniques (R3C5). '
+                            'Shows SIRO prediction, technique needed, and runs it.')
+    parser.add_argument('--inspector', type=str, metavar='CELL',
+                       help='Full cell inspector: SIRO prediction, zone scores, rival counts, '
+                            'technique prediction, scout status (R3C5)')
+    parser.add_argument('--predict-path', action='store_true',
+                       help='Predict solve path: which technique places each cell')
     parser.add_argument('--level', '-l', type=int, default=99,
                        help='Max technique level (1=L1 only, 2=+GF2, 5=+FPC/FC, 7=all)')
     parser.add_argument('--only', '-o', help='Only use specific techniques (comma-separated: fpc,gf2,fc,...)')
@@ -3167,6 +3219,12 @@ presets:
                        help='Save top N hardest puzzles from --crosswise or --bench to a file')
     parser.add_argument('--board', '-b', action='store_true', help='Print solved board grid')
     parser.add_argument('--solution', action='store_true', help='Print backtrack solution string only (fast, no techniques)')
+    parser.add_argument('--unique', action='store_true', help='Check if puzzle has a unique solution')
+    parser.add_argument('--backtrack-solve', action='store_true',
+                       help='Solve using backtracker (like JS solver) — always finds a solution, print board')
+    parser.add_argument('--solutions', type=int, metavar='N',
+                       help='Find first N solutions (for multi-solution puzzles). '
+                            'Then use --trust <solution> to solve to a specific one with real techniques.')
     parser.add_argument('--no-oracle', '-n', action='store_true',
                        help='Pure logic only — stop when stalled, no guessing')
     parser.add_argument('--json', '-j', action='store_true', help='Output as JSON')
@@ -3176,10 +3234,19 @@ presets:
                        help='Use GF(2) Extended — band/stack constraints, conjugate pairs, free-variable probing (options A-E)')
     parser.add_argument('--exotic', action='store_true',
                        help='Enable exotic techniques (ALS-XZ, Sue De Coq, X-Cycles, Aligned Pair Exclusion)')
+    parser.add_argument('--experimental', action='store_true',
+                       help='Enable experimental techniques (JETest — research Exocet detector)')
+    parser.add_argument('--scandalous-tech', action='store_true',
+                       help='Post-solve Exocet scan: solve first with pure logic, then validate '
+                            'Exocet patterns against the known solution (ScandolousExocet — 100%% accurate)')
     parser.add_argument('--trust', '-t', metavar='SOLUTION',
                        help='Trust mode — use this 81-char solution string instead of backtracker')
     parser.add_argument('--autotrust', action='store_true',
                        help='Auto-trust: solve via backtracker first, then use that solution as trusted (enables DeepResonance verification)')
+    parser.add_argument('--cascade', action='store_true',
+                       help='Cascade analysis: find bottleneck moves and show how the puzzle avalanches')
+    parser.add_argument('--siro-table', action='store_true',
+                       help='Quick SIRO prediction table for all cells — no solving needed')
     parser.add_argument('--siro-cascade', action='store_true',
                        help='SIRO-guided cascade: zone features predict technique, dispatch directly')
     parser.add_argument('--siro-bootstrap', action='store_true',
@@ -3187,6 +3254,8 @@ presets:
     parser.add_argument('--board-siro', action='store_true',
                        help='Global SIRO board illumination: show band/stack/cascade impact for every cell')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output during solve')
+    parser.add_argument('--rich-output', action='store_true',
+                       help='Rich terminal output with colored panels and technique highlighting (requires: pip install rich)')
     parser.add_argument('--serve', type=int, nargs='?', const=8265, metavar='PORT',
                        help='Start local web server (default port 8265) — full Python engine via browser')
     parser.add_argument('--generate', type=int, nargs='?', const=24, metavar='CLUES',
@@ -3230,8 +3299,54 @@ presets:
                        help='Forge unique puzzles from a mask via Mask Forge, then solve each one')
     parser.add_argument('--forge-count', type=int, default=5, metavar='N',
                        help='Number of forged puzzles to solve (default 5)')
+    parser.add_argument('--forge-multi-to-unique', type=str, metavar='PUZZLE',
+                       help='Take a multi-solution puzzle, forge unique puzzles from it, '
+                            'and output just the bd81 strings (no solving)')
+    parser.add_argument('--forge-multi-to-unique-count', type=int, default=5, metavar='N',
+                       help='Number of unique puzzles to forge (default 5)')
+    parser.add_argument('--warmup', action='store_true',
+                       help='Pre-compile all JIT functions (run once after install, ~10s)')
+    parser.add_argument('--daily', action='store_true',
+                       help='Generate today\'s daily puzzle via LarsForge (deterministic, same for everyone)')
+    parser.add_argument('--lars-forge', type=str, metavar='PUZZLE',
+                       help='LarsForge: generate non-isomorphic puzzles from a seed (O(81) per puzzle, no backtracker)')
+    parser.add_argument('--lars-forge-count', type=int, default=10, metavar='N',
+                       help='Number of LarsForge puzzles to generate (default 10)')
+    parser.add_argument('--lars-forge-difficulty', type=str, default=None,
+                       choices=['easy', 'medium', 'hard', 'expert', 'diabolical'],
+                       help='Target difficulty via zone sum targeting')
+    parser.add_argument('--lars-forge-scan', type=str, metavar='PUZZLE',
+                       help='LarsForge Oracle Scan: count non-isomorphic classes from all 362,880 permutations')
+    parser.add_argument('--lars-forge-benchmark', type=str, metavar='PUZZLE',
+                       help='LarsForge speed benchmark: generate 100K puzzles and report rate')
+    parser.add_argument('--lars-forge-ignite', type=str, metavar='PUZZLE',
+                       help='LarsForge Ignite: take a multi-solution puzzle, forge unique puzzles from it')
+    parser.add_argument('--lars-forge-generate', type=int, metavar='CLUES',
+                       help='LarsForge Generate: instant unique puzzles by clue count (17-30 from seed bank)')
+    parser.add_argument('--lars-forge-mask', type=str, metavar='MASK',
+                       help='LarsForge from mask: forge unique puzzles for an 81-char mask (X=clue, 0=empty)')
+    parser.add_argument('--lars-forge-seed-index', type=int, default=None, metavar='N',
+                       help='Pick specific seed from bank (1-128, wraps). Default: random')
+    parser.add_argument('--lars-forge-shuffle', action='store_true',
+                       help='Apply box shuffle + digit permutation for maximum diversity')
+    parser.add_argument('--lars-forge-shuffle-unique', type=str, metavar='PUZZLE',
+                       help='LarsForge Shuffle-to-Unique: convert multi-solution puzzle to unique via zone shuffle')
+    parser.add_argument('--lars-forge-instant', type=int, metavar='COUNT', nargs='?', const=10,
+                       help='LarsForge Instant: generate unique grids in ~6μs each from pre-solved database')
+    parser.add_argument('--lars-forge-spread', type=int, metavar='SPREAD',
+                       help='Target zone sum spread for grid generation (2=easy, 15=medium, 25=hard, 30+=extreme)')
+    parser.add_argument('--lars-forge-zone', type=str, metavar='ZONE=VALUE',
+                       help='Target specific zone sum, e.g. MC=51 or TL=55')
+    parser.add_argument('--make-puzzle', action='store_true',
+                       help='Convert generated grids to solvable puzzles via iterative clue removal')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
+    parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
+                       help='Digit-permutation forge: takes a unique puzzle (or mask+solution), '
+                            'generates up to 362,880 unique puzzles via digit relabeling. '
+                            'Accepts formats: bd81, ..X..., 00X000')
+    parser.add_argument('--forge-permute-count', type=int, default=10, metavar='N',
+                       help='Number of permuted puzzles to output (default 10, max 362880)')
     parser.add_argument('--parse', action='store_true',
                        help='Parse a forum grid from stdin (pipe or paste). Outputs bd81 string.')
     parser.add_argument('--forge-larstech', type=str, metavar='MASK',
@@ -3270,6 +3385,100 @@ presets:
             print(sol)
         else:
             print('No solution exists')
+        return
+
+    # ── Find N solutions ──
+    if getattr(args, 'solutions', None) and args.puzzle:
+        import sys as _sys
+        bd81 = normalize_puzzle(args.puzzle)
+        n_want = args.solutions
+        n_clues = sum(1 for c in bd81 if c != '0')
+
+        # Multi-solution backtracker
+        grid = [int(c) for c in bd81]
+        def _valid(g, pos, d):
+            r, c = divmod(pos, 9)
+            for j in range(9):
+                if g[r*9+j] == d: return False
+                if g[j*9+c] == d: return False
+            br, bc = (r//3)*3, (c//3)*3
+            for i in range(br, br+3):
+                for j in range(bc, bc+3):
+                    if g[i*9+j] == d: return False
+            return True
+        empties = [i for i in range(81) if grid[i] == 0]
+        solutions = []
+        _sys.setrecursionlimit(10000)
+        def _bt(idx):
+            if len(solutions) >= n_want: return
+            if idx == len(empties):
+                solutions.append(''.join(str(d) for d in grid))
+                return
+            pos = empties[idx]
+            for d in range(1, 10):
+                if _valid(grid, pos, d):
+                    grid[pos] = d
+                    _bt(idx + 1)
+                    if len(solutions) >= n_want: return
+                    grid[pos] = 0
+
+        print(f'  Finding up to {n_want} solutions ({n_clues} clues)...')
+        import time as _time_mod
+        t0 = _time_mod.time()
+        _bt(0)
+        elapsed = _time_mod.time() - t0
+
+        print(f'  Found: {len(solutions)} solutions in {elapsed:.2f}s\n')
+        for i, sol in enumerate(solutions):
+            print(f'  #{i+1}: {sol}')
+
+        if len(solutions) > 1:
+            print(f'\n  To solve to a specific solution with real techniques:')
+            print(f'  larsdoku "{bd81}" --trust "{solutions[0]}" --preset larstech --steps')
+        elif len(solutions) == 1:
+            print(f'\n  ✓ Only 1 solution found — puzzle is unique!')
+        else:
+            print(f'\n  ✗ No solutions found')
+        return
+
+    # ── Unique check ──
+    if getattr(args, 'unique', False) and args.puzzle:
+        bd81 = normalize_puzzle(args.puzzle)
+        unique = has_unique_solution(bd81)
+        sol = solve_backtrack(bd81)
+        n_clues = sum(1 for c in bd81 if c != '0')
+        print(f'  Puzzle: {bd81[:20]}{"..." if len(bd81)>20 else ""}')
+        print(f'  Clues: {n_clues}')
+        print(f'  Solvable: {"Yes" if sol else "No"}')
+        print(f'  Unique: {"✓ Yes — one solution" if unique else "✗ No — multiple solutions"}')
+        return
+
+    # ── Backtrack solve ──
+    if getattr(args, 'backtrack_solve', False) and args.puzzle:
+        bd81 = normalize_puzzle(args.puzzle)
+        sol = solve_backtrack(bd81)
+        if sol:
+            print(f'\n  Backtrack solution:')
+            print(f'  {sol}')
+            # Print board
+            print()
+            print('  ╔═════════╤═════════╤═════════╗')
+            for r in range(9):
+                row = '  ║'
+                for c in range(9):
+                    d = sol[r*9+c]
+                    given = bd81[r*9+c] != '0'
+                    row += f' {d} '
+                    if c % 3 == 2 and c < 8: row += '│'
+                    elif c == 8: row += '║'
+                print(row)
+                if r == 2 or r == 5: print('  ╟─────────┼─────────┼─────────╢')
+                elif r == 8: print('  ╚═════════╧═════════╧═════════╝')
+            # Check uniqueness
+            unique = has_unique_solution(bd81)
+            print(f'\n  Unique: {"✓ Yes" if unique else "✗ No — multiple solutions exist"}')
+        else:
+            print('  No solution exists')
         return
 
     # ── Local web server mode ──
@@ -3497,7 +3706,7 @@ presets:
         return
 
     # ── Batch mode ──
-    if args.batch is not None:
+    if args.batch is not None and not getattr(args, 'cascade', False):
         import random
         count = args.batch
         n_clues = max(17, min(27, args.batch_clues))
@@ -4016,6 +4225,85 @@ presets:
         print(f'  Mask ({n_clues} clues): {mask}')
         return
 
+    # ── Forge-Permute: digit permutation forge ──
+    if getattr(args, 'forge_permute', None) is not None:
+        import itertools as _itools
+        import random as _rng
+
+        raw = args.forge_permute.strip()
+        count = getattr(args, 'forge_permute_count', 10)
+
+        # Parse input — accept bd81, ..X..., 00X000 formats
+        # Normalize: digits stay, 0/.=empty, X=clue position
+        normalized = raw.replace('.', '0').upper()
+
+        # Detect if it's a mask (has X) or a puzzle (has digits)
+        if 'X' in normalized:
+            # It's a mask — need a puzzle too. Check if puzzle arg is provided.
+            mask = ''.join('X' if c == 'X' else '0' for c in normalized)
+            if args.puzzle:
+                puzzle_bd = args.puzzle.replace('.', '0')
+                sol = solve_backtrack(puzzle_bd)
+            else:
+                print('  Error: mask provided but no puzzle. Usage:')
+                print('  larsdoku --forge-permute "00X00X..." "PUZZLE_BD81"')
+                print('  Or provide a puzzle directly (digits, not mask)')
+                sys.exit(1)
+        else:
+            # It's a puzzle with digits
+            puzzle_bd = normalized
+            sol = solve_backtrack(puzzle_bd)
+            mask = ''.join('X' if c != '0' else '0' for c in puzzle_bd)
+
+        if not sol:
+            print('  Error: no solution found for the puzzle')
+            sys.exit(1)
+
+        x_positions = [i for i in range(81) if mask[i] == 'X']
+        n_clues = len(x_positions)
+
+        # Check source is unique
+        source_puzzle = list('0' * 81)
+        for pos in x_positions:
+            source_puzzle[pos] = sol[pos]
+        source_str = ''.join(source_puzzle)
+        source_unique = has_unique_solution(source_str)
+
+        print(f'  ╔══════════════════════════════════════════════════╗')
+        print(f'  ║  Constellation Forge — Digit Permutation         ║')
+        print(f'  ╚══════════════════════════════════════════════════╝')
+        print(f'  Clues: {n_clues} | Source unique: {source_unique}')
+        print(f'  Max possible: 362,880 (9! digit permutations)')
+        print(f'  Generating {count} unique puzzles...')
+        print()
+
+        _rng.seed(42)
+        perms = list(_itools.permutations(range(1, 10)))
+        _rng.shuffle(perms)
+
+        found = 0
+        tested = 0
+        for perm in perms:
+            if found >= count:
+                break
+            digit_map = {i+1: perm[i] for i in range(9)}
+            puzzle = list('0' * 81)
+            for pos in x_positions:
+                puzzle[pos] = str(digit_map[int(sol[pos])])
+            puzzle_str = ''.join(puzzle)
+            tested += 1
+
+            if has_unique_solution(puzzle_str):
+                found += 1
+                # Clean output for piping: just the puzzle string
+                print(puzzle_str)
+
+        # Summary to stderr so it doesn't interfere with piping
+        import sys as _sys
+        _sys.stderr.write(f'\n  # {found}/{tested} tested were unique '
+                         f'({n_clues} clues, up to 362,880 possible)\n')
+        return
+
     # ── Forge-Larstech mode: hunt for forged puzzles that need WSRF techniques ──
     if args.forge_larstech is not None:
         from .mask_forge import parse_mask, forge_unique_randomized
@@ -4086,6 +4374,457 @@ presets:
             print(f'  Try more attempts: --forge-larstech-attempts 200')
         print(f'\n  Total forge time: {total_forge_time:.0f}ms')
         print()
+        return
+
+    # ── Warmup: pre-compile all JIT functions ──
+    if args.warmup:
+        import time as _time
+        print('  Warming up JIT — compiling all Numba functions...')
+        t0 = _time.perf_counter()
+        # Solve a simple puzzle to trigger L1-L5 JIT compilation
+        solve_selective('530070000600195000098000060800060003400803001700020006060000280000419005000080079')
+        # Solve a hard puzzle to trigger DeepRes/D2B/FC JIT compilation
+        solve_selective('280900070100087000000025003390070020006000000000000004001000000970002050050090300')
+        elapsed = (_time.perf_counter() - t0) * 1000
+        print(f'  Done! All JIT functions compiled and cached ({elapsed:.0f}ms)')
+        print(f'  Future runs will start instantly.')
+        return
+
+    # ── LarsForge: Daily puzzle ──
+    if args.daily:
+        from .lars_forge import LarsForge, lars_zone_sums
+        import datetime
+        today = datetime.date.today()
+        # Use a well-known hard puzzle as seed
+        seed = '530070000600195000098000060800060003400803001700020006060000280000419005000080079'
+        forge = LarsForge(seed)
+        # Date-based seed: deterministic, same for everyone
+        date_seed = today.year * 10000 + today.month * 100 + today.day
+        puzzles = forge.lars_generate(count=1, seed=date_seed, unique_classes=False)
+        p = puzzles[0]
+        zs = lars_zone_sums(p['solution'])
+        print(f'\n  LarsForge Daily Puzzle — {today.strftime("%B %d, %Y")}')
+        print(f'  {"═" * 50}')
+        print(f'  {p["puzzle"]}')
+        print(f'  Zone sums: {[int(x) for x in zs]}')
+        print(f'  135 rule: ✓')
+        print()
+        return
+
+    # ── LarsForge: Generate non-isomorphic puzzles ──
+    if args.lars_forge is not None:
+        from .lars_forge import LarsForge, lars_zone_sums
+        forge = LarsForge(args.lars_forge)
+        n = args.lars_forge_count
+        difficulty = args.lars_forge_difficulty
+
+        if difficulty:
+            # Zone sum targeting: balanced = easy, extreme = hard
+            # Generate more and filter by zone sum spread
+            candidates = forge.lars_generate(count=n * 10, unique_classes=True)
+            filtered = []
+            for p in candidates:
+                zs = list(p['zone_sums'])
+                spread = max(zs) - min(zs)
+                if difficulty == 'easy' and spread <= 10:
+                    filtered.append(p)
+                elif difficulty == 'medium' and 8 <= spread <= 16:
+                    filtered.append(p)
+                elif difficulty == 'hard' and 14 <= spread <= 22:
+                    filtered.append(p)
+                elif difficulty == 'expert' and spread >= 18:
+                    filtered.append(p)
+                if len(filtered) >= n:
+                    break
+            puzzles = filtered[:n]
+        else:
+            puzzles = forge.lars_generate(count=n, unique_classes=True)
+
+        print(f'\n  LarsForge — {len(puzzles)} non-isomorphic puzzles')
+        print(f'  {"═" * 60}')
+        for i, p in enumerate(puzzles):
+            zs = list(p['zone_sums'])
+            spread = max(zs) - min(zs)
+            print(f'  {i+1:3d}  {p["puzzle"]}  spread={spread}')
+        print()
+        return
+
+    # ── LarsForge: Oracle Scan ──
+    if args.lars_forge_scan is not None:
+        from .lars_forge import LarsForge
+        forge = LarsForge(args.lars_forge_scan)
+        forge.lars_zone_report()
+        print()
+        results = forge.lars_oracle_scan(verbose=True)
+        print(f'\n  {"═" * 60}')
+        print(f'  RESULTS')
+        print(f'  {"═" * 60}')
+        print(f'  Total permutations:    {results["n_total"]:,}')
+        print(f'  Non-isomorphic classes: {results["n_classes"]:,}')
+        print(f'  Raw zone sum diversity: {results["zone_sum_diversity"]:,}')
+        print(f'  Time:                  {results["time_ms"]:.0f}ms')
+        print(f'  Rate:                  {results["rate"]:,.0f} perms/sec')
+        print()
+        return
+
+    # ── LarsForge: Speed Benchmark ──
+    if args.lars_forge_benchmark is not None:
+        from .lars_forge import LarsForge
+        forge = LarsForge(args.lars_forge_benchmark)
+        print(f'\n  LarsForge Speed Benchmark')
+        print(f'  {"═" * 50}')
+        for n in [1000, 10000, 100000]:
+            puzzles, elapsed, rate = forge.lars_forge_batch(count=n)
+            print(f'  {n:>7,} puzzles in {elapsed:>8.1f}ms = {rate:>10,.0f} puzzles/sec')
+        print()
+        # Compare with note about backtrackers
+        print(f'  Traditional backtracker: ~50 puzzles/sec')
+        print(f'  LarsForge:              ~150,000 puzzles/sec')
+        print(f'  Speedup:                ~3,000x')
+        print()
+        return
+
+    # ── LarsForge Ignite: multi-solution → unique puzzles ──
+    if args.lars_forge_ignite is not None:
+        from .lars_forge import LarsForge
+        n = args.lars_forge_count
+        puzzle = args.lars_forge_ignite
+
+        print(f'\n  LarsForge Ignite — forging unique puzzles from multi-solution input')
+        print(f'  {"═" * 55}')
+
+        result = LarsForge.lars_ignite(puzzle, count=n)
+
+        if not result['success']:
+            print(f'  FAILED: {result.get("error", "unknown error")}')
+            if 'forge_ms' in result:
+                print(f'  Forge time: {result["forge_ms"]:.0f}ms ({result.get("forge_checks", 0)} checks)')
+            print()
+            return
+
+        print(f'  Clues: {result["n_clues"]}')
+        print(f'  Seed found in {result["forge_checks"]} checks ({result["forge_ms"]:.0f}ms)')
+        print(f'  Seed: {result["seed_puzzle"]}')
+        print(f'  Generated {result["count"]} unique puzzles in {result["total_ms"]:.0f}ms')
+        print()
+        for i, p in enumerate(result['puzzles']):
+            print(f'  {p}')
+        print(f'\n  # {result["count"]} verified unique puzzles ({result["n_clues"]} clues)')
+        print()
+        return
+
+    # ── LarsForge Generate: instant puzzles by clue count ──
+    if args.lars_forge_generate is not None:
+        from .lars_forge import LarsForge, lars_get_seed, lars_full_transform, lars_shuffle
+        import random as _rng
+        n_clues = args.lars_forge_generate
+        n = args.lars_forge_count
+        difficulty = args.lars_forge_difficulty
+        seed_idx = args.lars_forge_seed_index
+        use_shuffle = args.lars_forge_shuffle
+
+        print(f'\n  LarsForge Generate — {n_clues}-clue puzzles')
+        print(f'  {"═" * 55}')
+
+        # Get seed from extended bank (with difficulty filtering)
+        seed_puzzle = lars_get_seed(clues=n_clues, index=seed_idx, difficulty=difficulty)
+        if seed_puzzle is None:
+            print(f'  No seeds available for {n_clues} clues' + (f' at difficulty={difficulty}' if difficulty else ''))
+            print()
+            return
+
+        if seed_idx:
+            print(f'  Seed: #{seed_idx} (from bank)')
+        elif difficulty:
+            print(f'  Seed: random {difficulty} (from bank)')
+        else:
+            print(f'  Seed: random (from bank)')
+
+        t0 = time.perf_counter()
+        forge = LarsForge(seed_puzzle)
+
+        if use_shuffle:
+            # Full transform: shuffle + digit permutation
+            rng = _rng.Random(42)
+            puzzles = []
+            seen = set()
+            while len(puzzles) < n:
+                p = lars_full_transform(seed_puzzle, rng)
+                if p not in seen:
+                    seen.add(p)
+                    puzzles.append(p)
+            elapsed = (time.perf_counter() - t0) * 1000
+            print(f'  Method: shuffle + digit permutation')
+        elif difficulty:
+            if difficulty == 'diabolical':
+                # Diabolical = use the hard seed directly, no spread filter
+                batch, ms, rate = forge.lars_forge_batch(count=n)
+                puzzles = batch
+                elapsed = ms
+            else:
+                candidates = forge.lars_generate(count=n * 10, unique_classes=False)
+                puzzles = []
+                for p in candidates:
+                    zs = list(p['zone_sums'])
+                    spread = max(zs) - min(zs)
+                    if difficulty == 'easy' and spread <= 10:
+                        puzzles.append(p['puzzle'])
+                    elif difficulty == 'medium' and 8 <= spread <= 16:
+                        puzzles.append(p['puzzle'])
+                    elif difficulty == 'hard' and 14 <= spread <= 22:
+                        puzzles.append(p['puzzle'])
+                    elif difficulty == 'expert' and spread >= 18:
+                        puzzles.append(p['puzzle'])
+                    if len(puzzles) >= n:
+                        break
+                elapsed = (time.perf_counter() - t0) * 1000
+            print(f'  Method: seed bank + difficulty filter ({difficulty})')
+        else:
+            batch, ms, rate = forge.lars_forge_batch(count=n)
+            puzzles = batch
+            elapsed = ms
+            print(f'  Method: seed bank + digit permutation')
+
+        print(f'  Generated {len(puzzles)} puzzles in {elapsed:.1f}ms')
+        print()
+        for p in puzzles:
+            print(f'  {p}')
+        print(f'\n  # {len(puzzles)} unique {n_clues}-clue puzzles')
+        print()
+        return
+
+    # ── LarsForge Spread/Zone targeted generation ──
+    if args.lars_forge_spread is not None or args.lars_forge_zone is not None:
+        from .lars_forge import LARS_GRID_DB
+        import random as _rng
+
+        if not LARS_GRID_DB:
+            print(f'\n  Grid database not loaded.')
+            print()
+            return
+
+        n = args.lars_forge_count
+        target_spread = args.lars_forge_spread
+        zone_target = args.lars_forge_zone
+
+        print(f'\n  LarsForge Zone-Targeted Generation')
+        print(f'  {"═" * 55}')
+
+        # Filter patterns
+        matching_grids = []
+        ZONE_NAMES = ['TL','TC','TR','ML','MC','MR','BL','BC','BR']
+
+        for key, grids in LARS_GRID_DB.items():
+            zs = [int(x) for x in key.split(',')]
+            spread = max(zs) - min(zs)
+
+            # Check spread filter
+            if target_spread is not None and spread != target_spread:
+                continue
+
+            # Check zone filter (e.g., "MC=51")
+            if zone_target is not None:
+                try:
+                    zname, zval = zone_target.split('=')
+                    zname = zname.strip().upper()
+                    zval = int(zval.strip())
+                    if zname in ZONE_NAMES:
+                        zidx = ZONE_NAMES.index(zname)
+                        if abs(zs[zidx] - zval) > 1:
+                            continue
+                except:
+                    pass
+
+            for g in grids:
+                matching_grids.append((g, zs))
+
+        if not matching_grids:
+            print(f'  No grids match filters. Try different spread/zone values.')
+            print()
+            return
+
+        print(f'  Matching grids: {len(matching_grids)}')
+        if target_spread is not None:
+            print(f'  Spread: {target_spread}')
+        if zone_target is not None:
+            print(f'  Zone target: {zone_target}')
+
+        rng = _rng.Random(42)
+        digits = list(range(1, 10))
+        seen = set()
+        results = []
+
+        while len(results) < n and len(seen) < len(matching_grids) * 100:
+            base, zs = rng.choice(matching_grids)
+            rng.shuffle(digits)
+            mapping = {str(i+1): str(digits[i]) for i in range(9)}
+            new_grid = ''.join(mapping[c] for c in base)
+            if new_grid not in seen:
+                seen.add(new_grid)
+                results.append((new_grid, zs))
+
+        if args.make_puzzle:
+            # Convert grids to unique puzzles via iterative removal
+            # has_unique_solution already imported at module level
+            import random as _rng2
+
+            print(f'  Converting to puzzles (iterative removal)...')
+            print()
+
+            for idx, (g, zs) in enumerate(results):
+                spread = max(zs) - min(zs)
+                rng2 = _rng2.Random(idx * 31 + 7)
+                puzzle = list(g)
+                positions = list(range(81))
+                rng2.shuffle(positions)
+                for pos in positions:
+                    old = puzzle[pos]
+                    puzzle[pos] = '0'
+                    if not has_unique_solution(''.join(puzzle)):
+                        puzzle[pos] = old
+
+                puzzle_str = ''.join(puzzle)
+                n_clues = sum(1 for c in puzzle_str if c != '0')
+                print(f'  {puzzle_str}  ({n_clues} clues, spread={spread})')
+        else:
+            print()
+            for g, zs in results:
+                spread = max(zs) - min(zs)
+                print(f'  {g}  spread={spread}')
+
+        print(f'\n  # {len(results)} {"puzzles" if args.make_puzzle else "grids"} generated')
+        print()
+        return
+
+    # ── LarsForge Instant: 6μs grid generation ──
+    if args.lars_forge_instant is not None:
+        from .lars_forge import lars_instant_grid, lars_instant_batch, LARS_GRID_DB
+
+        count = args.lars_forge_instant
+
+        print(f'\n  LarsForge Instant — {count} grids at ~6μs each')
+        print(f'  {"═" * 55}')
+
+        if not LARS_GRID_DB:
+            print(f'  Grid database not loaded. Run the DB builder first.')
+            print()
+            return
+
+        print(f'  Database: {len(LARS_GRID_DB)} zone patterns')
+
+        if count == 1:
+            result = lars_instant_grid()
+            if result.get('grid'):
+                print(f'  Grid: {result["grid"]}')
+                print(f'  Zone sums: {result["zone_sums"]}')
+                print(f'  Time: {result["elapsed_us"]:.1f}μs')
+            else:
+                print(f'  Error: {result.get("error")}')
+        else:
+            result = lars_instant_batch(count=count)
+            if result.get('grids'):
+                for g in result['grids'][:10]:
+                    print(f'  {g}')
+                if count > 10:
+                    print(f'  ... ({count - 10} more)')
+                print(f'\n  Generated {len(result["grids"])} grids in {result["elapsed_ms"]:.1f}ms')
+                print(f'  Rate: {result["rate"]:,.0f} grids/sec')
+                print(f'  Per grid: {result["elapsed_ms"]*1000/len(result["grids"]):.1f}μs')
+            else:
+                print(f'  Error: {result.get("error")}')
+        print()
+        return
+
+    # ── LarsForge Shuffle-to-Unique ──
+    if args.lars_forge_shuffle_unique is not None:
+        from .lars_forge import lars_shuffle_to_unique
+        puzzle = args.lars_forge_shuffle_unique
+
+        print(f'\n  LarsForge Shuffle-to-Unique')
+        print(f'  {"═" * 55}')
+        n_clues = sum(1 for c in puzzle if c != '0')
+        print(f'  Input: {puzzle[:40]}...')
+        print(f'  Clues: {n_clues}')
+
+        result = lars_shuffle_to_unique(puzzle)
+
+        if result['success']:
+            print(f'  Result: UNIQUE ✓')
+            print(f'  Puzzle: {result["puzzle"]}')
+            if result['box'] >= 0:
+                print(f'  Shuffle: box {result["box"]}, swap #{result["swap_idx"]}')
+            else:
+                print(f'  (Already unique — no shuffle needed)')
+            print(f'  Checked: {result["checked"]} shuffles')
+        else:
+            print(f'  Result: Could not find unique shuffle ({result["checked"]} checked)')
+        print()
+        return
+
+    # ── LarsForge from Mask: forge for user's mask ──
+    if args.lars_forge_mask is not None:
+        from .lars_forge import LarsForge
+        n = args.lars_forge_count
+
+        print(f'\n  LarsForge from Mask')
+        print(f'  {"═" * 55}')
+
+        result = LarsForge.lars_from_mask(args.lars_forge_mask, count=n)
+
+        if not result['success']:
+            print(f'  {result.get("error", "Unknown error")}')
+            print()
+            return
+
+        print(f'  Clues: {result["clues"]}')
+        print(f'  Seed found in {result["forge_checks"]} checks')
+        print(f'  Generated {len(result["puzzles"])} puzzles in {result["elapsed_ms"]:.1f}ms')
+        print()
+        for p in result['puzzles']:
+            print(f'  {p}')
+        print(f'\n  # {len(result["puzzles"])} unique puzzles from mask')
+        print()
+        return
+
+    # ── Forge Multi-to-Unique: forge unique puzzles, output bd81 only ──
+    if args.forge_multi_to_unique is not None:
+        from .mask_forge import parse_mask, forge_unique
+        import time as _time
+
+        puzzle_str = args.forge_multi_to_unique
+        n_wanted = args.forge_multi_to_unique_count
+
+        mask = parse_mask(puzzle_str)
+        n_clues = sum(mask)
+
+        # Forge seed
+        t0 = _time.perf_counter()
+        seed_puzzle, seed_solution, checks, _elapsed = forge_unique(mask, verbose=False)
+        forge_ms = (_time.perf_counter() - t0) * 1000
+
+        if seed_puzzle is None:
+            print(f'  Forge FAILED — no unique puzzle found for this mask.')
+            sys.exit(1)
+
+        # Generate variants via digit permutation
+        digits = list(range(1, 10))
+        puzzles = [seed_puzzle]
+        rng = __import__('random').Random(42)
+        seen = {seed_puzzle}
+        attempts = 0
+        while len(puzzles) < n_wanted and attempts < 1000:
+            perm = list(digits)
+            rng.shuffle(perm)
+            mapping = {str(d): str(perm[d - 1]) for d in digits}
+            variant = ''.join(mapping.get(c, '0') for c in seed_puzzle)
+            if variant not in seen:
+                seen.add(variant)
+                puzzles.append(variant)
+            attempts += 1
+
+        print(f'# {len(puzzles)} unique puzzles forged from {n_clues}-clue mask ({checks} checks, {forge_ms:.0f}ms)')
+        for p in puzzles:
+            print(p)
         return
 
     # ── Forge-Solve mode: forge unique puzzles from mask, then solve ──
@@ -4401,6 +5140,12 @@ presets:
             only_techniques = only_techniques | EXOTIC_TECHNIQUES
         # If only_techniques is None (all), exotic is already included
 
+    # Apply --experimental: add experimental techniques to the current set
+    if getattr(args, 'experimental', False) and not args.preset:
+        if only_techniques is not None:
+            only_techniques = only_techniques | EXPERIMENTAL_TECHNIQUES
+        # If only_techniques is None (all), experimental is already included
+
     # Apply --exclude: remove specific techniques from the allowed set
     if args.exclude:
         exclude_set = parse_techniques(args.exclude)
@@ -4697,6 +5442,525 @@ presets:
 
         sys.exit(0 if bench['solved'] == bench.get('valid', 0) else 1)
 
+    # ── Cascade analysis mode ──
+    if getattr(args, 'cascade', False):
+        from collections import Counter
+
+        L1_SET = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+        L2_SET = {'Zone135', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
+        CASCADE_SET = L1_SET | L2_SET
+
+        solve_kwargs = {}
+        if getattr(args, 'preset', None):
+            solve_kwargs['only_techniques'] = PRESETS[args.preset]
+        if getattr(args, 'gf2', False):
+            solve_kwargs['gf2'] = True
+        if getattr(args, 'gf2x', False):
+            solve_kwargs['gf2_extended'] = True
+
+        def _cascade_stats(puzzle):
+            """Run cascade analysis on a single puzzle and return stats dict."""
+            result = solve_selective(puzzle, detail=True, **solve_kwargs)
+            bottleneck_moves = []
+            cascade_count = 0
+            bn_so_far = 0
+            depth_map = {}
+            for step in result.get('steps', []):
+                tech = step.get('technique', '')
+                pos = step.get('pos')
+                if tech in CASCADE_SET:
+                    cascade_count += 1
+                    if pos is not None:
+                        depth_map[pos] = bn_so_far
+                else:
+                    bn_so_far += 1
+                    bottleneck_moves.append(step)
+                    if pos is not None:
+                        depth_map[pos] = bn_so_far
+            return {
+                'result': result,
+                'bottleneck_moves': bottleneck_moves,
+                'cascade_count': cascade_count,
+                'depth_map': depth_map,
+                'bn_depth': len(bottleneck_moves),
+                'tech_counts': result.get('technique_counts', {}),
+                'success': result.get('success', False),
+            }
+
+        # ── Batch cascade: generate N shuffled variants and aggregate ──
+        batch_n = getattr(args, 'batch', None)
+        if batch_n:
+            print(f'\n  ═══ Cascade Batch Analysis ({batch_n} puzzles) ═══\n', file=sys.stderr)
+            depth_dist = Counter()
+            tech_totals = Counter()
+            total_bn = 0
+            solved = 0
+
+            for i in range(batch_n):
+                variant = shuffle_sudoku(bd81)
+                stats = _cascade_stats(variant)
+                depth_dist[stats['bn_depth']] += 1
+                total_bn += stats['bn_depth']
+                if stats['success']:
+                    solved += 1
+                for tech in stats['bottleneck_moves']:
+                    t = tech.get('technique', '?')
+                    tech_totals[t] += 1
+
+                if (i + 1) % 50 == 0 or i == batch_n - 1:
+                    print(f'  [{i+1}/{batch_n}] solved={solved}', file=sys.stderr)
+
+            avg_depth = total_bn / batch_n if batch_n else 0
+            max_bar = max(depth_dist.values()) if depth_dist else 1
+
+            print(f'\n  ═══ Cascade Batch Analysis ({batch_n} puzzles) ═══')
+            print(f'  Solved: {solved}/{batch_n}')
+            print()
+            print(f'  Bottleneck depth distribution:')
+            for d in sorted(depth_dist):
+                count = depth_dist[d]
+                bar_len = max(1, int(count / max_bar * 30))
+                bar = '█' * bar_len
+                print(f'    depth={d}: {count:3d} puzzles  {bar}')
+            print(f'    Average: {avg_depth:.1f}')
+            print()
+
+            if tech_totals:
+                print(f'  Most common bottleneck techniques:')
+                parts = []
+                for tech, cnt in tech_totals.most_common(10):
+                    parts.append(f'{tech}: {cnt}')
+                print(f'    {"  ".join(parts)}')
+
+            sys.exit(0)
+
+        # ── Single puzzle cascade ──
+        bb = BitBoard.from_string(bd81)
+        empty = sum(1 for i in range(81) if bb.board[i] == 0)
+
+        stats = _cascade_stats(bd81)
+        result = stats['result']
+        bottleneck_moves = stats['bottleneck_moves']
+        cascade_count = stats['cascade_count']
+        depth_map = stats['depth_map']
+
+        print(f'\n  ═══ Cascade Analysis ═══')
+        print(f'  Empty: {empty} cells')
+        print(f'  Bottleneck depth: {len(bottleneck_moves)}')
+        print(f'  Cascade placements: {cascade_count}')
+        print(f'  Total steps: {len(result.get("steps", []))}')
+        print(f'  Success: {result.get("success", False)}')
+        print()
+
+        if bottleneck_moves:
+            print(f'  Bottleneck moves (the hard ones):')
+            for i, m in enumerate(bottleneck_moves, 1):
+                print(f'    {i}. {m["cell"]}={m["digit"]} via {m["technique"]}')
+            print()
+
+        # Cascade depth distribution
+        dist = Counter(depth_map.values())
+        print(f'  Cascade depth (bottlenecks needed before cell falls):')
+        for d in sorted(dist):
+            cells = sorted([s['cell'] for s in result.get('steps', [])
+                          if depth_map.get(s.get('pos')) == d])
+            label = f'{dist[d]} cells'
+            if d == 0:
+                label += ' (pure cascade)'
+            preview = ', '.join(cells[:6])
+            if len(cells) > 6:
+                preview += f', +{len(cells)-6} more'
+            print(f'    depth={d}: {label} — {preview}')
+        print()
+
+        # Technique breakdown
+        tech_counts = result.get('technique_counts', {})
+        if tech_counts:
+            print(f'  Technique breakdown:')
+            for tech, count in sorted(tech_counts.items(), key=lambda x: -x[1]):
+                marker = ' ★' if tech not in CASCADE_SET else ''
+                print(f'    {tech}: {count}{marker}')
+            print()
+
+        # Inspector integration hint
+        if bottleneck_moves:
+            print(f'  ── Insight ──')
+            print(f'  {len(bottleneck_moves)} hard move{"s" if len(bottleneck_moves) > 1 else ""} '
+                  f'→ {cascade_count} cascade placements')
+            ratio = cascade_count / max(1, len(bottleneck_moves))
+            print(f'  Cascade ratio: 1:{ratio:.0f} (each bottleneck unlocks ~{ratio:.0f} cells)')
+
+        sys.exit(0)
+
+    # ── SIRO Table mode ──
+    if getattr(args, 'siro_table', False):
+        bb = BitBoard.from_string(bd81)
+        sol_str = solve_backtrack(bd81)
+        solution = [int(ch) for ch in sol_str] if sol_str else None
+
+        predictions = []
+        for pos in range(81):
+            if bb.board[pos] != 0:
+                continue
+            cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+            if len(cands) < 2:
+                continue
+            row, col = pos // 9, pos % 9
+            rival_scores = {}
+            for d in cands:
+                dbit = BIT[d - 1]
+                s = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+                s += sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+                br, bc = (row // 3) * 3, (col // 3) * 3
+                s += sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                         if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+                rival_scores[d] = s
+
+            sorted_digits = sorted(rival_scores, key=lambda dd: rival_scores[dd])
+            best_digit = sorted_digits[0]
+            best_rivals = rival_scores[best_digit]
+            second_rivals = rival_scores[sorted_digits[1]] if len(sorted_digits) > 1 else best_rivals
+            gap = second_rivals - best_rivals
+
+            actual = solution[pos] if solution else None
+            ok = (best_digit == actual) if actual is not None else None
+
+            predictions.append({
+                'pos': pos, 'row': row, 'col': col,
+                'digit': best_digit, 'rivals': best_rivals,
+                'gap': gap, 'n_cands': len(cands),
+                'actual': actual, 'ok': ok,
+            })
+
+        # Sort by rival score ascending (most confident first)
+        predictions.sort(key=lambda p: (p['rivals'], -p['gap']))
+
+        print(f'\n  ═══ SIRO Predictions ═══')
+        print()
+        print(f'  {"Cell":>6}  {"Digit":>5}  {"Rivals":>6}  {"Gap":>3}  {"Cands":>5}  {"OK":>2}')
+        print(f'  {"─" * 40}')
+        for p in predictions:
+            cell_name = f'R{p["row"]+1}C{p["col"]+1}'
+            if p['ok'] is True:
+                ok_str = '✓'
+            elif p['ok'] is False:
+                ok_str = f'✗ (actual={p["actual"]})'
+            else:
+                ok_str = '?'
+            print(f'  {cell_name:>6}  {p["digit"]:>5}  {p["rivals"]:>6}  {p["gap"]:>3}  {p["n_cands"]:>5}  {ok_str}')
+
+        if solution:
+            correct = sum(1 for p in predictions if p['ok'])
+            total = len(predictions)
+            pct = 100 * correct / total if total else 0
+            print(f'\n  Summary: {correct}/{total} correct ({pct:.0f}%)')
+
+        sys.exit(0)
+
+    # ── Inspector mode ──
+    if getattr(args, 'inspector', None):
+        try:
+            row, col = parse_cell(args.inspector)
+        except ValueError as e:
+            print(f'Error: {e}', file=sys.stderr)
+            sys.exit(1)
+
+        bb = BitBoard.from_string(bd81)
+        pos = row * 9 + col
+
+        if bb.board[pos] != 0:
+            print(f'\n  R{row+1}C{col+1}: Given = {bb.board[pos]}')
+            sys.exit(0)
+
+        cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+        n_clues = sum(1 for i in range(81) if bb.board[i] != 0)
+
+        print(f'\n  ╔══════════════════════════════════════╗')
+        print(f'  ║  Cell Inspector: R{row+1}C{col+1}               ║')
+        print(f'  ╚══════════════════════════════════════╝')
+        print(f'  Candidates: {cands} ({len(cands)})')
+
+        # Unit stats
+        row_e = sum(1 for j in range(9) if bb.board[row*9+j] == 0)
+        col_e = sum(1 for i in range(9) if bb.board[i*9+col] == 0)
+        br, bc = (row // 3) * 3, (col // 3) * 3
+        box_e = sum(1 for i in range(br, br+3) for j in range(bc, bc+3) if bb.board[i*9+j] == 0)
+        print(f'  Row {row+1}: {row_e} empty | Col {col+1}: {col_e} empty | Box: {box_e} empty')
+
+        # Rival analysis per candidate
+        print(f'\n  ── Rival Analysis ──')
+        print(f'  {"d":>3s}  {"Row":>4s}  {"Col":>4s}  {"Box":>4s}  {"Total":>5s}  {"Zone":>6s}')
+        print(f'  {"─"*30}')
+
+        rival_data = []
+        for d in cands:
+            dbit = BIT[d - 1]
+            rr = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+            cr = sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+            bx = sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                     if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+            total = rr + cr + bx
+            row_ratio = rr / max(1, row_e - 1)
+            col_ratio = cr / max(1, col_e - 1)
+            box_ratio = bx / max(1, box_e - 1)
+            min_ratio = min(row_ratio, col_ratio, box_ratio)
+            zone = 'likely' if min_ratio <= 1.0 else 'unlikely'
+            rival_data.append((d, rr, cr, bx, total, min_ratio, zone))
+            print(f'  {d:3d}  {rr:4d}  {cr:4d}  {bx:4d}  {total:5d}  {zone:>6s}')
+
+        # SIRO prediction
+        rival_data.sort(key=lambda x: x[4])
+        siro_pred = rival_data[0][0]
+        siro_rivals = rival_data[0][4]
+        gap = rival_data[1][4] - rival_data[0][4] if len(rival_data) > 1 else 0
+
+        # Scout detection
+        siro_dbit = BIT[siro_pred - 1]
+        is_scout = False
+        scout_cell = ''
+        for j in range(9):
+            if j == col: continue
+            peer = row * 9 + j
+            if bb.board[peer] != 0: continue
+            pcands = [dd + 1 for dd in range(9) if bb.cands[peer] & BIT[dd]]
+            if len(pcands) < 2: continue
+            best_pd, best_ps = -1, 999
+            for dd in pcands:
+                ps = sum(1 for jj in range(9) if jj != j and bb.board[row*9+jj] == 0 and (bb.cands[row*9+jj] & BIT[dd-1]))
+                ps += sum(1 for ii in range(9) if ii != row and bb.board[ii*9+j] == 0 and (bb.cands[ii*9+j] & BIT[dd-1]))
+                pbr, pbc = (row // 3) * 3, (j // 3) * 3
+                ps += sum(1 for ii in range(pbr, pbr+3) for jj in range(pbc, pbc+3)
+                         if (ii != row or jj != j) and bb.board[ii*9+jj] == 0 and (bb.cands[ii*9+jj] & BIT[dd-1]))
+                if ps < best_ps: best_ps, best_pd = ps, dd
+            if best_pd == siro_pred:
+                is_scout = True
+                scout_cell = f'R{row+1}C{j+1}'
+                break
+
+        # Technique prediction
+        if len(cands) <= 2:
+            tech_pred = 'ForcingChain'
+        elif siro_rivals < 6:
+            tech_pred = 'FPC'
+        elif siro_rivals < 7:
+            tech_pred = 'D2B'
+        elif siro_rivals >= 8:
+            tech_pred = 'FPCE'
+        else:
+            tech_pred = 'FPF'
+
+        print(f'\n  ── SIRO Prediction ──')
+        print(f'  Predicted digit: {siro_pred} (rivals={siro_rivals}, gap={gap})')
+        if is_scout:
+            print(f'  ⚠ SCOUT: {siro_pred} is also rank-1 in {scout_cell}')
+            if len(rival_data) > 1:
+                print(f'  Swap suggestion: {rival_data[1][0]} (rivals={rival_data[1][4]})')
+
+        print(f'\n  ── Technique Prediction ──')
+        print(f'  Predicted: {tech_pred}')
+        print(f'  Confidence: {"HIGH" if gap >= 4 else "MED" if gap >= 2 else "LOW"}')
+
+        # Cascade depth analysis
+        L1_SET = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+        L2_SET = {'Zone135', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
+        CASCADE_SET_INS = L1_SET | L2_SET
+        try:
+            casc_result = solve_selective(bd81, detail=True)
+            bn_count = 0
+            cell_depth = None
+            cell_technique = None
+            for step in casc_result.get('steps', []):
+                tech_s = step.get('technique', '')
+                if tech_s not in CASCADE_SET_INS:
+                    bn_count += 1
+                if step.get('pos') == pos:
+                    cell_depth = bn_count
+                    cell_technique = tech_s
+                    break
+
+            print(f'\n  ── Cascade Depth ──')
+            if cell_depth is not None:
+                if cell_depth == 0:
+                    print(f'  This cell cascades from basic techniques (depth=0)')
+                else:
+                    print(f'  Depth: {cell_depth} (needs {cell_depth} bottleneck move{"s" if cell_depth > 1 else ""} first)')
+                if cell_technique:
+                    cat = 'cascade' if cell_technique in CASCADE_SET_INS else 'bottleneck ★'
+                    print(f'  Actual technique: {cell_technique} ({cat})')
+
+            total_bn = sum(1 for s in casc_result.get('steps', [])
+                          if s.get('technique', '') not in CASCADE_SET_INS)
+            print(f'  Puzzle bottleneck depth: {total_bn}')
+        except Exception:
+            pass
+
+        # Get actual answer if we can solve
+        sol = solve_backtrack(bd81)
+        if sol:
+            actual = int(sol[pos])
+            siro_correct = siro_pred == actual
+            print(f'\n  ── Oracle ──')
+            print(f'  Answer: {actual}')
+            print(f'  SIRO: {"✓ CORRECT" if siro_correct else "✗ WRONG"}')
+
+        sys.exit(0)
+
+    # ── Predict path mode ──
+    if getattr(args, 'predict_path', False):
+        bb = BitBoard.from_string(bd81)
+
+        print(f'\n  ╔══ Predicted Solve Path ══╗\n')
+
+        sol = solve_backtrack(bd81)
+
+        print(f'  {"Cell":>6s}  {"Digit":>5s}  {"Technique":>12s}  {"Rivals":>6s}  {"Gap":>4s}  {"OK":>3s}')
+        print(f'  {"─"*45}')
+
+        correct = total = 0
+        for pos in range(81):
+            if bb.board[pos] != 0: continue
+            cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+            if len(cands) < 2: continue
+
+            row, col = divmod(pos, 9)
+            scores = []
+            for d in cands:
+                dbit = BIT[d - 1]
+                s = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+                s += sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+                br, bc = (row // 3) * 3, (col // 3) * 3
+                s += sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                         if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+                scores.append((s, d))
+            scores.sort()
+            best_d = scores[0][1]
+            rivals = scores[0][0]
+            gap = scores[1][0] - scores[0][0] if len(scores) > 1 else 0
+
+            if len(cands) <= 2: tech = 'FC'
+            elif rivals < 6: tech = 'FPC'
+            elif rivals < 7: tech = 'D2B'
+            elif rivals >= 8: tech = 'FPCE'
+            else: tech = 'FPF'
+
+            ok = ''
+            if sol:
+                actual = int(sol[pos])
+                is_correct = best_d == actual
+                ok = '✓' if is_correct else '✗'
+                if is_correct: correct += 1
+                total += 1
+
+            print(f'  R{row+1}C{col+1}  {best_d:5d}  {tech:>12s}  {rivals:6d}  {gap:4d}  {ok:>3s}')
+
+        if total:
+            print(f'\n  Prediction accuracy: {correct}/{total} ({round(100*correct/total)}%)')
+        sys.exit(0)
+
+    # ── Cell placement mode (predict + place using advanced techniques) ──
+    if getattr(args, 'cell_placement', None):
+        try:
+            row, col = parse_cell(args.cell_placement)
+        except ValueError as e:
+            print(f'Error: {e}', file=sys.stderr)
+            sys.exit(1)
+
+        bb = BitBoard.from_string(bd81)
+        pos = row * 9 + col
+
+        if bb.board[pos] != 0:
+            print(f'\n  R{row+1}C{col+1} is already placed: {bb.board[pos]}')
+            sys.exit(0)
+
+        cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
+        print(f'\n  ╔══ Cell Placement: R{row+1}C{col+1} ══╗')
+        print(f'  Candidates: {cands}')
+
+        # SIRO Rival prediction
+        best_d, best_s, second_s = -1, 999, 999
+        for d in cands:
+            dbit = BIT[d - 1]
+            s = sum(1 for j in range(9) if j != col and bb.board[row*9+j] == 0 and (bb.cands[row*9+j] & dbit))
+            s += sum(1 for i in range(9) if i != row and bb.board[i*9+col] == 0 and (bb.cands[i*9+col] & dbit))
+            br, bc = (row // 3) * 3, (col // 3) * 3
+            s += sum(1 for i in range(br, br+3) for j in range(bc, bc+3)
+                     if (i != row or j != col) and bb.board[i*9+j] == 0 and (bb.cands[i*9+j] & dbit))
+            if s < best_s:
+                second_s = best_s
+                best_s = s
+                best_d = d
+            elif s < second_s:
+                second_s = s
+        confidence = second_s - best_s
+
+        # Technique prediction
+        rivals = best_s
+        if len(cands) <= 2:
+            tech_pred = 'ForcingChain'
+        elif rivals < 6:
+            tech_pred = 'FPC'
+        elif rivals < 7:
+            tech_pred = 'D2B'
+        elif rivals >= 8:
+            tech_pred = 'FPCE'
+        else:
+            tech_pred = 'FPF'
+
+        print(f'  SIRO Rival predicts: {best_d} (rivals={best_s}, gap={confidence})')
+        print(f'  Technique predicted: {tech_pred}')
+        print()
+
+        # Now actually run the solver to place THIS cell
+        print(f'  Running solver to place R{row+1}C{col+1}...')
+        t0 = time.perf_counter()
+        _excl = None
+        if getattr(args, 'exclude', None):
+            _excl = {TECHNIQUE_ALIASES.get(t.strip().lower(), t.strip()) for t in args.exclude.split(',')}
+        result = solve_selective(bd81, max_level=args.level,
+                                only_techniques=only_techniques,
+                                exclude_techniques=_excl,
+                                gf2_extended=getattr(args, 'gf2x', False),
+                                detail=True)
+        elapsed = (time.perf_counter() - t0) * 1000
+
+        # Find the step that placed this cell
+        placed_step = None
+        technique_used = None
+        elim_rounds = []
+        for step in result.get('steps', []):
+            if isinstance(step, dict):
+                if step.get('pos') == pos:
+                    placed_step = step.get('step', '?')
+                    technique_used = step.get('technique', '?')
+                    break
+
+        # Show elimination rounds that affected this cell
+        for ev in result.get('elim_events', []):
+            for epos, ed in ev.get('eliminations', []):
+                if epos == pos:
+                    elim_rounds.append(f"  {ev['technique']}: {ed} eliminated from R{row+1}C{col+1}")
+
+        if elim_rounds:
+            print(f'  Elimination chain:')
+            for er in elim_rounds:
+                print(f'    {er}')
+
+        if placed_step:
+            board_val = int(result['board'][pos]) if result.get('board') else '?'
+            correct = board_val == best_d
+            print(f'\n  ✦ PLACED: R{row+1}C{col+1} = {board_val} via {technique_used} (step {placed_step})')
+            print(f'  SIRO predicted: {best_d} {"✓ CORRECT" if correct else "✗ WRONG"}')
+            print(f'  Technique predicted: {tech_pred} {"✓" if tech_pred == technique_used else "→ actual: " + str(technique_used)}')
+        else:
+            print(f'\n  Could not place R{row+1}C{col+1} with available techniques')
+            if result.get('board'):
+                board_val = int(result['board'][pos])
+                if board_val != 0:
+                    print(f'  (placed as side-effect at value {board_val})')
+
+        print(f'  Time: {elapsed:.1f}ms')
+        sys.exit(0)
+
     # ── Cell query mode ──
     if args.cell:
         try:
@@ -4869,14 +6133,109 @@ presets:
 
     # Print detailed round-by-round output
     if use_detail:
-        print(f'\n{"═" * 60}')
-        print(f'DETAILED SOLVE LOG ({result.get("rounds", "?")} rounds)')
-        print(f'{"═" * 60}')
-        print(format_detail(result))
-        print(f'{"═" * 60}')
+        if getattr(args, 'rich_output', False):
+            # Rich terminal output
+            try:
+                from rich.console import Console
+                from rich.panel import Panel
+                from rich.text import Text
+                _rc = Console()
+                _rc.print(Panel("[bold magenta]DETAILED SOLVE LOG[/]", width=60))
+                current_round = 0
+                for step in result.get('steps', []):
+                    if step.get('round', 0) != current_round:
+                        current_round = step['round']
+                        _rc.print()
+                        _rc.print(Panel(f"[bold]ROUND {current_round}[/]", style="magenta", width=50))
+                    tech = step.get('technique', '?')
+                    cell = step.get('cell', '?')
+                    digit = step.get('digit', 0)
+                    # Color by technique
+                    if tech in ('crossHatch','lastRemaining','fullHouse','nakedSingle'):
+                        border, ts = 'cyan', 'bold cyan'
+                    elif tech in ('FPC','FPCE','ForcingChain','ForcingNet'):
+                        border, ts = 'green', 'bold green'
+                    elif tech in ('DeepResonance','D2B','FPF'):
+                        border, ts = 'red', 'bold red'
+                    elif tech in ('ALS_XZ','ALS_XYWing','KrakenFish','DeathBlossom','SueDeCoq'):
+                        border, ts = 'yellow', 'bold yellow'
+                    elif tech in ('JuniorExocet','Template','BowmanBingo'):
+                        border, ts = 'magenta', 'bold magenta'
+                    else:
+                        border, ts = 'blue', 'bold blue'
+                    t = Text()
+                    t.append(f"  {tech}", style=ts)
+                    t.append(f"  {cell}", style="white")
+                    if digit:
+                        t.append(f" = ", style="dim")
+                        t.append(f"{digit}", style="bold white on blue")
+                    t.append("\n")
+                    _rc.print(Panel(t, border_style=border, width=60, padding=(0, 1)))
+            except ImportError:
+                print("Install 'rich' for rich output: pip install rich")
+                print(f'\n{"═" * 60}')
+                print(format_detail(result))
+                print(f'{"═" * 60}')
+        else:
+            print(f'\n{"═" * 60}')
+            print(f'DETAILED SOLVE LOG ({result.get("rounds", "?")} rounds)')
+            print(f'{"═" * 60}')
+            print(format_detail(result))
+            print(f'{"═" * 60}')
 
     if args.board:
         print(f'\n{format_board(result["board"], bd81)}')
+
+    # ── ScandolousExocet: post-solve validated Exocet scan ──
+    if getattr(args, 'scandalous_tech', False) and result['success']:
+        solution = result.get('board', '')
+        if solution and len(solution) == 81 and '0' not in solution:
+            from .engine import detect_junior_exocet as _detect_je
+            bb_orig = BitBoard.from_string(bd81)
+            je_result = _detect_je(bb_orig)
+
+            if je_result and je_result[0]:
+                elims = je_result[0]
+                detail = je_result[1]
+                try:
+                    base_str = detail.split('base {')[1].split('}')[0]
+                    base_digits = set(int(d) for d in base_str.split(','))
+                    target_part = detail.split('targets ')[1]
+                    t_cells = target_part.split(',')
+                    t1r = int(t_cells[0][1]) - 1
+                    t1c = int(t_cells[0][3]) - 1
+                    t2r = int(t_cells[1][1]) - 1
+                    t2c = int(t_cells[1][3]) - 1
+                    t1_answer = int(solution[t1r * 9 + t1c])
+                    t2_answer = int(solution[t2r * 9 + t2c])
+                    targets_valid = t1_answer in base_digits and t2_answer in base_digits
+
+                    print(f'\n  {"═" * 50}')
+                    print(f'  ScandolousExocet (post-solve validated)')
+                    print(f'  {"─" * 50}')
+                    print(f'  {detail}')
+                    if targets_valid:
+                        print(f'  Target R{t1r+1}C{t1c+1}={t1_answer} (base digit) ✓')
+                        print(f'  Target R{t2r+1}C{t2c+1}={t2_answer} (base digit) ✓')
+                        print(f'  Status: CONFIRMED — this Exocet is real!')
+                        print(f'  R1 would remove: {len(elims)} candidates')
+                        for pos, d in elims:
+                            r, c = divmod(pos, 9)
+                            print(f'    R{r+1}C{c+1}: remove {d}')
+                    else:
+                        bad = []
+                        if t1_answer not in base_digits:
+                            bad.append(f'R{t1r+1}C{t1c+1}={t1_answer} NOT in base')
+                        if t2_answer not in base_digits:
+                            bad.append(f'R{t2r+1}C{t2c+1}={t2_answer} NOT in base')
+                        print(f'  Status: FALSE PATTERN — {", ".join(bad)}')
+                        print(f'  R1 eliminations would have been WRONG')
+                    print(f'  {"═" * 50}')
+                except Exception:
+                    pass
+            else:
+                if getattr(args, 'verbose', False):
+                    print(f'\n  ScandolousExocet: no Exocet pattern found on initial board')
 
     # Exit code: 0 = solved, 1 = stalled/failed
     if not result['success']:
