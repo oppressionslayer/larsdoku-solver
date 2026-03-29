@@ -3187,7 +3187,8 @@ presets:
   wsrf     Full WSRF stack — all techniques including FPC, D2B, FPF, GF(2)
   zone135  L1 + Zone135 — cross-board zone sum deduction (oracle-assisted)
 """)
-    parser.add_argument('--version', action='version', version='larsdoku 1.8.7')
+    from . import __version__
+    parser.add_argument('--version', action='version', version=f'larsdoku {__version__}')
     parser.add_argument('puzzle', nargs='?', default=None,
                        help='81-char puzzle string (bd81/bdp), or - for stdin')
     parser.add_argument('--cell', '-c', help='Query solution for a specific cell (R3C5 or row,col)')
@@ -3320,6 +3321,18 @@ presets:
                        help='LarsForge speed benchmark: generate 100K puzzles and report rate')
     parser.add_argument('--lars-forge-ignite', type=str, metavar='PUZZLE',
                        help='LarsForge Ignite: take a multi-solution puzzle, forge unique puzzles from it')
+    parser.add_argument('--lars-forge-generate', type=int, metavar='CLUES',
+                       help='LarsForge Generate: instant unique puzzles by clue count (17-30 from seed bank)')
+    parser.add_argument('--lars-forge-mask', type=str, metavar='MASK',
+                       help='LarsForge from mask: forge unique puzzles for an 81-char mask (X=clue, 0=empty)')
+    parser.add_argument('--lars-forge-seed-index', type=int, default=None, metavar='N',
+                       help='Pick specific seed from bank (1-128, wraps). Default: random')
+    parser.add_argument('--lars-forge-shuffle', action='store_true',
+                       help='Apply box shuffle + digit permutation for maximum diversity')
+    parser.add_argument('--lars-forge-shuffle-unique', type=str, metavar='PUZZLE',
+                       help='LarsForge Shuffle-to-Unique: convert multi-solution puzzle to unique via zone shuffle')
+    parser.add_argument('--lars-forge-instant', type=int, metavar='COUNT', nargs='?', const=10,
+                       help='LarsForge Instant: generate unique grids in ~6μs each from pre-solved database')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
     parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
@@ -4491,6 +4504,168 @@ presets:
         for i, p in enumerate(result['puzzles']):
             print(f'  {p}')
         print(f'\n  # {result["count"]} verified unique puzzles ({result["n_clues"]} clues)')
+        print()
+        return
+
+    # ── LarsForge Generate: instant puzzles by clue count ──
+    if args.lars_forge_generate is not None:
+        from .lars_forge import LarsForge, lars_get_seed, lars_full_transform, lars_shuffle
+        import random as _rng
+        n_clues = args.lars_forge_generate
+        n = args.lars_forge_count
+        difficulty = args.lars_forge_difficulty
+        seed_idx = args.lars_forge_seed_index
+        use_shuffle = args.lars_forge_shuffle
+
+        print(f'\n  LarsForge Generate — {n_clues}-clue puzzles')
+        print(f'  {"═" * 55}')
+
+        # Get seed from extended bank
+        seed_puzzle = lars_get_seed(clues=n_clues, index=seed_idx)
+        if seed_puzzle is None:
+            print(f'  No seeds available for {n_clues} clues')
+            print()
+            return
+
+        if seed_idx:
+            print(f'  Seed: #{seed_idx} (from bank)')
+        else:
+            print(f'  Seed: random (from bank)')
+
+        t0 = time.perf_counter()
+        forge = LarsForge(seed_puzzle)
+
+        if use_shuffle:
+            # Full transform: shuffle + digit permutation
+            rng = _rng.Random(42)
+            puzzles = []
+            seen = set()
+            while len(puzzles) < n:
+                p = lars_full_transform(seed_puzzle, rng)
+                if p not in seen:
+                    seen.add(p)
+                    puzzles.append(p)
+            elapsed = (time.perf_counter() - t0) * 1000
+            print(f'  Method: shuffle + digit permutation')
+        elif difficulty:
+            candidates = forge.lars_generate(count=n * 10, unique_classes=False)
+            puzzles = []
+            for p in candidates:
+                zs = list(p['zone_sums'])
+                spread = max(zs) - min(zs)
+                if difficulty == 'easy' and spread <= 10:
+                    puzzles.append(p['puzzle'])
+                elif difficulty == 'medium' and 8 <= spread <= 16:
+                    puzzles.append(p['puzzle'])
+                elif difficulty == 'hard' and 14 <= spread <= 22:
+                    puzzles.append(p['puzzle'])
+                elif difficulty == 'expert' and spread >= 18:
+                    puzzles.append(p['puzzle'])
+                if len(puzzles) >= n:
+                    break
+            elapsed = (time.perf_counter() - t0) * 1000
+            print(f'  Method: seed bank + difficulty filter ({difficulty})')
+        else:
+            batch, ms, rate = forge.lars_forge_batch(count=n)
+            puzzles = batch
+            elapsed = ms
+            print(f'  Method: seed bank + digit permutation')
+
+        print(f'  Generated {len(puzzles)} puzzles in {elapsed:.1f}ms')
+        print()
+        for p in puzzles:
+            print(f'  {p}')
+        print(f'\n  # {len(puzzles)} unique {n_clues}-clue puzzles')
+        print()
+        return
+
+    # ── LarsForge Instant: 6μs grid generation ──
+    if args.lars_forge_instant is not None:
+        from .lars_forge import lars_instant_grid, lars_instant_batch, LARS_GRID_DB
+
+        count = args.lars_forge_instant
+
+        print(f'\n  LarsForge Instant — {count} grids at ~6μs each')
+        print(f'  {"═" * 55}')
+
+        if not LARS_GRID_DB:
+            print(f'  Grid database not loaded. Run the DB builder first.')
+            print()
+            return
+
+        print(f'  Database: {len(LARS_GRID_DB)} zone patterns')
+
+        if count == 1:
+            result = lars_instant_grid()
+            if result.get('grid'):
+                print(f'  Grid: {result["grid"]}')
+                print(f'  Zone sums: {result["zone_sums"]}')
+                print(f'  Time: {result["elapsed_us"]:.1f}μs')
+            else:
+                print(f'  Error: {result.get("error")}')
+        else:
+            result = lars_instant_batch(count=count)
+            if result.get('grids'):
+                for g in result['grids'][:10]:
+                    print(f'  {g}')
+                if count > 10:
+                    print(f'  ... ({count - 10} more)')
+                print(f'\n  Generated {len(result["grids"])} grids in {result["elapsed_ms"]:.1f}ms')
+                print(f'  Rate: {result["rate"]:,.0f} grids/sec')
+                print(f'  Per grid: {result["elapsed_ms"]*1000/len(result["grids"]):.1f}μs')
+            else:
+                print(f'  Error: {result.get("error")}')
+        print()
+        return
+
+    # ── LarsForge Shuffle-to-Unique ──
+    if args.lars_forge_shuffle_unique is not None:
+        from .lars_forge import lars_shuffle_to_unique
+        puzzle = args.lars_forge_shuffle_unique
+
+        print(f'\n  LarsForge Shuffle-to-Unique')
+        print(f'  {"═" * 55}')
+        n_clues = sum(1 for c in puzzle if c != '0')
+        print(f'  Input: {puzzle[:40]}...')
+        print(f'  Clues: {n_clues}')
+
+        result = lars_shuffle_to_unique(puzzle)
+
+        if result['success']:
+            print(f'  Result: UNIQUE ✓')
+            print(f'  Puzzle: {result["puzzle"]}')
+            if result['box'] >= 0:
+                print(f'  Shuffle: box {result["box"]}, swap #{result["swap_idx"]}')
+            else:
+                print(f'  (Already unique — no shuffle needed)')
+            print(f'  Checked: {result["checked"]} shuffles')
+        else:
+            print(f'  Result: Could not find unique shuffle ({result["checked"]} checked)')
+        print()
+        return
+
+    # ── LarsForge from Mask: forge for user's mask ──
+    if args.lars_forge_mask is not None:
+        from .lars_forge import LarsForge
+        n = args.lars_forge_count
+
+        print(f'\n  LarsForge from Mask')
+        print(f'  {"═" * 55}')
+
+        result = LarsForge.lars_from_mask(args.lars_forge_mask, count=n)
+
+        if not result['success']:
+            print(f'  {result.get("error", "Unknown error")}')
+            print()
+            return
+
+        print(f'  Clues: {result["clues"]}')
+        print(f'  Seed found in {result["forge_checks"]} checks')
+        print(f'  Generated {len(result["puzzles"])} puzzles in {result["elapsed_ms"]:.1f}ms')
+        print()
+        for p in result['puzzles']:
+            print(f'  {p}')
+        print(f'\n  # {len(result["puzzles"])} unique puzzles from mask')
         print()
         return
 
