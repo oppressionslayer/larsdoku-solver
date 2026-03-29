@@ -186,7 +186,7 @@ def lars_instant_batch(count=1000, seed=42):
     }
 
 
-def lars_get_seed(clues=22, index=None, seed=None):
+def lars_get_seed(clues=22, index=None, seed=None, difficulty=None):
     """Get a seed puzzle from the extended bank.
 
     Args:
@@ -194,6 +194,10 @@ def lars_get_seed(clues=22, index=None, seed=None):
         index: specific seed index (1-based, wraps if > available)
                None = random selection
         seed: random seed (used when index is None)
+        difficulty: None (random), 'easy', 'hard', 'diabolical'
+                    For 17-clue: hard = Top95 seeds (1-38),
+                    diabolical = Lars-tech seeds (39-43),
+                    easy = Royle collection (44+)
 
     Returns:
         puzzle string or None
@@ -206,6 +210,33 @@ def lars_get_seed(clues=22, index=None, seed=None):
     elif clues in LARS_SEED_BANK:
         pool = [LARS_SEED_BANK[clues]]
     else:
+        return None
+
+    # Apply difficulty filter (tier-based for seed bank)
+    # For 17-clue: positions 1-38 = Top95 hard, 39-43 = Lars-tech, 44+ = easy
+    # For other clue counts: hard/diabolical = first half (from 48K forum hardest),
+    #                        easy = second half (general collection)
+    if difficulty is not None and len(pool) > 10:
+        half = len(pool) // 2
+        if clues == 17 and len(pool) > 43:
+            if difficulty == 'diabolical':
+                pool = pool[38:43]
+            elif difficulty == 'hard':
+                pool = pool[:43]
+            elif difficulty == 'easy':
+                pool = pool[43:]
+            elif difficulty == 'medium':
+                pool = pool[20:60]
+        else:
+            if difficulty in ('diabolical', 'hard'):
+                pool = pool[:half]
+            elif difficulty == 'easy':
+                pool = pool[half:]
+            elif difficulty == 'medium':
+                quarter = len(pool) // 4
+                pool = pool[quarter:quarter*3]
+
+    if not pool:
         return None
 
     if index is not None:

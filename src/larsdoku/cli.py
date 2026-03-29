@@ -3313,7 +3313,7 @@ presets:
     parser.add_argument('--lars-forge-count', type=int, default=10, metavar='N',
                        help='Number of LarsForge puzzles to generate (default 10)')
     parser.add_argument('--lars-forge-difficulty', type=str, default=None,
-                       choices=['easy', 'medium', 'hard', 'expert'],
+                       choices=['easy', 'medium', 'hard', 'expert', 'diabolical'],
                        help='Target difficulty via zone sum targeting')
     parser.add_argument('--lars-forge-scan', type=str, metavar='PUZZLE',
                        help='LarsForge Oracle Scan: count non-isomorphic classes from all 362,880 permutations')
@@ -4526,15 +4526,17 @@ presets:
         print(f'\n  LarsForge Generate — {n_clues}-clue puzzles')
         print(f'  {"═" * 55}')
 
-        # Get seed from extended bank
-        seed_puzzle = lars_get_seed(clues=n_clues, index=seed_idx)
+        # Get seed from extended bank (with difficulty filtering)
+        seed_puzzle = lars_get_seed(clues=n_clues, index=seed_idx, difficulty=difficulty)
         if seed_puzzle is None:
-            print(f'  No seeds available for {n_clues} clues')
+            print(f'  No seeds available for {n_clues} clues' + (f' at difficulty={difficulty}' if difficulty else ''))
             print()
             return
 
         if seed_idx:
             print(f'  Seed: #{seed_idx} (from bank)')
+        elif difficulty:
+            print(f'  Seed: random {difficulty} (from bank)')
         else:
             print(f'  Seed: random (from bank)')
 
@@ -4554,22 +4556,28 @@ presets:
             elapsed = (time.perf_counter() - t0) * 1000
             print(f'  Method: shuffle + digit permutation')
         elif difficulty:
-            candidates = forge.lars_generate(count=n * 10, unique_classes=False)
-            puzzles = []
-            for p in candidates:
-                zs = list(p['zone_sums'])
-                spread = max(zs) - min(zs)
-                if difficulty == 'easy' and spread <= 10:
-                    puzzles.append(p['puzzle'])
-                elif difficulty == 'medium' and 8 <= spread <= 16:
-                    puzzles.append(p['puzzle'])
-                elif difficulty == 'hard' and 14 <= spread <= 22:
-                    puzzles.append(p['puzzle'])
-                elif difficulty == 'expert' and spread >= 18:
-                    puzzles.append(p['puzzle'])
-                if len(puzzles) >= n:
-                    break
-            elapsed = (time.perf_counter() - t0) * 1000
+            if difficulty == 'diabolical':
+                # Diabolical = use the hard seed directly, no spread filter
+                batch, ms, rate = forge.lars_forge_batch(count=n)
+                puzzles = batch
+                elapsed = ms
+            else:
+                candidates = forge.lars_generate(count=n * 10, unique_classes=False)
+                puzzles = []
+                for p in candidates:
+                    zs = list(p['zone_sums'])
+                    spread = max(zs) - min(zs)
+                    if difficulty == 'easy' and spread <= 10:
+                        puzzles.append(p['puzzle'])
+                    elif difficulty == 'medium' and 8 <= spread <= 16:
+                        puzzles.append(p['puzzle'])
+                    elif difficulty == 'hard' and 14 <= spread <= 22:
+                        puzzles.append(p['puzzle'])
+                    elif difficulty == 'expert' and spread >= 18:
+                        puzzles.append(p['puzzle'])
+                    if len(puzzles) >= n:
+                        break
+                elapsed = (time.perf_counter() - t0) * 1000
             print(f'  Method: seed bank + difficulty filter ({difficulty})')
         else:
             batch, ms, rate = forge.lars_forge_batch(count=n)
@@ -4657,7 +4665,7 @@ presets:
 
         if args.make_puzzle:
             # Convert grids to unique puzzles via iterative removal
-            from .engine import has_unique_solution
+            # has_unique_solution already imported at module level
             import random as _rng2
 
             print(f'  Converting to puzzles (iterative removal)...')
