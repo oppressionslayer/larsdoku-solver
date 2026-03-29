@@ -3333,6 +3333,10 @@ presets:
                        help='LarsForge Shuffle-to-Unique: convert multi-solution puzzle to unique via zone shuffle')
     parser.add_argument('--lars-forge-instant', type=int, metavar='COUNT', nargs='?', const=10,
                        help='LarsForge Instant: generate unique grids in ~6μs each from pre-solved database')
+    parser.add_argument('--lars-forge-spread', type=int, metavar='SPREAD',
+                       help='Target zone sum spread for grid generation (2=easy, 15=medium, 25=hard, 30+=extreme)')
+    parser.add_argument('--lars-forge-zone', type=str, metavar='ZONE=VALUE',
+                       help='Target specific zone sum, e.g. MC=51 or TL=55')
     parser.add_argument('--to-mask', type=str, metavar='PUZZLE',
                        help='Convert a puzzle string to its mask (0→0, nonzero→X)')
     parser.add_argument('--forge-permute', type=str, metavar='PUZZLE_OR_MASK',
@@ -4576,6 +4580,84 @@ presets:
         for p in puzzles:
             print(f'  {p}')
         print(f'\n  # {len(puzzles)} unique {n_clues}-clue puzzles')
+        print()
+        return
+
+    # ── LarsForge Spread/Zone targeted generation ──
+    if args.lars_forge_spread is not None or args.lars_forge_zone is not None:
+        from .lars_forge import LARS_GRID_DB
+        import random as _rng
+
+        if not LARS_GRID_DB:
+            print(f'\n  Grid database not loaded.')
+            print()
+            return
+
+        n = args.lars_forge_count
+        target_spread = args.lars_forge_spread
+        zone_target = args.lars_forge_zone
+
+        print(f'\n  LarsForge Zone-Targeted Generation')
+        print(f'  {"═" * 55}')
+
+        # Filter patterns
+        matching_grids = []
+        ZONE_NAMES = ['TL','TC','TR','ML','MC','MR','BL','BC','BR']
+
+        for key, grids in LARS_GRID_DB.items():
+            zs = [int(x) for x in key.split(',')]
+            spread = max(zs) - min(zs)
+
+            # Check spread filter
+            if target_spread is not None and spread != target_spread:
+                continue
+
+            # Check zone filter (e.g., "MC=51")
+            if zone_target is not None:
+                try:
+                    zname, zval = zone_target.split('=')
+                    zname = zname.strip().upper()
+                    zval = int(zval.strip())
+                    if zname in ZONE_NAMES:
+                        zidx = ZONE_NAMES.index(zname)
+                        if abs(zs[zidx] - zval) > 1:
+                            continue
+                except:
+                    pass
+
+            for g in grids:
+                matching_grids.append((g, zs))
+
+        if not matching_grids:
+            print(f'  No grids match filters. Try different spread/zone values.')
+            print()
+            return
+
+        print(f'  Matching grids: {len(matching_grids)}')
+        if target_spread is not None:
+            print(f'  Spread: {target_spread}')
+        if zone_target is not None:
+            print(f'  Zone target: {zone_target}')
+
+        rng = _rng.Random(42)
+        digits = list(range(1, 10))
+        seen = set()
+        results = []
+
+        while len(results) < n and len(seen) < len(matching_grids) * 100:
+            base, zs = rng.choice(matching_grids)
+            rng.shuffle(digits)
+            mapping = {str(i+1): str(digits[i]) for i in range(9)}
+            new_grid = ''.join(mapping[c] for c in base)
+            if new_grid not in seen:
+                seen.add(new_grid)
+                results.append((new_grid, zs))
+
+        print()
+        for g, zs in results:
+            spread = max(zs) - min(zs)
+            print(f'  {g}  spread={spread}')
+        print(f'\n  # {len(results)} grids generated')
         print()
         return
 
