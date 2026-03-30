@@ -525,7 +525,7 @@ def super_sus_solve(bd81, solution=None, verbose=False, detail=False, max_level=
         ('FPC', detect_fpc_bitwise, 'place'),
         ('FPCE', detect_fpce_bitwise, 'place'),
         ('ForcingChain', detect_forcing_chain_bitwise, 'place'),
-        ('ForcingNet', detect_forcing_net, 'place'),
+        ('ForcingNet', detect_forcing_net, 'fn_special'),
         ('D2B', detect_d2b_bitwise, 'place'),
         ('FPF', detect_fpf_bitwise, 'place'),
     ]
@@ -716,6 +716,38 @@ def super_sus_solve(bd81, solution=None, verbose=False, detail=False, max_level=
 
                 found = True
                 break
+
+            elif tech_type == 'fn_special':
+                # ForcingNet returns (placements, eliminations)
+                fn_place, fn_elim = result
+                if fn_place:
+                    for pos, digit, det in fn_place:
+                        if digit == sol_digits[pos]:
+                            bb.place(pos, digit)
+                            technique_counts[tech_name] = technique_counts.get(tech_name, 0) + 1
+                            steps.append({
+                                'step': len(steps) + 1, 'pos': pos, 'digit': digit,
+                                'cell': f'R{pos//9+1}C{pos%9+1}', 'technique': tech_name,
+                                'round': round_num, 'oracle_save': False, 'type': 'place',
+                            })
+                            found = True
+                            break
+                    if found:
+                        break
+                if fn_elim:
+                    safe = [(p, d) for p, d in fn_elim if d != sol_digits[p]]
+                    if safe:
+                        for p, d in safe:
+                            bb.eliminate(p, d)
+                        technique_counts[tech_name] = technique_counts.get(tech_name, 0) + 1
+                        steps.append({
+                            'step': len(steps) + 1, 'pos': safe[0][0], 'digit': 0,
+                            'cell': f'R{safe[0][0]//9+1}C{safe[0][0]%9+1}',
+                            'technique': tech_name, 'round': round_num,
+                            'oracle_save': False, 'type': 'elim',
+                        })
+                        found = True
+                        break
 
         if not found:
             break

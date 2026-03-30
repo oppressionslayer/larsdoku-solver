@@ -920,27 +920,42 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
             if placed:
                 continue
 
-        # Forcing Net
+        # Forcing Net (placements + eliminations)
         if allowed('ForcingNet'):
-            fn_hits = detect_forcing_net(bb)
-            for pos, val, fn_detail in fn_hits:
-                if bb.board[pos] == 0:
-                    cands_before = _cands_list(bb, pos) if detail else None
-                    bb.place(pos, val)
-                    step_num += 1
-                    entry = {'step': step_num, 'pos': pos, 'digit': val,
-                             'technique': 'ForcingNet', 'cell': _cell_name(pos),
-                             'round': round_num}
-                    if detail:
-                        entry['cands_before'] = cands_before
-                        entry['explanation'] = f'Forcing Net: all candidate branches converge on {val}@{_cell_name(pos)}'
-                    steps.append(entry)
-                    technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
-                    placed = True
-                    if verbose:
-                        print(f"  #{step_num:3d}  {entry['cell']}={val}  [ForcingNet]")
-                    break
-            if placed:
+            fn_placements, fn_elims = detect_forcing_net(bb)
+            if fn_placements:
+                for pos, val, fn_detail in fn_placements:
+                    if bb.board[pos] == 0:
+                        cands_before = _cands_list(bb, pos) if detail else None
+                        bb.place(pos, val)
+                        step_num += 1
+                        entry = {'step': step_num, 'pos': pos, 'digit': val,
+                                 'technique': 'ForcingNet', 'cell': _cell_name(pos),
+                                 'round': round_num}
+                        if detail:
+                            entry['cands_before'] = cands_before
+                            entry['explanation'] = fn_detail
+                        steps.append(entry)
+                        technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                        placed = True
+                        if verbose:
+                            print(f"  #{step_num:3d}  {entry['cell']}={val}  [ForcingNet]")
+                        break
+                if placed:
+                    continue
+            if fn_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'ForcingNet',
+                        'eliminations': list(fn_elims),
+                        'detail': f'ForcingNet: {len(fn_elims)} eliminations',
+                    })
+                for pos, d in fn_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                if verbose:
+                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in fn_elims]
+                    print(f"        ForcingNet: {', '.join(descs)}")
                 continue
 
         # BUG+1
@@ -1009,6 +1024,11 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
                 technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                if verbose and je_detail:
+                    print(f"        {je_detail}")
+                    for pos, d in je_elims:
+                        r, c = pos // 9, pos % 9
+                        print(f"          {d} removed from R{r+1}C{c+1}")
                 continue
 
         # JETest — experimental: our original Exocet detector (fire once)
@@ -1620,23 +1640,29 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
         # ── FALLBACK: techniques not predicted by SIRO ──
         # These fire rarely but need coverage
 
-        # ForcingNet
+        # ForcingNet (fallback)
         if allowed('ForcingNet') and 'ForcingNet' not in predicted_techs:
-            fn_hits = detect_forcing_net(bb)
-            for pos, val, det in fn_hits:
-                if bb.board[pos] == 0:
-                    bb.place(pos, val)
-                    step_num += 1
-                    entry = {'step': step_num, 'pos': pos, 'digit': val,
-                             'technique': 'ForcingNet', 'cell': _cell_name(pos),
-                             'round': round_num}
-                    steps.append(entry)
-                    technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
-                    placed = True
-                    if verbose:
-                        print(f"  #{step_num:3d}  {entry['cell']}={val}  [ForcingNet <- fallback]")
-                    break
-            if placed:
+            fn_placements, fn_elims = detect_forcing_net(bb)
+            if fn_placements:
+                for pos, val, det in fn_placements:
+                    if bb.board[pos] == 0:
+                        bb.place(pos, val)
+                        step_num += 1
+                        entry = {'step': step_num, 'pos': pos, 'digit': val,
+                                 'technique': 'ForcingNet', 'cell': _cell_name(pos),
+                                 'round': round_num}
+                        steps.append(entry)
+                        technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                        placed = True
+                        if verbose:
+                            print(f"  #{step_num:3d}  {entry['cell']}={val}  [ForcingNet <- fallback]")
+                        break
+                if placed:
+                    continue
+            if fn_elims:
+                for pos, d in fn_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
                 continue
 
         # BUG+1
@@ -3206,6 +3232,8 @@ presets:
                        help='Max technique level (1=L1 only, 2=+GF2, 5=+FPC/FC, 7=all)')
     parser.add_argument('--only', '-o', help='Only use specific techniques (comma-separated: fpc,gf2,fc,...)')
     parser.add_argument('--exclude', '-x', help='Exclude specific techniques (comma-separated: gf2,fpc,d2b,...)')
+    parser.add_argument('--include', help='Add techniques to the current preset/set (comma-separated: fn,fpc,...). '
+                       'Use with --preset to add techniques back, e.g. --preset expert --include fpc')
     parser.add_argument('--preset', choices=list(PRESETS.keys()),
                        help='Use a preset technique set (expert = Sudoku Expert Approved, wsrf = full stack)')
     parser.add_argument('--steps', '-s', action='store_true', help='Show step-by-step solution trace')
@@ -3329,6 +3357,9 @@ presets:
                        help='Final Boss Mode: match ANY mask to a known seed via Sudoku symmetries (49K seeds, 60 quadrillion reach)')
     parser.add_argument('--lars-forge-mask-coverage', action='store_true',
                        help='Report mask index coverage statistics')
+    parser.add_argument('--lars-certify', type=str, metavar='PUZZLE_OR_MASK',
+                       help='7ms uniqueness oracle: for 17-clue, hash-certifies UNIQUE or MULTI-SOLUTION MASK '
+                            'against complete Royle enumeration. No backtracker needed.')
     parser.add_argument('--lars-forge-promote', type=int, metavar='CLUES',
                        help='Promote a puzzle by adding solution digits to reach N clues (guaranteed unique). '
                             'Use with a puzzle arg or --lars-forge-generate.')
@@ -4770,6 +4801,40 @@ presets:
         print()
         return
 
+    # ── Lars Certify: 7ms uniqueness oracle ──
+    if getattr(args, 'lars_certify', None) is not None:
+        from .lars_forge import lars_certify
+        import time as _time
+
+        puzzle_or_mask = args.lars_certify
+
+        print(f'\n  Lars Certify — Uniqueness Oracle')
+        print(f'  {"═" * 55}')
+
+        t0 = _time.time()
+        result = lars_certify(puzzle_or_mask)
+        elapsed = (_time.time() - t0) * 1000
+
+        print(f'  Input:   {puzzle_or_mask[:60]}{"..." if len(puzzle_or_mask) > 60 else ""}')
+        print(f'  Clues:   {result["n_clues"]}')
+        print(f'  Method:  {result["method"]}')
+        print(f'  Time:    {elapsed:.1f}ms')
+        print()
+
+        verdict = result['verdict']
+        if 'UNIQUE' in verdict and 'MULTI' not in verdict:
+            print(f'  >>> {verdict} <<<')
+            if result['method'] == 'royle_hash':
+                print(f'  Royle-certified: this mask geometry is in the complete')
+                print(f'  enumeration of all 49,158 valid 17-clue patterns.')
+        else:
+            print(f'  >>> {verdict} <<<')
+            if result['method'] == 'royle_hash':
+                print(f'  This mask geometry is NOT in the Royle enumeration.')
+                print(f'  No digit assignment can make this pattern unique.')
+        print()
+        return
+
     # ── LarsForge Mask Match: Final Boss Mode ──
     if getattr(args, 'lars_forge_mask_match', None) is not None:
         from .lars_forge import lars_mask_match, lars_mask_coverage, lars_parse_mask
@@ -5261,6 +5326,15 @@ presets:
         if only_techniques is not None:
             only_techniques = only_techniques | EXPERIMENTAL_TECHNIQUES
         # If only_techniques is None (all), experimental is already included
+
+    # Apply --include: add techniques to the current set
+    if getattr(args, 'include', None):
+        include_set = parse_techniques(args.include)
+        if include_set:
+            if only_techniques is None:
+                pass  # all techniques already included
+            else:
+                only_techniques = only_techniques | include_set
 
     # Apply --exclude: remove specific techniques from the allowed set
     if args.exclude:

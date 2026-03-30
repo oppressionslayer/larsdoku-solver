@@ -9,7 +9,7 @@ Quick usage:
     print(result['n_steps'])     # number of steps
     print(result['technique_counts'])  # technique frequency
 """
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 
 def _lars_warmup():

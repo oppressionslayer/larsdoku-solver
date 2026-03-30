@@ -3031,22 +3031,28 @@ def detect_forcing_chain_bitwise(bb):
 # ══════════════════════════════════════════════════════════════════════
 
 def detect_forcing_net(bb):
-    """Forcing Net: 3-4 candidate cells, JIT-accelerated propagation.
-    Uses fast_propagate for contradiction, fast_propagate_full for convergence."""
-    results = []
+    """Forcing Net: propagate each candidate in 2-5 candidate cells.
+    Uses fast_propagate for contradiction, fast_propagate_full for convergence.
+
+    Returns: tuple (placements, eliminations)
+        placements: list of (pos, val, description) — direct placements
+        eliminations: list of (pos, digit) — candidate removals
+    """
     cells = []
     for pos in range(81):
         if bb.board[pos] != 0:
             continue
         pc = POPCOUNT[bb.cands[pos]]
-        if 3 <= pc <= 4:
+        if 2 <= pc <= 8:
             cells.append((pos, pc))
     cells.sort(key=lambda x: x[1])
 
-    for pos, _ in cells[:15]:
+    all_elims = []
+
+    for pos, _ in cells:
         digits = [d + 1 for d in iter_bits9(bb.cands[pos])]
 
-        # Phase 1: JIT contradiction check
+        # Phase 1: JIT contradiction check for each candidate
         contradicted = []
         valid = []
         for v in digits:
@@ -3059,42 +3065,38 @@ def detect_forcing_net(bb):
         if len(contradicted) == len(digits) - 1 and len(valid) == 1:
             val = valid[0]
             r, c = pos // 9, pos % 9
-            results.append((pos, val,
-                f'ForcingNet R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)'))
-            return results
+            return ([(pos, val,
+                f'ForcingNet R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)')], [])
 
-        # Some contradicted → naked single
-        if contradicted and len(contradicted) < len(digits):
-            remaining = bb.cands[pos]
+        # Some contradicted → eliminations
+        if contradicted and valid:
             for v in contradicted:
-                remaining &= ~BIT[v - 1]
-            if remaining and (remaining & (remaining - 1)) == 0:
-                val = remaining.bit_length()
-                r, c = pos // 9, pos % 9
-                results.append((pos, val,
-                    f'ForcingNet R{r+1}C{c+1}={val} (elim {len(contradicted)})'))
-                return results
+                all_elims.append((pos, v))
 
-        # Phase 2: Convergence check
+        # Phase 2: Convergence — all branches place same value in some cell
         if len(valid) >= 2:
             boards = []
             for v in valid:
-                new_b, _ = fast_propagate_full(bb.board, bb.cands, pos, v)
+                new_b, _ = fast_propagate_full(bb.board, bb.cands, pos, v,
+                                               return_np=True)
                 if new_b is not None:
                     boards.append(new_b)
             if len(boards) == len(valid):
                 for cell in range(81):
                     if bb.board[cell] != 0:
                         continue
-                    vals = [b[cell] for b in boards]
+                    vals = [int(b[cell]) for b in boards]
                     if all(v != 0 for v in vals) and len(set(vals)) == 1:
                         kr, kc = cell // 9, cell % 9
                         r, c = pos // 9, pos % 9
-                        results.append((cell, vals[0],
-                            f'ForcingNet from R{r+1}C{c+1}: all → R{kr+1}C{kc+1}={vals[0]}'))
-                        return results
+                        return ([(cell, vals[0],
+                            f'ForcingNet from R{r+1}C{c+1}: all → R{kr+1}C{kc+1}={vals[0]}')], [])
 
-    return results
+    # Return all accumulated eliminations (if any)
+    if all_elims:
+        return ([], all_elims)
+
+    return ([], [])
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -3367,7 +3369,8 @@ def detect_junior_exocet_stuart(bb):
                                         tp = tr * 9 + tc
                                         if bb.board[tp] != 0:
                                             continue
-                                        if (bb.cands[tp] & base_cands) != base_cands:
+                                        # Target needs at least one base digit
+                                        if (bb.cands[tp] & base_cands) == 0:
                                             continue
                                         target_candidates.append((tp, tr, tc, obx, t_line))
 
@@ -3468,11 +3471,10 @@ def detect_junior_exocet_stuart(bb):
 
                                     if elims:
                                         elims = list(dict.fromkeys(elims))
-                                        base_str = ','.join(str(d + 1) for d in base_digits)
-                                        detail = (f'JuniorExocet [R1]: '
-                                                  f'base {{{base_str}}} at '
-                                                  f'R{br1+1}C{bc1+1},R{br2+1}C{bc2+1} → '
-                                                  f'targets R{t1r+1}C{t1c+1},R{t2r+1}C{t2c+1}')
+                                        base_str = '/'.join(str(d + 1) for d in base_digits)
+                                        detail = (f'Exocet pattern of {base_str} in base '
+                                                  f'[R{br1+1}C{bc1+1},R{br2+1}C{bc2+1}] '
+                                                  f'and targets R{t1r+1}C{t1c+1} and R{t2r+1}C{t2c+1}')
                                         return elims, detail
     return [], None
 
@@ -3534,7 +3536,8 @@ def detect_junior_exocet(bb):
                                         if bb.board[tp] != 0:
                                             continue
                                         # Target must contain ALL base digits (extras OK — Rule 1 removes them)
-                                        if (bb.cands[tp] & base_cands) != base_cands:
+                                        # Target needs at least one base digit
+                                        if (bb.cands[tp] & base_cands) == 0:
                                             continue
                                         target_candidates.append((tp, tr, tc, obx, t_line))
 
@@ -5317,17 +5320,23 @@ def solve_bitwise(bd81, solution=None, verbose=False):
         if placed:
             continue
 
-        # Forcing Net (3-4 candidate cells)
-        fn_hits = detect_forcing_net(bb)
-        for pos, val, detail in fn_hits:
-            if bb.board[pos] == 0 and solution[pos] == val:
-                bb.place(pos, val)
-                step_num += 1
-                steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'ForcingNet'})
-                technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
-                placed = True
-                break
-        if placed:
+        # Forcing Net (placements + eliminations)
+        fn_placements, fn_elims = detect_forcing_net(bb)
+        if fn_placements:
+            for pos, val, detail in fn_placements:
+                if bb.board[pos] == 0 and solution[pos] == val:
+                    bb.place(pos, val)
+                    step_num += 1
+                    steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'ForcingNet'})
+                    technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                    placed = True
+                    break
+            if placed:
+                continue
+        if fn_elims:
+            for pos, d in fn_elims:
+                bb.eliminate(pos, d)
+            technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
             continue
 
         # ── L6: BUG+1 ──

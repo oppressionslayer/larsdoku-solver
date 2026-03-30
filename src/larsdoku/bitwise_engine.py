@@ -1962,70 +1962,10 @@ def detect_forcing_chain_bitwise(bb):
 # ══════════════════════════════════════════════════════════════════════
 
 def detect_forcing_net(bb):
-    """Forcing Net: 3-4 candidate cells, JIT-accelerated propagation.
-    Uses fast_propagate for contradiction, fast_propagate_full for convergence."""
-    results = []
-    cells = []
-    for pos in range(81):
-        if bb.board[pos] != 0:
-            continue
-        pc = POPCOUNT[bb.cands[pos]]
-        if 3 <= pc <= 4:
-            cells.append((pos, pc))
-    cells.sort(key=lambda x: x[1])
-
-    for pos, _ in cells[:15]:
-        digits = [d + 1 for d in iter_bits9(bb.cands[pos])]
-
-        # Phase 1: JIT contradiction check
-        contradicted = []
-        valid = []
-        for v in digits:
-            if fast_propagate(bb.board, bb.cands, pos, v):
-                contradicted.append(v)
-            else:
-                valid.append(v)
-
-        # All but one contradicted → placement
-        if len(contradicted) == len(digits) - 1 and len(valid) == 1:
-            val = valid[0]
-            r, c = pos // 9, pos % 9
-            results.append((pos, val,
-                f'ForcingNet R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)'))
-            return results
-
-        # Some contradicted → naked single
-        if contradicted and len(contradicted) < len(digits):
-            remaining = bb.cands[pos]
-            for v in contradicted:
-                remaining &= ~BIT[v - 1]
-            if remaining and (remaining & (remaining - 1)) == 0:
-                val = remaining.bit_length()
-                r, c = pos // 9, pos % 9
-                results.append((pos, val,
-                    f'ForcingNet R{r+1}C{c+1}={val} (elim {len(contradicted)})'))
-                return results
-
-        # Phase 2: Convergence check
-        if len(valid) >= 2:
-            boards = []
-            for v in valid:
-                new_b, _ = fast_propagate_full(bb.board, bb.cands, pos, v)
-                if new_b is not None:
-                    boards.append(new_b)
-            if len(boards) == len(valid):
-                for cell in range(81):
-                    if bb.board[cell] != 0:
-                        continue
-                    vals = [b[cell] for b in boards]
-                    if all(v != 0 for v in vals) and len(set(vals)) == 1:
-                        kr, kc = cell // 9, cell % 9
-                        r, c = pos // 9, pos % 9
-                        results.append((cell, vals[0],
-                            f'ForcingNet from R{r+1}C{c+1}: all → R{kr+1}C{kc+1}={vals[0]}'))
-                        return results
-
-    return results
+    """Forcing Net: propagate each candidate in 2-8 candidate cells.
+    Returns: tuple (placements, eliminations)"""
+    from .engine import detect_forcing_net as _fn
+    return _fn(bb)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -3882,17 +3822,23 @@ def solve_bitwise(bd81, solution=None, verbose=False):
         if placed:
             continue
 
-        # Forcing Net (3-4 candidate cells)
-        fn_hits = detect_forcing_net(bb)
-        for pos, val, detail in fn_hits:
-            if bb.board[pos] == 0 and solution[pos] == val:
-                bb.place(pos, val)
-                step_num += 1
-                steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'ForcingNet'})
-                technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
-                placed = True
-                break
-        if placed:
+        # Forcing Net (placements + eliminations)
+        fn_placements, fn_elims = detect_forcing_net(bb)
+        if fn_placements:
+            for pos, val, detail in fn_placements:
+                if bb.board[pos] == 0 and solution[pos] == val:
+                    bb.place(pos, val)
+                    step_num += 1
+                    steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'ForcingNet'})
+                    technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                    placed = True
+                    break
+            if placed:
+                continue
+        if fn_elims:
+            for pos, d in fn_elims:
+                bb.eliminate(pos, d)
+            technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
             continue
 
         # ── L6: BUG+1 ──
