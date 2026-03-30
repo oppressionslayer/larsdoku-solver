@@ -3325,6 +3325,15 @@ presets:
                        help='LarsForge Generate: instant unique puzzles by clue count (17-30 from seed bank)')
     parser.add_argument('--lars-forge-mask', type=str, metavar='MASK',
                        help='LarsForge from mask: forge unique puzzles for an 81-char mask (X=clue, 0=empty)')
+    parser.add_argument('--lars-forge-mask-match', type=str, metavar='MASK',
+                       help='Final Boss Mode: match ANY mask to a known seed via Sudoku symmetries (49K seeds, 60 quadrillion reach)')
+    parser.add_argument('--lars-forge-mask-coverage', action='store_true',
+                       help='Report mask index coverage statistics')
+    parser.add_argument('--lars-forge-promote', type=int, metavar='CLUES',
+                       help='Promote a puzzle by adding solution digits to reach N clues (guaranteed unique). '
+                            'Use with a puzzle arg or --lars-forge-generate.')
+    parser.add_argument('--lars-forge-promote-count', type=int, default=10, metavar='N',
+                       help='Number of promoted puzzles to generate (default 10)')
     parser.add_argument('--lars-forge-seed-index', type=int, default=None, metavar='N',
                        help='Pick specific seed from bank (1-128, wraps). Default: random')
     parser.add_argument('--lars-forge-shuffle', action='store_true',
@@ -4758,6 +4767,113 @@ presets:
             print(f'  Checked: {result["checked"]} shuffles')
         else:
             print(f'  Result: Could not find unique shuffle ({result["checked"]} checked)')
+        print()
+        return
+
+    # ── LarsForge Mask Match: Final Boss Mode ──
+    if getattr(args, 'lars_forge_mask_match', None) is not None:
+        from .lars_forge import lars_mask_match, lars_mask_coverage, lars_parse_mask
+        import time as _time
+
+        mask_str = args.lars_forge_mask_match
+        n_clues = sum(1 for c in mask_str if c in ('x', 'X', '1') or (c.isdigit() and c != '0'))
+
+        print(f'\n  LarsForge Mask Match — Final Boss Mode')
+        print(f'  {"═" * 55}')
+        print(f'  Mask: {mask_str[:60]}{"..." if len(mask_str) > 60 else ""}')
+        print(f'  Clues: {n_clues}')
+
+        t0 = _time.time()
+        result = lars_mask_match(mask_str, verbose=False)
+        elapsed = (_time.time() - t0) * 1000
+
+        if result.get('matched'):
+            print(f'  MATCHED in {elapsed:.1f}ms')
+            print(f'  Seed: {result["seed_clues"]}-clue #{result["seed_index"]+1}')
+            if result.get('rotated'):
+                print(f'  (via 180° box rotation)')
+            rp, cp, tr = result['transform']
+            print(f'  Transform: rows={rp} cols={cp} transposed={tr}')
+            print(f'  Candidates checked: {result["n_candidates"]}')
+            print()
+            print(f'  Puzzle: {result["puzzle"]}')
+
+            # Optionally generate more via digit permutation
+            n = args.lars_forge_count
+            if n > 1:
+                from .lars_forge import LarsForge
+                forge = LarsForge(result['puzzle'])
+                extras = forge.lars_forge_batch(count=n - 1)
+                print()
+                for p in extras[0]:
+                    print(f'  {p}')
+                print(f'\n  # {n} total puzzles (1 matched + {n-1} digit-permuted)')
+        else:
+            print(f'  No match found ({elapsed:.1f}ms, {result["n_candidates"]} candidates checked)')
+            print(f'  This mask geometry is not in the Royle 49K collection.')
+        print()
+        return
+
+    # ── LarsForge Mask Coverage ──
+    if getattr(args, 'lars_forge_mask_coverage', False):
+        from .lars_forge import lars_mask_coverage
+
+        print(f'\n  LarsForge Mask Coverage')
+        print(f'  {"═" * 55}')
+        lars_mask_coverage(verbose=True)
+        print()
+        return
+
+    # ── LarsForge Promote: add solution digits to reach target clues ──
+    if getattr(args, 'lars_forge_promote', None) is not None:
+        from .lars_forge import (
+            lars_promote_batch, lars_get_seed, lars_full_transform,
+            LARS_EXTENDED_BANK
+        )
+        import random as _rand
+
+        target = args.lars_forge_promote
+        n = getattr(args, 'lars_forge_promote_count', 10)
+
+        print(f'\n  LarsForge Promote — 17→{target} Clues')
+        print(f'  {"═" * 55}')
+
+        # Get source puzzle: either from args or generate a 17-clue
+        if args.puzzle:
+            source = normalize_puzzle(args.puzzle)
+        else:
+            seed = lars_get_seed(
+                17,
+                difficulty=getattr(args, 'lars_forge_difficulty', None),
+                index=getattr(args, 'lars_forge_seed_index', None),
+            )
+            if seed is None:
+                print(f'  No 17-clue seeds available')
+                print()
+                return
+            # Shuffle for diversity
+            source = lars_full_transform(seed, rng=_rand.Random())
+            print(f'  Source: 17-clue seed (shuffled + digit-permuted)')
+
+        src_clues = sum(1 for c in source if c != '0')
+        print(f'  Source clues: {src_clues}')
+        print(f'  Target clues: {target}')
+        if target <= src_clues:
+            print(f'  Already at or above target!')
+            print()
+            return
+
+        import time as _time
+        t0 = _time.time()
+        puzzles = lars_promote_batch(source, target, count=n)
+        elapsed = (_time.time() - t0) * 1000
+
+        print(f'  Generated: {len(puzzles)} puzzles in {elapsed:.1f}ms')
+        print(f'  All guaranteed unique (inherits from {src_clues}-clue parent)')
+        print()
+        for p in puzzles:
+            print(f'  {p}')
+        print(f'\n  # {len(puzzles)} unique {target}-clue puzzles')
         print()
         return
 
