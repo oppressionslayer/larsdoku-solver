@@ -3369,8 +3369,10 @@ def detect_junior_exocet_stuart(bb):
                                         tp = tr * 9 + tc
                                         if bb.board[tp] != 0:
                                             continue
-                                        # Target needs at least one base digit
-                                        if (bb.cands[tp] & base_cands) == 0:
+                                        # Target needs majority base-digit overlap:
+                                        # at least (base_pc - 1) base digits present
+                                        overlap = bb.cands[tp] & base_cands
+                                        if POPCOUNT[overlap] < base_pc - 1:
                                             continue
                                         target_candidates.append((tp, tr, tc, obx, t_line))
 
@@ -3536,8 +3538,10 @@ def detect_junior_exocet(bb):
                                         if bb.board[tp] != 0:
                                             continue
                                         # Target must contain ALL base digits (extras OK — Rule 1 removes them)
-                                        # Target needs at least one base digit
-                                        if (bb.cands[tp] & base_cands) == 0:
+                                        # Target needs majority base-digit overlap:
+                                        # at least (base_pc - 1) base digits present
+                                        overlap = bb.cands[tp] & base_cands
+                                        if POPCOUNT[overlap] < base_pc - 1:
                                             continue
                                         target_candidates.append((tp, tr, tc, obx, t_line))
 
