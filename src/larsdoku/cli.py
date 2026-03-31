@@ -1080,27 +1080,42 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
             if tmpl_e:
                 continue
 
-        # Bowman's Bingo
+        # Bowman's Bingo (placements + eliminations)
         if allowed('BowmanBingo'):
-            bingo_hits = detect_bowman_bingo(bb)
-            for pos, val, bingo_detail in bingo_hits:
-                if bb.board[pos] == 0:
-                    cands_before = _cands_list(bb, pos) if detail else None
-                    bb.place(pos, val)
-                    step_num += 1
-                    entry = {'step': step_num, 'pos': pos, 'digit': val,
-                             'technique': 'BowmanBingo', 'cell': _cell_name(pos),
-                             'round': round_num}
-                    if detail:
-                        entry['cands_before'] = cands_before
-                        entry['explanation'] = f'Bowman\'s Bingo: trial-and-error eliminates all but {val}'
-                    steps.append(entry)
-                    technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
-                    placed = True
-                    if verbose:
-                        print(f"  #{step_num:3d}  {entry['cell']}={val}  [BowmanBingo]")
-                    break
-            if placed:
+            bb_placements, bb_elims = detect_bowman_bingo(bb)
+            if bb_placements:
+                for pos, val, bingo_detail in bb_placements:
+                    if bb.board[pos] == 0:
+                        cands_before = _cands_list(bb, pos) if detail else None
+                        bb.place(pos, val)
+                        step_num += 1
+                        entry = {'step': step_num, 'pos': pos, 'digit': val,
+                                 'technique': 'BowmanBingo', 'cell': _cell_name(pos),
+                                 'round': round_num}
+                        if detail:
+                            entry['cands_before'] = cands_before
+                            entry['explanation'] = bingo_detail
+                        steps.append(entry)
+                        technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
+                        placed = True
+                        if verbose:
+                            print(f"  #{step_num:3d}  {entry['cell']}={val}  [BowmanBingo]")
+                        break
+                if placed:
+                    continue
+            if bb_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'BowmanBingo',
+                        'eliminations': list(bb_elims),
+                        'detail': f'BowmanBingo: {len(bb_elims)} eliminations',
+                    })
+                for pos, d in bb_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
+                if verbose:
+                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in bb_elims]
+                    print(f"        BowmanBingo: {', '.join(descs)}")
                 continue
 
         # D2B
@@ -1738,21 +1753,27 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
             if tmpl_e:
                 continue
 
-        # BowmanBingo
+        # BowmanBingo (fallback)
         if allowed('BowmanBingo'):
-            bingo_hits = detect_bowman_bingo(bb)
-            for pos, val, det in bingo_hits:
-                if bb.board[pos] == 0:
-                    bb.place(pos, val)
-                    step_num += 1
-                    entry = {'step': step_num, 'pos': pos, 'digit': val,
-                             'technique': 'BowmanBingo', 'cell': _cell_name(pos),
-                             'round': round_num}
-                    steps.append(entry)
-                    technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
-                    placed = True
-                    break
-            if placed:
+            bb_place, bb_elim = detect_bowman_bingo(bb)
+            if bb_place:
+                for pos, val, det in bb_place:
+                    if bb.board[pos] == 0:
+                        bb.place(pos, val)
+                        step_num += 1
+                        entry = {'step': step_num, 'pos': pos, 'digit': val,
+                                 'technique': 'BowmanBingo', 'cell': _cell_name(pos),
+                                 'round': round_num}
+                        steps.append(entry)
+                        technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
+                        placed = True
+                        break
+                if placed:
+                    continue
+            if bb_elim:
+                for pos, d in bb_elim:
+                    bb.eliminate(pos, d)
+                technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
                 continue
 
         # Full fallback: FPC+FPCE already ran above, try remaining techniques
@@ -3415,6 +3436,24 @@ presets:
     parser.add_argument('--like-count', type=int, default=5, metavar='N',
                        help='Number of similar puzzles to generate (default 5)')
 
+    # ── LForge: Technique-targeted puzzle generation ──
+    parser.add_argument('--lforge-attempt', type=str, metavar='TECHS',
+                       help='Technique Forge: generate puzzles targeting specific techniques '
+                            '(comma-separated: als,kraken,coloring,deathblossom)')
+    parser.add_argument('--lforge-count', type=int, default=10, metavar='N',
+                       help='Number of lforge puzzles to generate (default 10)')
+    parser.add_argument('--lforge-clues', type=int, default=None, metavar='N',
+                       help='Target clue count filter for lforge (e.g. 22, 23, 24)')
+    parser.add_argument('--lforge-tier', type=str, default=None,
+                       choices=['medium', 'hard', 'extreme', 'any'],
+                       help='Seed tier: medium (22-25), hard (Andrew weekly), extreme (forum hardest)')
+    parser.add_argument('--lforge-stats', action='store_true',
+                       help='Show technique seed bank statistics')
+    parser.add_argument('--lforge-list', action='store_true',
+                       help='List all available technique tags')
+    parser.add_argument('--lforge-search', type=str, metavar='TECH',
+                       help='Find all technique profiles containing a specific technique')
+
     args = parser.parse_args()
 
     # ── Solution mode: just print backtrack answer ──
@@ -4802,6 +4841,104 @@ presets:
         return
 
     # ── Lars Certify: 7ms uniqueness oracle ──
+    # ── LForge: Technique-targeted generation ──
+    if getattr(args, 'lforge_stats', False):
+        from .lars_forge import lars_technique_catalog_stats
+        stats = lars_technique_catalog_stats()
+        if not stats.get('loaded'):
+            print('  Technique seed bank not loaded.')
+            return
+        print(f'\n  LForge Technique Seed Bank')
+        print(f'  {"═" * 55}')
+        meta = stats['meta']
+        print(f'  Seeds: {meta.get("total_seeds", "?")} ({meta.get("andrew_seeds", 0)} Andrew + {meta.get("forum_seeds", 0)} forum)')
+        print(f'  Signatures: {stats["n_signatures"]}')
+        print(f'\n  By tier:')
+        for tier, count in stats['tier_counts'].items():
+            if count:
+                print(f'    {tier:10s} {count:5d} seeds')
+        print(f'\n  By clue count:')
+        for cc, count in stats['clue_counts'].items():
+            bar = '#' * (count // 10)
+            print(f'    {cc} clues: {count:4d} {bar}')
+        print(f'\n  Techniques:')
+        for tech, count in stats['tech_freq'].items():
+            print(f'    {tech:25s} {count:4d} seeds')
+        print()
+        return
+
+    if getattr(args, 'lforge_list', False):
+        from .lars_forge import lars_technique_list
+        techs = lars_technique_list()
+        print(f'\n  Available techniques ({len(techs)}):')
+        for t in techs:
+            print(f'    {t}')
+        print()
+        return
+
+    if getattr(args, 'lforge_search', None):
+        from .lars_forge import LARS_TECH_INDEX, LARS_TECHNIQUE_SIGS
+        tech_name = parse_techniques(args.lforge_search)
+        if tech_name:
+            tech_name = next(iter(tech_name))
+        else:
+            tech_name = args.lforge_search
+        sigs = LARS_TECH_INDEX.get(tech_name, [])
+        print(f'\n  Profiles containing {tech_name}: {len(sigs)}')
+        for sig in sorted(sigs)[:30]:
+            data = LARS_TECHNIQUE_SIGS.get(sig, {})
+            n = sum(len(s) for s in data.get('seeds', {}).values())
+            clues = sorted(data.get('seeds', {}).keys())
+            print(f'    {sig:50s} {n:3d} seeds  clues={",".join(clues)}')
+        if len(sigs) > 30:
+            print(f'    ... and {len(sigs) - 30} more')
+        print()
+        return
+
+    if getattr(args, 'lforge_attempt', None) is not None:
+        from .lars_forge import lars_technique_forge
+        import time as _time
+
+        # Parse technique names, filter out L1
+        L1 = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+        tech_set = parse_techniques(args.lforge_attempt)
+        if tech_set:
+            tech_set = tech_set - L1
+        if not tech_set:
+            print(f'  Unknown techniques: {args.lforge_attempt}')
+            return
+
+        n = getattr(args, 'lforge_count', 10)
+        clues = getattr(args, 'lforge_clues', None)
+        tier = getattr(args, 'lforge_tier', None)
+        if tier == 'any':
+            tier = None
+
+        print(f'\n  LForge — Technique Forge')
+        print(f'  {"═" * 55}')
+        print(f'  Techniques: {", ".join(sorted(tech_set))}')
+        if clues:
+            print(f'  Clue count: {clues}')
+        if tier:
+            print(f'  Tier: {tier}')
+
+        result = lars_technique_forge(tech_set, count=n, clues=clues, tier=tier)
+
+        if not result['success']:
+            print(f'  {result.get("error", "No matching seeds found")}')
+            print()
+            return
+
+        print(f'  Signature: {result["signature"]}')
+        print(f'  Available seeds: {result["available_seeds"]}')
+        print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms')
+        print()
+        for p in result['puzzles']:
+            print(f'  {p}')
+        print(f'\n  # {result["count"]} puzzles requiring {", ".join(sorted(tech_set))}')
+        print()
+        return
+
     if getattr(args, 'lars_certify', None) is not None:
         from .lars_forge import lars_certify
         import time as _time

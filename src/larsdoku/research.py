@@ -518,7 +518,7 @@ def super_sus_solve(bd81, solution=None, verbose=False, detail=False, max_level=
         ('URType4', detect_ur_type4, 'elim'),
         ('JuniorExocet', detect_junior_exocet_stuart, 'elim'),
         ('Template', detect_template, 'elim'),
-        ('BowmanBingo', detect_bowman_bingo, 'elim'),
+        ('BowmanBingo', detect_bowman_bingo, 'fn_special'),
         ('DeepResonance', detect_deep_resonance, 'elim'),
         # Placements
         ('FinnedPointingChain', _finned_pointing_chain, 'place'),

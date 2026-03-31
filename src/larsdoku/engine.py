@@ -3909,22 +3909,25 @@ def detect_template(bb):
 
 
 def detect_bowman_bingo(bb):
-    """Bowman's Bingo: JIT-accelerated extended forcing chains.
-    Cells with 2-5 candidates. Uses fast_propagate (JIT) for contradiction,
-    fast_propagate_full (JIT) for convergence."""
+    """Bowman's Bingo: exhaustive trial on ALL unsolved cells.
+    More aggressive than ForcingNet — checks every cell up to 9 candidates.
+    Returns: tuple (placements, eliminations) same as ForcingNet.
+    """
     cells = []
     for pos in range(81):
         if bb.board[pos] != 0:
             continue
         pc = POPCOUNT[bb.cands[pos]]
-        if 2 <= pc <= 5:
+        if pc >= 2:
             cells.append((pos, pc))
     cells.sort(key=lambda x: x[1])
+
+    all_elims = []
 
     for pos, _ in cells:
         digits = [d + 1 for d in iter_bits9(bb.cands[pos])]
 
-        # Phase 1: JIT contradiction check
+        # Phase 1: JIT contradiction check for each candidate
         contradicted = []
         valid = []
         for v in digits:
@@ -3937,37 +3940,36 @@ def detect_bowman_bingo(bb):
         if len(contradicted) == len(digits) - 1 and len(valid) == 1:
             val = valid[0]
             r, c = pos // 9, pos % 9
-            return [(pos, val, f'BowmanBingo R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)')]
+            return ([(pos, val,
+                f'BowmanBingo R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)')], [])
 
-        # Some contradicted → naked single
-        if contradicted and len(contradicted) < len(digits):
-            remaining = bb.cands[pos]
+        # Some contradicted → eliminations
+        if contradicted and valid:
             for v in contradicted:
-                remaining &= ~BIT[v - 1]
-            if remaining and (remaining & (remaining - 1)) == 0:
-                val = remaining.bit_length()
-                r, c = pos // 9, pos % 9
-                return [(pos, val, f'BowmanBingo R{r+1}C{c+1}={val} (elim {len(contradicted)})')]
+                all_elims.append((pos, v))
 
-        # Phase 2: Convergence check
+        # Phase 2: Convergence — all branches place same value in some cell
         if len(valid) >= 2:
             boards = []
             for v in valid:
-                new_b, _ = fast_propagate_full(bb.board, bb.cands, pos, v)
+                new_b, _ = fast_propagate_full(bb.board, bb.cands, pos, v,
+                                               return_np=True)
                 if new_b is not None:
                     boards.append(new_b)
             if len(boards) == len(valid):
                 for cell in range(81):
                     if bb.board[cell] != 0:
                         continue
-                    vals = [b[cell] for b in boards]
+                    vals = [int(b[cell]) for b in boards]
                     if all(v != 0 for v in vals) and len(set(vals)) == 1:
                         kr, kc = cell // 9, cell % 9
                         r, c = pos // 9, pos % 9
-                        return [(cell, vals[0],
-                            f'BowmanBingo from R{r+1}C{c+1}: all → R{kr+1}C{kc+1}={vals[0]}')]
+                        return ([(cell, vals[0],
+                            f'BowmanBingo from R{r+1}C{c+1}: all -> R{kr+1}C{kc+1}={vals[0]}')], [])
 
-    return []
+    if all_elims:
+        return ([], all_elims)
+    return ([], [])
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -5398,17 +5400,23 @@ def solve_bitwise(bd81, solution=None, verbose=False):
         if tmpl_elims:
             continue  # eliminations happened, retry
 
-        # ── L6: Bowman's Bingo ──
-        bingo_hits = detect_bowman_bingo(bb)
-        for pos, val, detail in bingo_hits:
-            if bb.board[pos] == 0 and solution[pos] == val:
-                bb.place(pos, val)
-                step_num += 1
-                steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'BowmanBingo'})
-                technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
-                placed = True
-                break
-        if placed:
+        # ── L6: Bowman's Bingo (placements + eliminations) ──
+        bb_place, bb_elim = detect_bowman_bingo(bb)
+        if bb_place:
+            for pos, val, detail in bb_place:
+                if bb.board[pos] == 0 and solution[pos] == val:
+                    bb.place(pos, val)
+                    step_num += 1
+                    steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'BowmanBingo'})
+                    technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
+                    placed = True
+                    break
+            if placed:
+                continue
+        if bb_elim:
+            for pos, d in bb_elim:
+                bb.eliminate(pos, d)
+            technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
             continue
 
         # D2B

@@ -1781,5 +1781,182 @@ def main():
         print(f'  {count:,} puzzles — zones {list(canon[:3])}|{list(canon[3:6])}|{list(canon[6:])}')
 
 
+# ══════════════════════════════════════════════════════════════════════
+# LARS TECHNIQUE FORGE — Generate puzzles by required technique
+# "Give me an ALS_XZ + KrakenFish puzzle" → boom, here's a trillion
+# ══════════════════════════════════════════════════════════════════════
+
+_TECHNIQUE_BANK_PATH = _os.path.join(_os.path.dirname(__file__), 'technique_seed_bank.json')
+LARS_TECHNIQUE_BANK = {}
+LARS_TECH_INDEX = {}
+LARS_TECHNIQUE_SIGS = {}
+
+if _os.path.exists(_TECHNIQUE_BANK_PATH):
+    with open(_TECHNIQUE_BANK_PATH) as _f:
+        LARS_TECHNIQUE_BANK = _json.load(_f)
+        LARS_TECHNIQUE_SIGS = LARS_TECHNIQUE_BANK.get('signatures', {})
+        LARS_TECH_INDEX = LARS_TECHNIQUE_BANK.get('tech_index', {})
+
+
+def technique_signature(technique_counts):
+    """Canonical signature from a solve result's technique_counts dict.
+
+    Filters out L1 techniques, sorts alphabetically, joins with '+'.
+    Returns 'L1_only' if no advanced techniques were used.
+    """
+    L1 = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+    advanced = sorted(t for t in technique_counts if t not in L1)
+    return '+'.join(advanced) if advanced else 'L1_only'
+
+
+def lars_technique_seeds(techniques, clues=None, tier=None):
+    """Find seeds matching ALL requested techniques.
+
+    Args:
+        techniques: set of technique names (e.g. {'ALS_XZ', 'KrakenFish'})
+        clues: optional clue count filter (int)
+        tier: optional tier filter ('medium', 'hard', 'extreme')
+
+    Returns: list of puzzle strings
+    """
+    if not LARS_TECH_INDEX:
+        return []
+
+    # Find signatures containing ALL requested techniques
+    sig_sets = []
+    for tech in techniques:
+        sigs = LARS_TECH_INDEX.get(tech, [])
+        if not sigs:
+            return []  # technique not in bank
+        sig_sets.append(set(sigs))
+
+    # Intersect
+    matching_sigs = sig_sets[0]
+    for s in sig_sets[1:]:
+        matching_sigs &= s
+
+    if not matching_sigs:
+        return []
+
+    # Collect seeds
+    seeds = []
+    for sig in matching_sigs:
+        data = LARS_TECHNIQUE_SIGS.get(sig, {})
+        if tier and data.get('tier') != tier:
+            continue
+        for cc_str, puzzles in data.get('seeds', {}).items():
+            if clues and int(cc_str) != clues:
+                continue
+            seeds.extend(puzzles)
+
+    return seeds
+
+
+def lars_technique_forge(techniques, count=10, clues=None, tier=None, seed=42):
+    """Generate puzzles requiring specific techniques.
+
+    Finds matching seeds, picks one, applies lars_full_transform to
+    generate unique variants. All variants are guaranteed to require
+    the same techniques as the seed (invariant under symmetry group).
+
+    Args:
+        techniques: set of technique names
+        count: number of puzzles to generate
+        clues: optional clue count filter
+        tier: optional tier filter
+        seed: random seed
+
+    Returns: dict with success, puzzles, signature, tier, clues, etc.
+    """
+    import random
+    import time as _time
+
+    seeds = lars_technique_seeds(techniques, clues=clues, tier=tier)
+    if not seeds:
+        return {
+            'success': False,
+            'error': f'No seeds found for techniques: {techniques}',
+            'available_seeds': 0,
+        }
+
+    rng = random.Random(seed)
+    t0 = _time.time()
+
+    puzzles = []
+    seen = set()
+    attempts = 0
+    while len(puzzles) < count and attempts < count * 20:
+        attempts += 1
+        base = rng.choice(seeds)
+        transformed = lars_full_transform(base, rng=random.Random(rng.randint(0, 2**31)))
+        if transformed not in seen:
+            seen.add(transformed)
+            puzzles.append(transformed)
+
+    elapsed = (_time.time() - t0) * 1000
+
+    # Find the signature for the seed
+    base_seed = seeds[0]
+    base_cc = sum(1 for c in base_seed if c != '0')
+    # Find which signature contains this seed
+    sig_name = None
+    for sn, data in LARS_TECHNIQUE_SIGS.items():
+        for cc_str, seed_list in data.get('seeds', {}).items():
+            if base_seed in seed_list:
+                sig_name = sn
+                break
+        if sig_name:
+            break
+
+    return {
+        'success': True,
+        'puzzles': puzzles,
+        'signature': sig_name or '+'.join(sorted(techniques)),
+        'tier': LARS_TECHNIQUE_SIGS.get(sig_name, {}).get('tier', 'unknown'),
+        'clues': clues or base_cc,
+        'count': len(puzzles),
+        'available_seeds': len(seeds),
+        'elapsed_ms': elapsed,
+    }
+
+
+def lars_technique_catalog_stats():
+    """Statistics about the loaded technique bank."""
+    if not LARS_TECHNIQUE_BANK:
+        return {'loaded': False}
+
+    meta = LARS_TECHNIQUE_BANK.get('meta', {})
+    tier_counts = {'medium': 0, 'hard': 0, 'extreme': 0}
+    clue_counts = {}
+    for sig, data in LARS_TECHNIQUE_SIGS.items():
+        t = data.get('tier', 'unknown')
+        for cc_str, seeds in data.get('seeds', {}).items():
+            tier_counts[t] = tier_counts.get(t, 0) + len(seeds)
+            cc = int(cc_str)
+            clue_counts[cc] = clue_counts.get(cc, 0) + len(seeds)
+
+    tech_freq = {}
+    for tech, sigs in LARS_TECH_INDEX.items():
+        n = sum(
+            sum(len(s) for s in LARS_TECHNIQUE_SIGS.get(sig, {}).get('seeds', {}).values())
+            for sig in sigs
+        )
+        tech_freq[tech] = n
+
+    return {
+        'loaded': True,
+        'meta': meta,
+        'n_signatures': len(LARS_TECHNIQUE_SIGS),
+        'tier_counts': tier_counts,
+        'clue_counts': dict(sorted(clue_counts.items())),
+        'tech_freq': dict(sorted(tech_freq.items(), key=lambda x: -x[1])),
+    }
+
+
+def lars_technique_list():
+    """All technique names available in the bank."""
+    return sorted(LARS_TECH_INDEX.keys())
+
+
 if __name__ == '__main__':
     main()

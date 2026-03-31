@@ -2713,6 +2713,11 @@ def detect_template(bb):
 
 
 def detect_bowman_bingo(bb):
+    """Delegate to engine.py implementation."""
+    from .engine import detect_bowman_bingo as _bb
+    return _bb(bb)
+
+def _detect_bowman_bingo_old(bb):
     """Bowman's Bingo: JIT-accelerated extended forcing chains.
     Cells with 2-5 candidates. Uses fast_propagate (JIT) for contradiction,
     fast_propagate_full (JIT) for convergence."""
@@ -3896,17 +3901,23 @@ def solve_bitwise(bd81, solution=None, verbose=False):
         if tmpl_elims:
             continue  # eliminations happened, retry
 
-        # ── L6: Bowman's Bingo ──
-        bingo_hits = detect_bowman_bingo(bb)
-        for pos, val, detail in bingo_hits:
-            if bb.board[pos] == 0 and solution[pos] == val:
-                bb.place(pos, val)
-                step_num += 1
-                steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'BowmanBingo'})
-                technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
-                placed = True
-                break
-        if placed:
+        # ── L6: Bowman's Bingo (placements + eliminations) ──
+        bb_place, bb_elim = detect_bowman_bingo(bb)
+        if bb_place:
+            for pos, val, detail in bb_place:
+                if bb.board[pos] == 0 and solution[pos] == val:
+                    bb.place(pos, val)
+                    step_num += 1
+                    steps.append({'step': step_num, 'pos': pos, 'digit': val, 'technique': 'BowmanBingo'})
+                    technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
+                    placed = True
+                    break
+            if placed:
+                continue
+        if bb_elim:
+            for pos, d in bb_elim:
+                bb.eliminate(pos, d)
+            technique_counts['BowmanBingo'] = technique_counts.get('BowmanBingo', 0) + 1
             continue
 
         # D2B
