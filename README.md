@@ -17,7 +17,7 @@
 
 **Sittin' on the Throne of Euler:** [Listen Now! They said NP Complete, i said check out my zones brother Euler! ](https://suno.com/s/ABPiCLAgaZLNmGko)  
 
-**Sittin' on the Throne of Euler:** [Listen Now! Epic Space Opera Regarding Sudoku! ](https://suno.com/s/5Vp81L1tj0DNnVKz)  
+**Sittin' on the Throne of Euler:** [Listen Now! Epic Space Opera Regarding Sudoku! ](https://suno.com/s/cfKdA5mrpkSGt9oL)  
 
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
 
