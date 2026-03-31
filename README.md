@@ -17,7 +17,45 @@
 
 **Sittin' on the Throne of Euler:** [Listen Now! They said NP Complete, i said check out my zones brother Euler! ](https://suno.com/s/ABPiCLAgaZLNmGko)  
 
+**Sittin' on the Throne of Euler:** [Listen Now! Epic Space Opera Regarding Sudoku! ](https://suno.com/s/5Vp81L1tj0DNnVKz)  
+
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
+
+## LarsForge: 60 Quadrillion Indestructible Puzzles
+
+LarsForge generates **60 quadrillion unique 17-clue puzzles** from the complete Royle enumeration (49,158 seeds). Every puzzle is backed by a mathematically proven 17-clue skeleton — the minimum information needed to determine a unique Sudoku solution.
+
+**Why this matters:** Traditional puzzle generators use backtrackers to verify uniqueness for one configuration. LarsForge puzzles are **dimensionally unique** — unique across ALL states. Add solution digits to create 24-clue puzzles, remove any of the added clues in any order, and uniqueness holds. The 17-clue core is bedrock. Everything above it is armor.
+
+We are building toward forging all puzzles from an **18-clue minimum base** — one clue above the mathematical floor. At 17 clues, 90% of puzzles solve with basic techniques alone. At 18 clues, the extra clue opens the door to harder, more interesting puzzles while still guaranteeing dimensional uniqueness. When a 24-clue puzzle is built on the forge, removing any clue above the 18-clue base never leads to multiple solutions. Boards that break when reduced to their minimum base are, in our view, backtracker-unreliable — verified at one snapshot, but fragile under interaction. We prefer puzzles with structural integrity all the way down.
+
+```bash
+# 6ms uniqueness oracle — no backtracker needed
+larsdoku --lars-certify "000000010400000000020000000000050407008000300001090000300400200050100000000806000"
+# >>> UNIQUE <<<  Royle-certified
+
+# Match ANY mask to a seed in 7ms (Final Boss Mode)
+larsdoku --lars-forge-mask-match "...x..x.x....."
+
+# Promote to any clue count — guaranteed unique, remove any added clue
+larsdoku "000000010..." --lars-forge-promote 24
+
+# Technique-targeted generation — "give me a KrakenFish puzzle"
+larsdoku --lforge-attempt kraken --lforge-clues 23 --lforge-count 5
+
+# See all available technique tags
+larsdoku --lforge-stats
+```
+
+| Feature | What it does |
+|---------|-------------|
+| `--lars-certify` | 6ms uniqueness oracle (Royle hash lookup) |
+| `--lars-forge-mask-match` | Match any 17-clue mask to a seed (7ms) |
+| `--lars-forge-promote N` | 17-clue → any clue count, all unique |
+| `--lforge-attempt TECHS` | Generate by technique (684 seeds, 16 techniques) |
+| `--include TECHS` | Add techniques to presets |
+
+**The numbers:** 49,196 seeds × 362,880 digit perms × 3,359,232 symmetries = **60 quadrillion** unique 17-clue puzzles. With promote (2^64 variants per seed): **1 undecillion** (10^36) across all clue counts.
 
 ** USE --preset expert  first, and --preset larstech for the new techniques listed at the gihub New Techniques site! 
 
