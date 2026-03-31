@@ -1011,7 +1011,7 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet — Andrew Stuart's validated version (strict cover-line ≤2)
+        # Junior Exocet — validated version (strict cover-line ≤2)
         if allowed('JuniorExocet'):
             je_elims, je_detail = detect_junior_exocet_stuart(bb)
             if je_elims:
@@ -1713,7 +1713,7 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet — Stuart's validated version
+        # Junior Exocet — validated version
         if allowed('JuniorExocet'):
             je_elims, _ = detect_junior_exocet_stuart(bb)
             if je_elims:
@@ -3446,7 +3446,7 @@ presets:
                        help='Target clue count filter for lforge (e.g. 22, 23, 24)')
     parser.add_argument('--lforge-tier', type=str, default=None,
                        choices=['medium', 'hard', 'extreme', 'any'],
-                       help='Seed tier: medium (22-25), hard (Andrew weekly), extreme (forum hardest)')
+                       help='Seed tier: medium (22-25), hard (expert collection), extreme (forum hardest)')
     parser.add_argument('--lforge-stats', action='store_true',
                        help='Show technique seed bank statistics')
     parser.add_argument('--lforge-list', action='store_true',
@@ -4851,7 +4851,7 @@ presets:
         print(f'\n  LForge Technique Seed Bank')
         print(f'  {"═" * 55}')
         meta = stats['meta']
-        print(f'  Seeds: {meta.get("total_seeds", "?")} ({meta.get("andrew_seeds", 0)} Andrew + {meta.get("forum_seeds", 0)} forum)')
+        print(f'  Seeds: {meta.get("total_seeds", meta.get("seed_count", "?"))}')
         print(f'  Signatures: {stats["n_signatures"]}')
         print(f'\n  By tier:')
         for tier, count in stats['tier_counts'].items():

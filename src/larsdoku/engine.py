@@ -3310,9 +3310,9 @@ def detect_ur_type4(bb):
 
 
 def detect_junior_exocet_stuart(bb):
-    """Junior Exocet — Andrew Stuart's validated implementation.
+    """Junior Exocet — validated implementation with cover-line check.
 
-    Pattern Rules 1-4 from Bird's specification via sudokuwiki.org:
+    Pattern Rules 1-4 from Bird's specification:
       1. Base pair in minirow with 3-4 combined candidates
       2. Two targets in other boxes, different lines, can't see each other
       3. Companion cells must not contain placed base digits
@@ -3406,7 +3406,7 @@ def detect_junior_exocet_stuart(bb):
                                     if companion_bad:
                                         continue
 
-                                    # Rule 4: Cover-line validation (Stuart/Bird)
+                                    # Rule 4: Cover-line validation (Bird)
                                     # Cross-lines = target columns + unused base column
                                     base_box_start = bx * 3
                                     cross_positions = set()

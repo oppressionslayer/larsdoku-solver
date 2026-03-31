@@ -4,8 +4,7 @@
     "created": "2026-03-30",
     "total_seeds": 684,
     "total_signatures": 368,
-    "andrew_seeds": 684,
-    "forum_seeds": 0
+    "seed_count": 684
   },
   "signatures": {
     "ALS_XZ+AlignedPairExcl+FPC": {
@@ -16,7 +15,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+XWing": {
       "seeds": {
@@ -36,7 +35,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+SimpleColoring+XWing": {
       "seeds": {
@@ -53,7 +52,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish": {
       "seeds": {
@@ -83,7 +82,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -93,7 +92,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+XCycle": {
       "seeds": {
@@ -103,7 +102,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC": {
       "seeds": {
@@ -143,7 +142,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -190,7 +189,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC": {
       "seeds": {
@@ -208,7 +207,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+XWing": {
       "seeds": {
@@ -221,7 +220,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+FPC+FPCE": {
       "seeds": {
@@ -232,7 +231,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -252,7 +251,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -265,7 +264,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ": {
       "seeds": {
@@ -278,7 +277,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+XCycle": {
       "seeds": {
@@ -292,7 +291,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+SimpleColoring+XCycle": {
       "seeds": {
@@ -311,7 +310,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+SimpleColoring+Swordfish+XCycle+XWing": {
       "seeds": {
@@ -321,7 +320,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -331,7 +330,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+XWing": {
       "seeds": {
@@ -344,7 +343,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPC+FPCE": {
       "seeds": {
@@ -358,7 +357,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring+XWing": {
       "seeds": {
@@ -394,7 +393,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+KrakenFish": {
       "seeds": {
@@ -404,7 +403,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+SimpleColoring": {
       "seeds": {
@@ -428,7 +427,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish": {
       "seeds": {
@@ -453,7 +452,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+FPCE+FPF+JuniorExocet": {
       "seeds": {
@@ -464,7 +463,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -478,7 +477,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPCE": {
       "seeds": {
@@ -498,7 +497,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+KrakenFish": {
       "seeds": {
@@ -518,7 +517,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -540,7 +539,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+FPC+FPCE": {
       "seeds": {
@@ -550,7 +549,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring": {
       "seeds": {
@@ -588,7 +587,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring+XCycle": {
       "seeds": {
@@ -602,7 +601,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+XCycle": {
       "seeds": {
@@ -616,7 +615,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE+SimpleColoring": {
       "seeds": {
@@ -639,7 +638,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPF+JuniorExocet+KrakenFish+XWing": {
       "seeds": {
@@ -649,7 +648,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -659,7 +658,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE": {
       "seeds": {
@@ -686,7 +685,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPCE+SimpleColoring": {
       "seeds": {
@@ -699,7 +698,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPCE+KrakenFish+XCycle": {
       "seeds": {
@@ -709,7 +708,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+AlignedPairExcl+FPCE+KrakenFish": {
       "seeds": {
@@ -722,7 +721,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE+KrakenFish+XWing": {
       "seeds": {
@@ -732,7 +731,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+Swordfish": {
       "seeds": {
@@ -747,7 +746,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+FPCE+FPF+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -758,7 +757,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+XWing": {
       "seeds": {
@@ -769,7 +768,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+SueDeCoq": {
       "seeds": {
@@ -780,7 +779,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+KrakenFish": {
       "seeds": {
@@ -790,7 +789,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE+SimpleColoring": {
       "seeds": {
@@ -803,7 +802,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -820,7 +819,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE": {
       "seeds": {
@@ -838,7 +837,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+DeepResonance+FPCE+FPF+KrakenFish": {
       "seeds": {
@@ -849,7 +848,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE+KrakenFish": {
       "seeds": {
@@ -862,7 +861,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeathBlossom+FPC+SimpleColoring": {
       "seeds": {
@@ -872,7 +871,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring+Swordfish": {
       "seeds": {
@@ -888,7 +887,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -901,7 +900,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -920,7 +919,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+Swordfish": {
       "seeds": {
@@ -933,7 +932,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -954,7 +953,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -964,7 +963,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+XCycle+XWing": {
       "seeds": {
@@ -977,7 +976,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE": {
       "seeds": {
@@ -997,7 +996,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE": {
       "seeds": {
@@ -1010,7 +1009,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+Swordfish": {
       "seeds": {
@@ -1023,7 +1022,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+SimpleColoring+XWing": {
       "seeds": {
@@ -1033,7 +1032,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+XCycle": {
       "seeds": {
@@ -1043,7 +1042,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+KrakenFish+XCycle": {
       "seeds": {
@@ -1053,7 +1052,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+Swordfish": {
       "seeds": {
@@ -1063,7 +1062,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -1077,7 +1076,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+JuniorExocet": {
       "seeds": {
@@ -1088,7 +1087,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1104,7 +1103,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+XWing": {
       "seeds": {
@@ -1114,7 +1113,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeathBlossom+FPC+KrakenFish+XWing": {
       "seeds": {
@@ -1124,7 +1123,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -1138,7 +1137,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1152,7 +1151,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPF+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -1162,7 +1161,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+FPCE+JuniorExocet": {
       "seeds": {
@@ -1173,7 +1172,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1186,7 +1185,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -1196,7 +1195,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1211,7 +1210,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1221,7 +1220,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeathBlossom+DeepResonance+FPC+JuniorExocet": {
       "seeds": {
@@ -1231,7 +1230,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPCE+JuniorExocet": {
       "seeds": {
@@ -1241,7 +1240,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPCE+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1255,7 +1254,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPCE+JuniorExocet+Swordfish": {
       "seeds": {
@@ -1265,7 +1264,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -1275,7 +1274,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE+JuniorExocet": {
       "seeds": {
@@ -1292,7 +1291,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1302,7 +1301,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+JuniorExocet+KrakenFish+SimpleColoring+Swordfish": {
       "seeds": {
@@ -1312,7 +1311,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1322,7 +1321,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1342,7 +1341,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPCE+Swordfish+XCycle": {
       "seeds": {
@@ -1352,7 +1351,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPCE+SimpleColoring": {
       "seeds": {
@@ -1363,7 +1362,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1373,7 +1372,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPCE+JuniorExocet+XCycle": {
       "seeds": {
@@ -1384,7 +1383,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1397,7 +1396,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPCE+JuniorExocet+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -1407,7 +1406,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+SimpleColoring+XCycle": {
       "seeds": {
@@ -1417,7 +1416,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1431,7 +1430,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1441,7 +1440,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1451,7 +1450,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1464,7 +1463,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1474,7 +1473,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -1487,7 +1486,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1500,7 +1499,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1510,7 +1509,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+DeepResonance+FPC+FPCE+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1520,7 +1519,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+XWing": {
       "seeds": {
@@ -1530,7 +1529,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1540,7 +1539,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPCE+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1550,7 +1549,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1560,7 +1559,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPCE+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1571,7 +1570,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1581,7 +1580,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -1597,7 +1596,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPF+JuniorExocet+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -1607,7 +1606,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPF+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -1617,7 +1616,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1630,7 +1629,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPCE+SimpleColoring+XCycle": {
       "seeds": {
@@ -1640,7 +1639,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+D2B+DeepResonance+FPC+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1650,7 +1649,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+JuniorExocet+KrakenFish+SimpleColoring+Swordfish+XCycle": {
       "seeds": {
@@ -1664,7 +1663,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -1679,7 +1678,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1689,7 +1688,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -1699,7 +1698,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+KrakenFish+SimpleColoring+Swordfish+XCycle+XWing": {
       "seeds": {
@@ -1709,7 +1708,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+JuniorExocet": {
       "seeds": {
@@ -1719,7 +1718,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1729,7 +1728,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+D2B+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1739,7 +1738,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -1753,7 +1752,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+FPF+JuniorExocet": {
       "seeds": {
@@ -1763,7 +1762,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+DeepResonance+FPC+FPCE+FPF+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1773,7 +1772,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF": {
       "seeds": {
@@ -1783,7 +1782,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+FPF+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1794,7 +1793,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeathBlossom+FPC+FPCE+FPF+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1804,7 +1803,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1814,7 +1813,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPF+JuniorExocet+KrakenFish+XWing": {
       "seeds": {
@@ -1825,7 +1824,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+KrakenFish": {
       "seeds": {
@@ -1841,7 +1840,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+FPCE+FPF+KrakenFish": {
       "seeds": {
@@ -1851,7 +1850,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -1861,7 +1860,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1871,7 +1870,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1881,7 +1880,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -1891,7 +1890,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -1901,7 +1900,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -1914,7 +1913,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPCE+JuniorExocet": {
       "seeds": {
@@ -1927,7 +1926,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+Swordfish": {
       "seeds": {
@@ -1938,7 +1937,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1948,7 +1947,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+XWing": {
       "seeds": {
@@ -1958,7 +1957,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+FPCE+Swordfish+XWing": {
       "seeds": {
@@ -1968,7 +1967,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE+FPF+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -1978,7 +1977,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+AlignedPairExcl+DeepResonance+FPC+FPCE+FPF+JuniorExocet+KrakenFish+SimpleColoring+Swordfish": {
       "seeds": {
@@ -1988,7 +1987,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+JuniorExocet+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -1998,7 +1997,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -2008,7 +2007,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -2027,7 +2026,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+JuniorExocet+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -2037,7 +2036,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+Swordfish+XWing": {
       "seeds": {
@@ -2047,7 +2046,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPC+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2057,7 +2056,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPCE+FPF": {
       "seeds": {
@@ -2068,7 +2067,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPCE+FPF+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -2078,7 +2077,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -2095,7 +2094,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPF": {
       "seeds": {
@@ -2105,7 +2104,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -2118,7 +2117,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+JuniorExocet": {
       "seeds": {
@@ -2128,7 +2127,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -2138,7 +2137,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPF+SimpleColoring": {
       "seeds": {
@@ -2148,7 +2147,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+FPCE+KrakenFish": {
       "seeds": {
@@ -2161,7 +2160,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPCE+SimpleColoring": {
       "seeds": {
@@ -2171,7 +2170,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+XWing": {
       "seeds": {
@@ -2181,7 +2180,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+SimpleColoring+XCycle": {
       "seeds": {
@@ -2191,7 +2190,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -2201,7 +2200,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPF+XCycle": {
       "seeds": {
@@ -2211,7 +2210,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPF+KrakenFish+XCycle": {
       "seeds": {
@@ -2221,7 +2220,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPF+XCycle": {
       "seeds": {
@@ -2231,7 +2230,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+SimpleColoring+XCycle": {
       "seeds": {
@@ -2241,7 +2240,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+XWing": {
       "seeds": {
@@ -2251,7 +2250,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -2270,7 +2269,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+SimpleColoring": {
       "seeds": {
@@ -2280,7 +2279,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPCE+SimpleColoring": {
       "seeds": {
@@ -2291,7 +2290,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC": {
       "seeds": {
@@ -2301,7 +2300,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPCE": {
       "seeds": {
@@ -2315,7 +2314,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC": {
       "seeds": {
@@ -2330,7 +2329,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPCE+FPF+KrakenFish": {
       "seeds": {
@@ -2340,7 +2339,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPCE+FPF+KrakenFish+XCycle+XWing": {
       "seeds": {
@@ -2350,7 +2349,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+FPF+SimpleColoring": {
       "seeds": {
@@ -2360,7 +2359,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE+XWing": {
       "seeds": {
@@ -2370,7 +2369,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -2380,7 +2379,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC": {
       "seeds": {
@@ -2390,7 +2389,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+KrakenFish": {
       "seeds": {
@@ -2400,7 +2399,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -2410,7 +2409,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+SimpleColoring+Swordfish+XCycle": {
       "seeds": {
@@ -2420,7 +2419,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+FPC+FPF+KrakenFish": {
       "seeds": {
@@ -2430,7 +2429,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPCE+FPF": {
       "seeds": {
@@ -2440,7 +2439,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -2450,7 +2449,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -2463,7 +2462,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2473,7 +2472,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -2483,7 +2482,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC": {
       "seeds": {
@@ -2493,7 +2492,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance": {
       "seeds": {
@@ -2503,7 +2502,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance": {
       "seeds": {
@@ -2513,7 +2512,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+SimpleColoring+Swordfish": {
       "seeds": {
@@ -2526,7 +2525,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+SimpleColoring": {
       "seeds": {
@@ -2536,7 +2535,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPCE+FPF": {
       "seeds": {
@@ -2546,7 +2545,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+XWing": {
       "seeds": {
@@ -2556,7 +2555,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+KrakenFish": {
       "seeds": {
@@ -2567,7 +2566,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -2577,7 +2576,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPCE+KrakenFish+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -2587,7 +2586,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPCE+FPF+KrakenFish+SimpleColoring+Swordfish+XCycle+XWing": {
       "seeds": {
@@ -2597,7 +2596,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPCE": {
       "seeds": {
@@ -2607,7 +2606,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+KrakenFish+SimpleColoring+Swordfish": {
       "seeds": {
@@ -2617,7 +2616,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+XCycle": {
       "seeds": {
@@ -2627,7 +2626,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+SimpleColoring+XWing": {
       "seeds": {
@@ -2637,7 +2636,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2647,7 +2646,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE": {
       "seeds": {
@@ -2657,7 +2656,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE+FPF": {
       "seeds": {
@@ -2667,7 +2666,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2677,7 +2676,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2687,7 +2686,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+SimpleColoring+XCycle": {
       "seeds": {
@@ -2697,7 +2696,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -2707,7 +2706,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPCE+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2717,7 +2716,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+KrakenFish": {
       "seeds": {
@@ -2730,7 +2729,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -2740,7 +2739,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -2750,7 +2749,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPCE": {
       "seeds": {
@@ -2760,7 +2759,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -2770,7 +2769,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -2780,7 +2779,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+JuniorExocet+XCycle+XWing": {
       "seeds": {
@@ -2790,7 +2789,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+JuniorExocet+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -2800,7 +2799,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+JuniorExocet+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -2810,7 +2809,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2820,7 +2819,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+XWing": {
       "seeds": {
@@ -2830,7 +2829,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -2840,7 +2839,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+FPF": {
       "seeds": {
@@ -2850,7 +2849,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+FPF+SimpleColoring+XWing": {
       "seeds": {
@@ -2860,7 +2859,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+FPF+XWing": {
       "seeds": {
@@ -2870,7 +2869,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPC+FPCE+FPF": {
       "seeds": {
@@ -2880,7 +2879,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -2890,7 +2889,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+FPCE": {
       "seeds": {
@@ -2900,7 +2899,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPCE+KrakenFish": {
       "seeds": {
@@ -2910,7 +2909,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPCE+FPF+XCycle": {
       "seeds": {
@@ -2921,7 +2920,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPF+KrakenFish": {
       "seeds": {
@@ -2931,7 +2930,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -2941,7 +2940,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPCE": {
       "seeds": {
@@ -2951,7 +2950,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance": {
       "seeds": {
@@ -2961,7 +2960,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+FPCE": {
       "seeds": {
@@ -2971,7 +2970,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+SimpleColoring+Swordfish+XCycle": {
       "seeds": {
@@ -2981,7 +2980,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPF": {
       "seeds": {
@@ -2991,7 +2990,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+FPC+SimpleColoring+XCycle": {
       "seeds": {
@@ -3002,7 +3001,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+SimpleColoring": {
       "seeds": {
@@ -3012,7 +3011,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+SimpleColoring+XCycle": {
       "seeds": {
@@ -3022,7 +3021,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -3032,7 +3031,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+FPF+KrakenFish+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -3042,7 +3041,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+FPCE+SimpleColoring": {
       "seeds": {
@@ -3052,7 +3051,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -3062,7 +3061,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+D2B+FPCE+SimpleColoring": {
       "seeds": {
@@ -3073,7 +3072,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -3083,7 +3082,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -3093,7 +3092,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+KrakenFish+XWing": {
       "seeds": {
@@ -3103,7 +3102,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+FPC": {
       "seeds": {
@@ -3113,7 +3112,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+XWing": {
       "seeds": {
@@ -3123,7 +3122,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -3133,7 +3132,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+FPC+FPCE": {
       "seeds": {
@@ -3143,7 +3142,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3153,7 +3152,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -3163,7 +3162,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "AlignedPairExcl+D2B+DeepResonance+FPC+Swordfish": {
       "seeds": {
@@ -3173,7 +3172,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+JuniorExocet": {
       "seeds": {
@@ -3183,7 +3182,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPCE+FPF": {
       "seeds": {
@@ -3193,7 +3192,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPF": {
       "seeds": {
@@ -3203,7 +3202,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -3213,7 +3212,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+FPC+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -3223,7 +3222,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPCE+FPF+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3233,7 +3232,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+JuniorExocet+SimpleColoring+XWing": {
       "seeds": {
@@ -3243,7 +3242,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPCE+FPF+JuniorExocet+XWing": {
       "seeds": {
@@ -3253,7 +3252,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPF+JuniorExocet+XCycle": {
       "seeds": {
@@ -3263,7 +3262,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3273,7 +3272,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPCE+FPF+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -3283,7 +3282,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+FPF+SimpleColoring+Swordfish": {
       "seeds": {
@@ -3293,7 +3292,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+FPF+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3303,7 +3302,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPCE+FPF+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -3313,7 +3312,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+FPC+FPCE+FPF+JuniorExocet": {
       "seeds": {
@@ -3323,7 +3322,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+FPF": {
       "seeds": {
@@ -3333,7 +3332,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+FPF+JuniorExocet+XWing": {
       "seeds": {
@@ -3343,7 +3342,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "DeepResonance+FPF+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -3353,7 +3352,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -3363,7 +3362,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+FPF+Swordfish": {
       "seeds": {
@@ -3373,7 +3372,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPF+KrakenFish+XCycle": {
       "seeds": {
@@ -3383,7 +3382,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+D2B+DeepResonance+FPCE+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3393,7 +3392,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPF+JuniorExocet+SimpleColoring+Swordfish": {
       "seeds": {
@@ -3403,7 +3402,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPF+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3413,7 +3412,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -3423,7 +3422,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -3433,7 +3432,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE": {
       "seeds": {
@@ -3449,7 +3448,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE+KrakenFish+XWing": {
       "seeds": {
@@ -3459,7 +3458,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+SimpleColoring": {
       "seeds": {
@@ -3469,7 +3468,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring+Swordfish+XCycle": {
       "seeds": {
@@ -3479,7 +3478,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+KrakenFish": {
       "seeds": {
@@ -3490,7 +3489,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+FPF+KrakenFish+XWing": {
       "seeds": {
@@ -3500,7 +3499,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+FPF+JuniorExocet+KrakenFish+Swordfish": {
       "seeds": {
@@ -3510,7 +3509,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+DeepResonance+FPCE": {
       "seeds": {
@@ -3520,7 +3519,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+JuniorExocet+KrakenFish": {
       "seeds": {
@@ -3531,7 +3530,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+JuniorExocet+SimpleColoring+XCycle": {
       "seeds": {
@@ -3541,7 +3540,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPC+FPCE": {
       "seeds": {
@@ -3551,7 +3550,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+KrakenFish+XCycle+XWing": {
       "seeds": {
@@ -3561,7 +3560,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+DeepResonance+FPC+FPCE+KrakenFish+SimpleColoring+Swordfish": {
       "seeds": {
@@ -3571,7 +3570,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+D2B+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+XCycle": {
       "seeds": {
@@ -3581,7 +3580,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+FPF+KrakenFish": {
       "seeds": {
@@ -3591,7 +3590,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPF+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -3601,7 +3600,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -3611,7 +3610,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+FPC+FPCE+FPF+JuniorExocet+SimpleColoring": {
       "seeds": {
@@ -3621,7 +3620,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+SimpleColoring+SueDeCoq": {
       "seeds": {
@@ -3631,7 +3630,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+FPCE+JuniorExocet+XCycle": {
       "seeds": {
@@ -3641,7 +3640,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+DeepResonance+FPC+FPCE+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -3651,7 +3650,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "D2B+DeepResonance+JuniorExocet": {
       "seeds": {
@@ -3661,7 +3660,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeepResonance+FPC+FPCE+JuniorExocet+KrakenFish+Swordfish+XCycle": {
       "seeds": {
@@ -3671,7 +3670,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+D2B+DeepResonance+FPCE+KrakenFish": {
       "seeds": {
@@ -3681,7 +3680,7 @@
       },
       "tier": "extreme",
       "max_level": 7,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -3694,7 +3693,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+Swordfish+XCycle": {
       "seeds": {
@@ -3704,7 +3703,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+XCycle": {
       "seeds": {
@@ -3714,7 +3713,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+SimpleColoring": {
       "seeds": {
@@ -3727,7 +3726,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPCE": {
       "seeds": {
@@ -3740,7 +3739,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -3750,7 +3749,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -3760,7 +3759,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -3770,7 +3769,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+SimpleColoring": {
       "seeds": {
@@ -3780,7 +3779,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPCE+KrakenFish+SimpleColoring+XWing": {
       "seeds": {
@@ -3790,7 +3789,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -3803,7 +3802,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE": {
       "seeds": {
@@ -3815,7 +3814,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -3825,7 +3824,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPCE+XCycle": {
       "seeds": {
@@ -3836,7 +3835,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+Swordfish+XCycle+XWing": {
       "seeds": {
@@ -3846,7 +3845,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+FPCE+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -3856,7 +3855,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+KrakenFish+Swordfish+XCycle": {
       "seeds": {
@@ -3866,7 +3865,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+Swordfish+XCycle": {
       "seeds": {
@@ -3876,7 +3875,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+SimpleColoring+Swordfish": {
       "seeds": {
@@ -3886,7 +3885,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+KrakenFish+Swordfish": {
       "seeds": {
@@ -3896,7 +3895,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -3906,7 +3905,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+Swordfish": {
       "seeds": {
@@ -3916,7 +3915,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE+SimpleColoring+Swordfish": {
       "seeds": {
@@ -3926,7 +3925,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+XCycle+XWing": {
       "seeds": {
@@ -3937,7 +3936,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -3947,7 +3946,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+FPCE+XCycle": {
       "seeds": {
@@ -3957,7 +3956,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+XCycle+XWing": {
       "seeds": {
@@ -3967,7 +3966,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -3977,7 +3976,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+SimpleColoring+XWing": {
       "seeds": {
@@ -3987,7 +3986,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+SimpleColoring+Swordfish+XCycle+XWing": {
       "seeds": {
@@ -3997,7 +3996,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+KrakenFish+Swordfish": {
       "seeds": {
@@ -4007,7 +4006,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+KrakenFish+SimpleColoring+XCycle": {
       "seeds": {
@@ -4017,7 +4016,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+SimpleColoring+Swordfish": {
       "seeds": {
@@ -4027,7 +4026,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPCE+XWing": {
       "seeds": {
@@ -4037,7 +4036,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+KrakenFish+SueDeCoq+XCycle+XWing": {
       "seeds": {
@@ -4047,7 +4046,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -4057,7 +4056,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+KrakenFish+SimpleColoring+Swordfish+XCycle": {
       "seeds": {
@@ -4067,7 +4066,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE+XWing": {
       "seeds": {
@@ -4077,7 +4076,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -4087,7 +4086,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+SimpleColoring+XWing": {
       "seeds": {
@@ -4097,7 +4096,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+KrakenFish+Swordfish": {
       "seeds": {
@@ -4107,7 +4106,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+SimpleColoring+Swordfish": {
       "seeds": {
@@ -4117,7 +4116,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+SimpleColoring": {
       "seeds": {
@@ -4130,7 +4129,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC+SimpleColoring": {
       "seeds": {
@@ -4140,7 +4139,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+DeathBlossom+FPC": {
       "seeds": {
@@ -4150,7 +4149,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+FPCE+XCycle": {
       "seeds": {
@@ -4160,7 +4159,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE+KrakenFish": {
       "seeds": {
@@ -4170,7 +4169,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+Swordfish+XCycle": {
       "seeds": {
@@ -4180,7 +4179,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+FPC+FPCE+KrakenFish": {
       "seeds": {
@@ -4190,7 +4189,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+AlignedPairExcl+FPCE+KrakenFish+SimpleColoring": {
       "seeds": {
@@ -4200,7 +4199,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC+KrakenFish+SimpleColoring+Swordfish+XWing": {
       "seeds": {
@@ -4210,7 +4209,7 @@
       },
       "tier": "hard",
       "max_level": 6,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPCE+XWing": {
       "seeds": {
@@ -4220,7 +4219,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ": {
       "seeds": {
@@ -4230,7 +4229,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XZ+FPC": {
       "seeds": {
@@ -4240,7 +4239,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPCE+SimpleColoring": {
       "seeds": {
@@ -4250,7 +4249,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "FPC+FPCE+XWing": {
       "seeds": {
@@ -4260,7 +4259,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     },
     "ALS_XYWing+ALS_XZ+AlignedPairExcl+FPC+FPCE+SimpleColoring": {
       "seeds": {
@@ -4270,7 +4269,7 @@
       },
       "tier": "hard",
       "max_level": 5,
-      "source": "andrew"
+      "source": "expert"
     }
   },
   "tech_index": {
