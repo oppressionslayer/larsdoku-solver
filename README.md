@@ -4,7 +4,7 @@
 
  ## The Anthem                                                                                                                                                     
                                                             
-  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/5Vp81L1tj0DNnVKz)                                                                
+  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/selpQcGm1lreUDEW)                                                                
    
   *"Solved the whole damn game like it's just another Tuesday"*    
   
