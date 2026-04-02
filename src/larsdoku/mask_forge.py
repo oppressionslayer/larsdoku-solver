@@ -364,7 +364,7 @@ def main():
      graph exactly. If the original has one solution, every
      permutation has exactly one solution.
 
-  Mask uniqueness discovery: Andrew Stuart (brute force)
+  Mask uniqueness: brute force constraint search
   Constraint-guided forge + permutation proof: WSRF / Sir Lars
   ─────────────────────────────────────────────────────────────""")
     print(f"{'=' * 65}")
