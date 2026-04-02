@@ -3556,6 +3556,8 @@ presets:
                        help='Show Lars Seeds registry statistics')
     parser.add_argument('--lforge-no-confirm', action='store_true',
                        help='Skip solving forged puzzles to confirm techniques (faster, no verification)')
+    parser.add_argument('--lforge-seed', type=int, default=None, metavar='N',
+                       help='Random seed for lforge generation (for reproducible output)')
     parser.add_argument('--elite', action='store_true',
                        help='Elite mode: only return puzzles that resist all expert techniques. '
                             'These puzzles require DeepResonance/D2B — the hardest puzzles possible.')
@@ -5098,12 +5100,17 @@ presets:
         if elite:
             multiplier = 12  # ~92% get filtered by elite
 
-        result = lars_deepres_forge(count=n * multiplier, technique=_lforge_tech)
+        import time as _time_seed
+        forge_seed = getattr(args, 'lforge_seed', None)
+        if forge_seed is None:
+            forge_seed = int(_time_seed.time() * 1000) % (2**31)
+        result = lars_deepres_forge(count=n * multiplier, technique=_lforge_tech,
+                                     seed=forge_seed)
         if not result['success']:
             print(f'  {result.get("error", "Failed")}')
             print()
             return
-        print(f'  Lars Seeds: {result["seed_count"]:,} seeds')
+        print(f'  Lars Seeds: {result["seed_count"]:,} seeds (seed={forge_seed})')
 
         if no_confirm and not elite:
             print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms (unconfirmed)')
