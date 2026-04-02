@@ -36,7 +36,7 @@ from .engine import (
     propagate_l1l2, solve_backtrack, solve_bitwise,
     detect_fpc_bitwise, detect_fpce_bitwise,
     detect_forcing_chain_bitwise, detect_forcing_net, detect_forcing_net_v2,
-    detect_rectangle_elimination, detect_xy_chain,
+    detect_rectangle_elimination, detect_xy_chain, detect_dpi,
     detect_d2b_bitwise, detect_fpf_bitwise,
     detect_xwing, detect_swordfish, detect_simple_coloring,
     detect_bug_plus1, detect_ur_type2, detect_ur_type4,
@@ -75,6 +75,7 @@ TECHNIQUE_LEVELS = {
 TECHNIQUE_ALIASES = {
     'fpc': 'FPC', 'fpce': 'FPCE', 'fc': 'ForcingChain', 'fn': 'ForcingNet', 'fnv2': 'FNv2',
     'xychain': 'XYChain', 'xy': 'XYChain', 'rectelim': 'RectElim', 're': 'RectElim',
+    'dpi': 'DPI', 'deeppath': 'DPI', 'pathincompat': 'DPI',
     'd2b': 'D2B', 'fpf': 'FPF', 'gf2': 'GF2_Lanczos',
     'gf2x': 'GF2_Extended', 'gf2p': 'GF2_Probe',
     'xwing': 'XWing', 'swordfish': 'Swordfish', 'coloring': 'SimpleColoring',
@@ -98,7 +99,7 @@ TECHNIQUE_ALIASES = {
 WSRF_INVENTIONS = {'FPC', 'FPCE', 'D2B', 'FPF', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
 
 # Experimental techniques — research detectors not ready for production
-EXPERIMENTAL_TECHNIQUES = {'JETest'}
+EXPERIMENTAL_TECHNIQUES = {'JETest', 'DPI'}
 
 # Sudoku Expert Approved — standard L1-L6 techniques only (no WSRF inventions)
 EXPERT_APPROVED = {
@@ -975,6 +976,23 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 if verbose:
                     descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in xy_elims]
                     print(f"        XYChain: {', '.join(descs)}")
+                continue
+
+        # DPI — Deep Path Incompatibility (Yves's technique)
+        if allowed('DPI'):
+            dpi_elims = detect_dpi(bb)
+            if dpi_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'DPI',
+                        'eliminations': list(dpi_elims),
+                    })
+                for pos, d in dpi_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['DPI'] = technique_counts.get('DPI', 0) + 1
+                if verbose:
+                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in dpi_elims]
+                    print(f"        DPI: {', '.join(descs)}")
                 continue
 
         # Rectangle Elimination

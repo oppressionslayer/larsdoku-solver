@@ -3167,6 +3167,167 @@ def detect_rectangle_elimination(bb):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# DPI — Deep Path Incompatibility (Yves's technique)
+# If C1=d ON is incompatible with both C2=d ON and C2=d OFF
+# via a witness cell, then C1 cannot be d.
+# Credit: Yves (forum observation on Lars puzzle #691)
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_dpi(bb):
+    """Deep Path Incompatibility — Yves's technique formalized.
+
+    For each digit d, for each pair of cells (C1, C2) sharing d as candidate
+    and sharing a unit (peers):
+
+      1. Assume C1=d (ON) → propagate → record state of all cells with d
+      2. For C2: test both ON and OFF paths
+         - C2=d ON → propagate → record witness states
+         - C2=d OFF → if bivalue, forces other digit → propagate → record witness states
+      3. If C1=d ON forces a witness cell W to have d in one state,
+         but BOTH C2=d ON and C2=d OFF force W to the opposite state
+         → C1=d is incompatible → eliminate d from C1
+
+    Returns: list of (pos, digit) elimination tuples
+    """
+    elims = []
+    elim_seen = set()
+
+    for d in range(9):
+        dbit = BIT[d]
+        dval = d + 1
+
+        # Find all cells with candidate d
+        d_cells = []
+        for pos in range(81):
+            if bb.board[pos] == 0 and (bb.cands[pos] & dbit):
+                d_cells.append(pos)
+
+        if len(d_cells) < 3:
+            continue
+
+        # For each cell C1 with candidate d
+        for c1 in d_cells:
+            # Propagate C1=d ON
+            c1_b, c1_c = fast_propagate_full(bb.board, bb.cands, c1, dval,
+                                              return_np=True)
+            if c1_b is None:
+                # Direct contradiction — standard FN catches this
+                # Still record as elimination
+                key = (c1, dval)
+                if key not in elim_seen:
+                    elim_seen.add(key)
+                    elims.append(key)
+                continue
+
+            # C1=d ON path: which cells have d placed or eliminated?
+            c1_d_placed = set()  # cells where d is placed (ON)
+            c1_d_gone = set()    # cells where d is eliminated (OFF)
+            for pos in d_cells:
+                if pos == c1:
+                    continue
+                val = int(c1_b[pos])
+                if val == dval:
+                    c1_d_placed.add(pos)
+                elif val != 0:
+                    c1_d_gone.add(pos)  # placed something else → d is OFF
+                elif not (int(c1_c[pos]) & dbit):
+                    c1_d_gone.add(pos)  # d eliminated from candidates
+
+            # For each peer C2 that also has d
+            c1r, c1c = c1 // 9, c1 % 9
+            c1box = (c1r // 3) * 3 + c1c // 3
+
+            for c2 in d_cells:
+                if c2 == c1:
+                    continue
+                c2r, c2c = c2 // 9, c2 % 9
+                c2box = (c2r // 3) * 3 + c2c // 3
+
+                # C1 and C2 must share a unit (they're peers for digit d)
+                if c1r != c2r and c1c != c2c and c1box != c2box:
+                    continue
+
+                # C2=d ON path
+                c2on_b, c2on_c = fast_propagate_full(bb.board, bb.cands, c2, dval,
+                                                      return_np=True)
+                c2on_d_placed = set()
+                c2on_d_gone = set()
+                if c2on_b is not None:
+                    for pos in d_cells:
+                        if pos == c2:
+                            continue
+                        val = int(c2on_b[pos])
+                        if val == dval:
+                            c2on_d_placed.add(pos)
+                        elif val != 0:
+                            c2on_d_gone.add(pos)
+                        elif not (int(c2on_c[pos]) & dbit):
+                            c2on_d_gone.add(pos)
+
+                # C2=d OFF path — need to check if removing d creates a propagation
+                c2_cands = bb.cands[c2]
+                c2_remaining = c2_cands & ~dbit
+                c2off_d_placed = set()
+                c2off_d_gone = set()
+
+                if POPCOUNT[c2_remaining] == 1:
+                    # Bivalue: removing d forces the other digit
+                    other = 0
+                    tmp = c2_remaining
+                    while tmp > 1:
+                        tmp >>= 1
+                        other += 1
+                    other += 1
+
+                    c2off_b, c2off_c = fast_propagate_full(bb.board, bb.cands, c2, other,
+                                                            return_np=True)
+                    if c2off_b is not None:
+                        for pos in d_cells:
+                            if pos == c2:
+                                continue
+                            val = int(c2off_b[pos])
+                            if val == dval:
+                                c2off_d_placed.add(pos)
+                            elif val != 0:
+                                c2off_d_gone.add(pos)
+                            elif not (int(c2off_c[pos]) & dbit):
+                                c2off_d_gone.add(pos)
+
+                # DPI check: is there a witness cell W where:
+                # C1=d ON forces W=d to one state
+                # BUT both C2=d ON and C2=d OFF force W=d to the opposite state?
+                #
+                # Case A: C1=d ON → W=d ON, but C2-ON → W=d OFF and C2-OFF → W=d OFF
+                for w in c1_d_placed:
+                    if w in c2on_d_gone and w in c2off_d_gone:
+                        # C1=d forces W=d ON
+                        # Both C2 paths force W=d OFF
+                        # Incompatible! C1 cannot be d
+                        key = (c1, dval)
+                        if key not in elim_seen:
+                            elim_seen.add(key)
+                            elims.append(key)
+                        break
+
+                # Case B: C1=d ON → W=d OFF, but C2-ON → W=d ON and C2-OFF → W=d ON
+                for w in c1_d_gone:
+                    if w in c2on_d_placed and w in c2off_d_placed:
+                        key = (c1, dval)
+                        if key not in elim_seen:
+                            elim_seen.add(key)
+                            elims.append(key)
+                        break
+
+                if (c1, dval) in elim_seen:
+                    break  # already eliminated, move to next C1
+
+            if elims:
+                return elims  # return first batch
+
+    return elims
+
+
 # XY-CHAIN — bivalue cell chain with endpoint elimination
 # NEW function — chains through bivalue cells, eliminates from cells
 # that see both endpoints
