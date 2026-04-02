@@ -94,6 +94,14 @@ $ larsdoku --lforge-d2b 3
   # 3 D2B puzzles (confirmed by solver)
 ```
 
+### Elite Mode — Puzzles That Stall Expert Solvers
+
+If you have a really good solver and want puzzles that will challenge it, use `--elite`. These puzzles resist all standard expert techniques — only DeepResonance/D2B can crack them.
+
+```bash
+larsdoku --lforge-d2b 25 --lforge-seed 777 --elite
+```
+
 ### Lars Provenance — "Is this puzzle a Lars Seed?"
 ```
 $ larsdoku --lars-provenance "700009300040050000001700040100000800070200060602000009400600010007005000000030708"
