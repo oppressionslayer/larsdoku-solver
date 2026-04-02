@@ -3558,6 +3558,9 @@ presets:
                        help='Skip solving forged puzzles to confirm techniques (faster, no verification)')
     parser.add_argument('--lforge-seed', type=int, default=None, metavar='N',
                        help='Random seed for lforge generation (for reproducible output)')
+    parser.add_argument('--lforge-batch', type=str, default=None, metavar='BATCH',
+                       choices=['deepres', 'd2b', 'l1', 'l2', 'l3', 'box', 'shuffle', 'all'],
+                       help='Which seed batch to forge from: deepres, d2b, l1 (1-step), l2 (2-step), l3 (3-step), or all')
     parser.add_argument('--elite', action='store_true',
                        help='Elite mode: only return puzzles that resist all expert techniques. '
                             'These puzzles require DeepResonance/D2B — the hardest puzzles possible.')
@@ -5059,7 +5062,7 @@ presets:
         print(f'  DeepRes seeds: {stats["deepres_count"]:,}')
         print(f'  D2B seeds:     {stats["d2b_count"]:,}')
         print(f'  Total seeds:   {stats["total_seeds"]:,}')
-        print(f'  Mask hashes:   {stats["mask_hashes"]:,}')
+        print(f'  Mask hashes:   {stats["mask_hashes"]:,} (core: {stats.get("core_hashes",0):,} + variants: {stats.get("variant_hashes",0):,})')
         print(f'  Unique masks:  {stats["unique_masks"]:,}')
         dr_puzzles = stats['deepres_count'] * 362880 * 3359232
         d2b_puzzles = stats['d2b_count'] * 362880 * 3359232
@@ -5104,8 +5107,61 @@ presets:
         forge_seed = getattr(args, 'lforge_seed', None)
         if forge_seed is None:
             forge_seed = int(_time_seed.time() * 1000) % (2**31)
-        result = lars_deepres_forge(count=n * multiplier, technique=_lforge_tech,
-                                     seed=forge_seed)
+
+        # Allow batch override — forge from specific seed batch
+        batch_override = getattr(args, 'lforge_batch', None)
+
+        if batch_override in ('l1', 'l2', 'l3', 'box', 'shuffle'):
+            # Forge from variant puzzle strings
+            import json as _json_batch
+            import os as _os_batch
+            _pkg_dir = _os_batch.path.dirname(_os_batch.path.abspath(__file__))
+            step_map = {'l1': 'l1', 'l2': 'l1_2step', 'l3': 'l1_3step',
+                        'box': 'rotate180', 'shuffle': 'shuffle_l1'}
+            step_name = step_map[batch_override]
+            pool = []
+            for part in [1, 2]:
+                _path = _os_batch.path.join(_pkg_dir, f'lars_seeds_{step_name}_part{part}.json')
+                if _os_batch.path.exists(_path):
+                    with open(_path) as _fb:
+                        _data = _json_batch.load(_fb)
+                    pool.extend(_data.get('mask_hashes', {}).values())
+
+            if not pool:
+                print(f'  No {batch_override} seed files found')
+                print()
+                return
+
+            # Forge from the L1 pool
+            import random as _rng_batch
+            from .lars_forge import lars_full_transform
+            rng = _rng_batch.Random(forge_seed)
+            puzzles_out = []
+            seen = set()
+            for _ in range(n * multiplier * 2):
+                if len(puzzles_out) >= n * multiplier:
+                    break
+                base = rng.choice(pool)
+                transformed = lars_full_transform(base, rng=_rng_batch.Random(rng.randint(0, 2**31)))
+                if transformed not in seen:
+                    seen.add(transformed)
+                    puzzles_out.append(transformed)
+
+            result = {
+                'success': True,
+                'puzzles': puzzles_out,
+                'seed_count': len(pool),
+                'technique': f'{batch_override}-step',
+                'count': len(puzzles_out),
+                'elapsed_ms': 0,
+            }
+            label = f'{label} ({batch_override.upper()} batch, {len(pool):,} seeds)'
+        else:
+            forge_tech = _lforge_tech
+            if batch_override and batch_override not in ('all',):
+                forge_tech = batch_override
+            result = lars_deepres_forge(count=n * multiplier, technique=forge_tech,
+                                         seed=forge_seed)
         if not result['success']:
             print(f'  {result.get("error", "Failed")}')
             print()

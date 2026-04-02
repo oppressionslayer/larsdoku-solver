@@ -1993,8 +1993,12 @@ def _load_lars_seeds():
                     pass
                 break
 
-    # L1 variant hashes (separate layer — tested at ~99% confidence)
-    for _part_name in ['lars_seeds_l1_part1.json', 'lars_seeds_l1_part2.json']:
+    # Variant hashes for provenance matching
+    for _part_name in ['lars_seeds_l1_part1.json', 'lars_seeds_l1_part2.json',
+                        'lars_seeds_l1_2step_part1.json', 'lars_seeds_l1_2step_part2.json',
+                        'lars_seeds_l1_3step_part1.json', 'lars_seeds_l1_3step_part2.json',
+                        'lars_seeds_rotate180_part1.json', 'lars_seeds_rotate180_part2.json',
+                        'lars_seeds_shuffle_l1_part1.json', 'lars_seeds_shuffle_l1_part2.json']:
         for _base in [_pkg_dir, _lars_dir]:
             _path = _os.path.join(_base, _part_name)
             if _os.path.exists(_path):
@@ -2176,7 +2180,9 @@ def lars_seeds_stats():
         'deepres_count': len(seeds_data.get('deepres', [])),
         'd2b_count': len(seeds_data.get('d2b', [])),
         'total_seeds': len(seeds_data.get('deepres', [])) + len(seeds_data.get('d2b', [])),
-        'mask_hashes': len(LARS_SEEDS_HASHES),
+        'mask_hashes': len(LARS_SEEDS_HASHES) + len(LARS_SEEDS_L1_HASHES),
+        'core_hashes': len(LARS_SEEDS_HASHES),
+        'variant_hashes': len(LARS_SEEDS_L1_HASHES),
         'unique_masks': LARS_SEEDS.get('total_unique_masks', 0),
     }
 
