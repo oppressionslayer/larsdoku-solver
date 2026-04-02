@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "larsdoku"
-version = "2.2.0"
+version = "2.2.2"
 description = "Pure logic Sudoku solver — 35 techniques, zero backtracking, 100% on Top1465"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-larsdoku = ["seed_bank_64.json", "seed_bank_128.json", "zone_grid_db_full.json", "royle_17_hashes.json", "royle_17_hashes.pkl", "technique_seed_bank.json", "lars_seeds_part1.json", "lars_seeds_part2.json"]
+larsdoku = ["seed_bank_64.json", "seed_bank_128.json", "zone_grid_db_full.json", "royle_17_hashes.json", "royle_17_hashes.pkl", "technique_seed_bank.json", "lars_seeds_part1.json", "lars_seeds_part2.json", "lars_seeds_l1_part1.json", "lars_seeds_l1_part2.json"]
 
 [project.urls]
 Homepage = "https://github.com/oppressionslayer/larsdoku-solver"
