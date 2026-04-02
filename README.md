@@ -17,7 +17,10 @@
 
 **Sittin' on the Throne of Euler:** [Listen Now! They said NP Complete, i said check out my zones brother Euler! ](https://suno.com/s/ABPiCLAgaZLNmGko)  
 
+
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
+
+> **Note:** There is a rare bug where JuniorExocet can cause a stall on a very very very small number of puzzles  If you encounter a STALL, try running with `--exclude JuniorExocet` as a workaround. A fix is in progress.
 
 ## LarsForge: 60 Quadrillion Indestructible Puzzles
 
@@ -590,37 +593,7 @@ for name, author, year, puzzle in FAMOUS_10:
 
 The canonical benchmark collection compiled by Guenter Stertenbrink (dukuso). 1,465 of the hardest Sudoku puzzles, sorted by difficulty rating. The gold standard for solver evaluation since the mid-2000s.
 
----# Larsdoku
-
-**Pure logic Sudoku solver. Zero guessing. Every step proven.**
-
- ## The Anthem                                                                                                                                                     
-                                                            
-  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/selpQcGm1lreUDEW)                                                                
-   
-  *"Solved the whole damn game like it's just another Tuesday"*    
-  
-
-**Documentation: [larsdoku-docs.netlify.app](https://larsdoku-docs.netlify.app/)**
-
-**Web App (WIP): [larsdoku.netlify.app](https://larsdoku.netlify.app/)** — click Expert mode tab to open the Top-N Solver
-
-**New techniques `--preset larstech` from:** [wsrf-sudoku-solved-series](https://github.com/oppressionslayer/wsrf-sudoku-solved-series)
-
-**Sittin' on the Throne of Euler:** [Listen Now! They said NP Complete, i said check out my zones brother Euler! ](https://suno.com/s/ABPiCLAgaZLNmGko)  
-
-**Sittin' on the Throne of Euler:** [Listen Now! Epic Space Opera Regarding Sudoku! ](https://suno.com/s/cfKdA5mrpkSGt9oL)  
-
-Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
-
-## LarsForge: 60 Quadrillion Indestructible Puzzles
-
-LarsForge generates **60 quadrillion unique 17-clue puzzles** from the complete Royle enumeration (49,158 seeds). Every puzzle is backed by a mathematically proven 17-clue skeleton — the minimum information needed to determine a unique Sudoku solution.
-
-**Why this matters:** Traditional puzzle generators use backtrackers to verify uniqueness for one configuration. LarsForge puzzles are **dimensionally unique** — unique across ALL states. Add solution digits to create 24-clue puzzles, remove any of the added clues in any order, and uniqueness holds. The 17-clue core is bedrock. Everything above it is armor.
-
-We are building toward forging all puzzles from an **18-clue minimum base** — one clue above the mathematical floor. At 17 clues, 90% of puzzles solve with basic techniques alone. At 18 clues, the extra clue opens the door to harder, more interesting puzzles while still guaranteeing dimensional uniqueness. When a 24-clue puzzle is built on the forge, removing any clue above the 18-clue base never leads to multiple solutions. Boards that break when reduced to their minimum base are, in our view, backtracker-unreliable — verified at one snapshot, but fragile under interaction. We prefer puzzles with structural integrity all the way down.
-
+---
 
 ## Python API
 
