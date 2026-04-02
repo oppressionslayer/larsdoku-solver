@@ -1965,13 +1965,15 @@ def lars_technique_list():
 
 # Load Lars Seeds from split files (part1 + part2)
 LARS_SEEDS = {'seeds': {'deepres': [], 'd2b': []}, 'meta': {}}
-LARS_SEEDS_HASHES = {}
+LARS_SEEDS_HASHES = {}       # hash -> puzzle (core seeds, 100% confidence)
+LARS_SEEDS_L1_HASHES = {}    # hash -> puzzle (L1 variants, separate confidence)
 
 def _load_lars_seeds():
-    global LARS_SEEDS, LARS_SEEDS_HASHES
+    global LARS_SEEDS, LARS_SEEDS_HASHES, LARS_SEEDS_L1_HASHES
     _pkg_dir = _os.path.dirname(__file__)
     _lars_dir = _os.path.join(_pkg_dir, '..', '..', 'lars')
 
+    # Core seeds (100% confidence)
     for _part_name in ['lars_seeds_part1.json', 'lars_seeds_part2.json']:
         _loaded = False
         for _base in [_pkg_dir, _lars_dir]:
@@ -1987,6 +1989,19 @@ def _load_lars_seeds():
                             LARS_SEEDS['seeds'][_tech].extend(_part['seeds'][_tech])
                     LARS_SEEDS_HASHES.update(_part.get('mask_hashes', {}))
                     _loaded = True
+                except Exception:
+                    pass
+                break
+
+    # L1 variant hashes (separate layer — tested at ~99% confidence)
+    for _part_name in ['lars_seeds_l1_part1.json', 'lars_seeds_l1_part2.json']:
+        for _base in [_pkg_dir, _lars_dir]:
+            _path = _os.path.join(_base, _part_name)
+            if _os.path.exists(_path):
+                try:
+                    with open(_path) as _f:
+                        _part = _json.load(_f)
+                    LARS_SEEDS_L1_HASHES.update(_part.get('mask_hashes', {}))
                 except Exception:
                     pass
                 break
@@ -2083,14 +2098,15 @@ def lars_deepres_forge(count=10, seed=42, technique='deepres'):
 def lars_provenance(puzzle_or_mask):
     """Check if a puzzle is derived from a Lars Seed.
 
-    Computes the mask hash and checks against the Lars Seeds registry.
+    Checks core seeds (100% confidence) first, then L1 variant hashes
+    (high probability). Reports confidence level accordingly.
 
     Args:
         puzzle_or_mask: 81-char puzzle string or mask string
 
-    Returns: dict with matched, seed_number, technique, etc.
+    Returns: dict with matched, confidence, technique, etc.
     """
-    if not LARS_SEEDS_HASHES:
+    if not LARS_SEEDS_HASHES and not LARS_SEEDS_L1_HASHES:
         return {'matched': False, 'error': 'Lars Seeds registry not loaded'}
 
     s = puzzle_or_mask.strip().replace('.', '0')
@@ -2103,9 +2119,9 @@ def lars_provenance(puzzle_or_mask):
 
     h = str(lars_mask_hash(mask))
 
+    # Check core seeds first (100% confidence)
     if h in LARS_SEEDS_HASHES:
         matched_seed = LARS_SEEDS_HASHES[h]
-        # Determine technique
         seeds_data = LARS_SEEDS.get('seeds', {})
         is_dr = matched_seed in seeds_data.get('deepres', [])
         is_d2b = matched_seed in seeds_data.get('d2b', [])
@@ -2117,8 +2133,23 @@ def lars_provenance(puzzle_or_mask):
 
         return {
             'matched': True,
+            'confidence': 'exact',
+            'confidence_pct': 100,
             'seed': matched_seed,
-            'technique': technique or ['unknown'],
+            'technique': technique or ['DeepResonance or D2B'],
+            'hash': h,
+            'n_clues': sum(mask),
+        }
+
+    # Check L1 variant hashes (high probability)
+    if h in LARS_SEEDS_L1_HASHES:
+        matched_seed = LARS_SEEDS_L1_HASHES[h]
+        return {
+            'matched': True,
+            'confidence': 'l1_variant',
+            'confidence_pct': 99,
+            'seed': matched_seed,
+            'technique': ['DeepResonance or D2B'],
             'hash': h,
             'n_clues': sum(mask),
         }

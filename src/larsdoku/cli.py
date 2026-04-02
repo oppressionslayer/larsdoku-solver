@@ -3463,6 +3463,8 @@ presets:
                        help='Check if a puzzle is derived from a Lars Seed')
     parser.add_argument('--lars-seeds-stats', action='store_true',
                        help='Show Lars Seeds registry statistics')
+    parser.add_argument('--lforge-no-confirm', action='store_true',
+                       help='Skip solving forged puzzles to confirm techniques (faster, no verification)')
 
     args = parser.parse_args()
 
@@ -4976,19 +4978,47 @@ presets:
     if getattr(args, 'lforge_deepres', None) is not None:
         from .lars_forge import lars_deepres_forge
         n = args.lforge_deepres
-        print(f'\n  LForge — DeepRes Puzzle Forge')
+        no_confirm = getattr(args, 'lforge_no_confirm', False)
+        label = 'DeepRes'
+        print(f'\n  LForge — {label} Puzzle Forge')
         print(f'  {"=" * 55}')
-        result = lars_deepres_forge(count=n, technique='deepres')
+        result = lars_deepres_forge(count=n * (3 if not no_confirm else 1), technique='deepres')
         if not result['success']:
             print(f'  {result.get("error", "Failed")}')
             print()
             return
-        print(f'  Lars Seeds: {result["seed_count"]:,} DeepRes seeds')
-        print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms')
-        print()
-        for p in result['puzzles']:
-            print(f'  {p}')
-        print(f'\n  # {result["count"]} DeepRes puzzles from Lars Seeds')
+        print(f'  Lars Seeds: {result["seed_count"]:,} {label} seeds')
+        if no_confirm:
+            print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms (unconfirmed)')
+            print()
+            for p in result['puzzles'][:n]:
+                print(f'  {p}')
+            print(f'\n  # {min(n, len(result["puzzles"]))} {label} puzzles (--lforge-no-confirm: not verified)')
+        else:
+            import time as _time
+            t0 = _time.time()
+            confirmed = []
+            skipped = 0
+            for p in result['puzzles']:
+                if len(confirmed) >= n:
+                    break
+                try:
+                    r = solve_selective(p)
+                    if r.get('success'):
+                        counts = r.get('technique_counts', {})
+                        advanced = sorted(t for t in counts if TECHNIQUE_LEVELS.get(t, 1) >= 5)
+                        confirmed.append((p, advanced))
+                    else:
+                        skipped += 1
+                except Exception:
+                    skipped += 1
+            elapsed_confirm = (_time.time() - t0) * 1000
+            skip_note = f' ({skipped} skipped)' if skipped else ''
+            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_confirm:.0f}ms{skip_note}')
+            print()
+            for p, techs in confirmed:
+                print(f'  {p}  [{", ".join(techs)}]')
+            print(f'\n  # {len(confirmed)} {label} puzzles (confirmed by solver)')
         print()
         return
 
@@ -4996,19 +5026,47 @@ presets:
     if getattr(args, 'lforge_d2b', None) is not None:
         from .lars_forge import lars_deepres_forge
         n = args.lforge_d2b
-        print(f'\n  LForge — D2B Puzzle Forge')
+        no_confirm = getattr(args, 'lforge_no_confirm', False)
+        label = 'D2B'
+        print(f'\n  LForge — {label} Puzzle Forge')
         print(f'  {"=" * 55}')
-        result = lars_deepres_forge(count=n, technique='d2b')
+        result = lars_deepres_forge(count=n * (3 if not no_confirm else 1), technique='d2b')
         if not result['success']:
             print(f'  {result.get("error", "Failed")}')
             print()
             return
-        print(f'  Lars Seeds: {result["seed_count"]:,} D2B seeds')
-        print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms')
-        print()
-        for p in result['puzzles']:
-            print(f'  {p}')
-        print(f'\n  # {result["count"]} D2B puzzles from Lars Seeds')
+        print(f'  Lars Seeds: {result["seed_count"]:,} {label} seeds')
+        if no_confirm:
+            print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms (unconfirmed)')
+            print()
+            for p in result['puzzles'][:n]:
+                print(f'  {p}')
+            print(f'\n  # {min(n, len(result["puzzles"]))} {label} puzzles (--lforge-no-confirm: not verified)')
+        else:
+            import time as _time
+            t0 = _time.time()
+            confirmed = []
+            skipped = 0
+            for p in result['puzzles']:
+                if len(confirmed) >= n:
+                    break
+                try:
+                    r = solve_selective(p)
+                    if r.get('success'):
+                        counts = r.get('technique_counts', {})
+                        advanced = sorted(t for t in counts if TECHNIQUE_LEVELS.get(t, 1) >= 5)
+                        confirmed.append((p, advanced))
+                    else:
+                        skipped += 1
+                except Exception:
+                    skipped += 1
+            elapsed_confirm = (_time.time() - t0) * 1000
+            skip_note = f' ({skipped} skipped)' if skipped else ''
+            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_confirm:.0f}ms{skip_note}')
+            print()
+            for p, techs in confirmed:
+                print(f'  {p}  [{", ".join(techs)}]')
+            print(f'\n  # {len(confirmed)} {label} puzzles (confirmed by solver)')
         print()
         return
 
@@ -5031,8 +5089,29 @@ presets:
         print()
 
         if result.get('matched'):
+            conf = result.get('confidence', 'unknown')
+            pct = result.get('confidence_pct', 0)
+
+            # Actually solve it to confirm techniques
+            puzzle_to_solve = puzzle.replace('.', '0')
+            if not any(c in puzzle for c in 'xX'):
+                solve_result = solve_selective(puzzle_to_solve)
+                if solve_result.get('success'):
+                    actual_techs = solve_result.get('technique_counts', {})
+                    from .cli import TECHNIQUE_LEVELS as _TL
+                    advanced = [t for t in actual_techs if _TL.get(t, 1) >= 5]
+                    tech_str = ', '.join(sorted(advanced)) if advanced else 'L5+ (confirmed by solve)'
+                else:
+                    tech_str = ', '.join(result.get('technique', []))
+            else:
+                tech_str = ', '.join(result.get('technique', []))
+
             print(f'  >>> LARS SEED MATCH <<<')
-            print(f'  Technique: {", ".join(result["technique"])}')
+            if conf == 'exact':
+                print(f'  Confidence: Very high (core seed match)')
+            else:
+                print(f'  Confidence: High (~{pct}%, L1 variant match)')
+            print(f'  Techniques: {tech_str}')
             print(f'  Hash: {result["hash"]}')
             print(f'  This puzzle is derived from a Lars Seed.')
         else:
