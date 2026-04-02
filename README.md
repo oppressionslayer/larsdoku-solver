@@ -102,7 +102,7 @@ If you have a really good solver and want puzzles that will challenge it, use `-
 larsdoku --lforge-d2b 25 --lforge-seed 777 --elite
 ```
 
-### Lars Provenance — "Is this puzzle a Lars Seed?"
+### Lars Provenance — "Is this puzzle a Lars Database Seed?"
 ```
 $ larsdoku --lars-provenance "700009300040050000001700040100000800070200060602000009400600010007005000000030708"
 
@@ -112,7 +112,7 @@ $ larsdoku --lars-provenance "70000930004005000000170004010000080007020006060200
   Clues: 24
   Time:  4.5ms
 
-  >>> LARS SEED MATCH <<<
+  >>> LARS DATABASE SEED MATCH <<<
   Confidence: Very high (core seed match)
   Techniques: ALS_XZ, AlignedPairExcl, D2B, DeepResonance, FPC, FPCE, JuniorExocet
   Hash: (((2, 2, 3), (2, 3, 3), (2, 3, 4)), ((2, 3, 3), (2, 3, 3), (2, 3, 3)), (1, 2, 2, 3, 3, 3, 3, 3, 4))
