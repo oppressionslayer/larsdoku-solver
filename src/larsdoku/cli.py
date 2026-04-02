@@ -5207,7 +5207,7 @@ presets:
             else:
                 tech_str = ', '.join(result.get('technique', []))
 
-            print(f'  >>> LARS SEED MATCH <<<')
+            print(f'  >>> LARS DATABASE SEED MATCH <<<')
             if conf == 'exact':
                 print(f'  Confidence: Very high (core seed match)')
             else:
