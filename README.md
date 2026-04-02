@@ -96,7 +96,7 @@ $ larsdoku --lforge-d2b 3
 
 ### Elite Mode — Puzzles That Stall Expert Solvers
 
-If you have a really good solver and want puzzles that will challenge it, use `--elite`. These puzzles resist all standard expert techniques — only DeepResonance/D2B can crack them.
+If you have a really good solver and want puzzles that will challenge it, use `--elite`. These puzzles should be harder for those of you with solvers that as close to 100% as you can get like larsdoku — only DeepResonance/D2B and other really good solvers like this one should be able to crack them.
 
 ```bash
 larsdoku --lforge-d2b 25 --lforge-seed 777 --elite
