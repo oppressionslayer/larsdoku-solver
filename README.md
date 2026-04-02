@@ -17,8 +17,6 @@
 
 **Sittin' on the Throne of Euler:** [Listen Now! They said NP Complete, i said check out my zones brother Euler! ](https://suno.com/s/ABPiCLAgaZLNmGko)  
 
-**Sittin' on the Throne of Euler:** [Listen Now! Epic Space Opera Regarding Sudoku! ](https://suno.com/s/cfKdA5mrpkSGt9oL)  
-
 Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
 
 ## LarsForge: 60 Quadrillion Indestructible Puzzles
@@ -56,6 +54,83 @@ larsdoku --lforge-stats
 | `--include TECHS` | Add techniques to presets |
 
 **The numbers:** 49,196 seeds × 362,880 digit perms × 3,359,232 symmetries = **60 quadrillion** unique 17-clue puzzles. With promote (2^64 variants per seed): **1 undecillion** (10^36) across all clue counts.
+
+## Lars Seeds: 384K DeepRes/D2B Seeds — 469 Quadrillion Hard Puzzles
+
+The **Lars Seeds Registry** contains 384,505 seeds for the hardest Sudoku techniques (DeepResonance & D2B), forged via a novel swap technique. Every puzzle is confirmed by the solver before output.
+
+### Forge DeepRes Puzzles (confirmed by solver)
+```
+$ larsdoku --lforge-deepres 3
+
+  LForge — DeepRes Puzzle Forge
+  =======================================================
+  Lars Seeds: 209,762 DeepRes seeds
+  Confirmed: 3/3 in 722ms
+
+  000200000200000046039000200000010000006008015900400600075000008000007000400600300  [ALS_XZ, D2B, DeepResonance, FPC, FPCE, JuniorExocet]
+  700600010000005009400000300102000800040200060607000002004100023000090008000003500  [D2B, DeepResonance, FPCE]
+  080900007200000050004000300800700000010096000000001009300800020070600008000040500  [ALS_XYWing, AlignedPairExcl, DeepResonance, FPC, FPCE, JuniorExocet]
+
+  # 3 DeepRes puzzles (confirmed by solver)
+```
+
+### Forge D2B Puzzles (confirmed by solver)
+```
+$ larsdoku --lforge-d2b 3
+
+  LForge — D2B Puzzle Forge
+  =======================================================
+  Lars Seeds: 174,745 D2B seeds
+  Confirmed: 3/3 in 934ms
+
+  000000000500020068030879400000010600060208015100500080270080046004000000000700000  [ALS_XYWing, ALS_XZ, D2B, FPC, KrakenFish]
+  700009300040050000001700040100000800070200060602000009400600010007005000000030708  [ALS_XZ, AlignedPairExcl, D2B, DeepResonance, FPC, FPCE, JuniorExocet]
+  090001020003709500000000007030640000200003600056010030002070000060305200005000080  [ALS_XYWing, ALS_XZ, D2B, FPC, FPCE, KrakenFish]
+
+  # 3 D2B puzzles (confirmed by solver)
+```
+
+### Lars Provenance — "Is this puzzle a Lars Seed?"
+```
+$ larsdoku --lars-provenance "700009300040050000001700040100000800070200060602000009400600010007005000000030708"
+
+  Lars Provenance Registry
+  =======================================================
+  Input: 700009300040050000001700040100000800070200060602000009400600...
+  Clues: 24
+  Time:  4.5ms
+
+  >>> LARS SEED MATCH <<<
+  Confidence: Very high (core seed match)
+  Techniques: ALS_XZ, AlignedPairExcl, D2B, DeepResonance, FPC, FPCE, JuniorExocet
+  Hash: (((2, 2, 3), (2, 3, 3), (2, 3, 4)), ((2, 3, 3), (2, 3, 3), (2, 3, 3)), (1, 2, 2, 3, 3, 3, 3, 3, 4))
+  This puzzle is derived from a Lars Seed.
+```
+
+### Lars Certify — 6ms Uniqueness Oracle
+```
+$ larsdoku --lars-certify "000000010400000000020000000000050407008000300001090000300400200050100000000806000"
+
+  Lars Certify — Uniqueness Oracle
+  ═══════════════════════════════════════════════════════
+  Input:   000000010400000000020000000000050407008000300001090000300400...
+  Clues:   17
+  Method:  royle_hash
+  Time:    15.0ms
+
+  >>> UNIQUE <<<
+  Royle-certified: this mask geometry is in the complete
+  enumeration of all 49,158 valid 17-clue patterns.
+```
+
+| Command | What it does |
+|---------|-------------|
+| `--lforge-deepres N` | Forge N DeepRes puzzles (confirmed by solver) |
+| `--lforge-d2b N` | Forge N D2B puzzles (confirmed by solver) |
+| `--lforge-no-confirm` | Skip solver verification (fast mode) |
+| `--lars-provenance "puzzle"` | Check if puzzle is a Lars Seed (4.5ms) |
+| `--lars-seeds-stats` | Registry statistics (384K seeds, 469 quadrillion) |
 
 ** USE --preset expert  first, and --preset larstech for the new techniques listed at the gihub New Techniques site! 
 
@@ -515,7 +590,37 @@ for name, author, year, puzzle in FAMOUS_10:
 
 The canonical benchmark collection compiled by Guenter Stertenbrink (dukuso). 1,465 of the hardest Sudoku puzzles, sorted by difficulty rating. The gold standard for solver evaluation since the mid-2000s.
 
----
+---# Larsdoku
+
+**Pure logic Sudoku solver. Zero guessing. Every step proven.**
+
+ ## The Anthem                                                                                                                                                     
+                                                            
+  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/selpQcGm1lreUDEW)                                                                
+   
+  *"Solved the whole damn game like it's just another Tuesday"*    
+  
+
+**Documentation: [larsdoku-docs.netlify.app](https://larsdoku-docs.netlify.app/)**
+
+**Web App (WIP): [larsdoku.netlify.app](https://larsdoku.netlify.app/)** — click Expert mode tab to open the Top-N Solver
+
+**New techniques `--preset larstech` from:** [wsrf-sudoku-solved-series](https://github.com/oppressionslayer/wsrf-sudoku-solved-series)
+
+**Sittin' on the Throne of Euler:** [Listen Now! They said NP Complete, i said check out my zones brother Euler! ](https://suno.com/s/ABPiCLAgaZLNmGko)  
+
+**Sittin' on the Throne of Euler:** [Listen Now! Epic Space Opera Regarding Sudoku! ](https://suno.com/s/cfKdA5mrpkSGt9oL)  
+
+Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduction — no backtracking, no trial-and-error. Built on a bitwise engine with GF(2) linear algebra, it achieves **100% pure logic on the Top1465 benchmark** (1,465 of the hardest known puzzles), averaging **19ms per puzzle*.
+
+## LarsForge: 60 Quadrillion Indestructible Puzzles
+
+LarsForge generates **60 quadrillion unique 17-clue puzzles** from the complete Royle enumeration (49,158 seeds). Every puzzle is backed by a mathematically proven 17-clue skeleton — the minimum information needed to determine a unique Sudoku solution.
+
+**Why this matters:** Traditional puzzle generators use backtrackers to verify uniqueness for one configuration. LarsForge puzzles are **dimensionally unique** — unique across ALL states. Add solution digits to create 24-clue puzzles, remove any of the added clues in any order, and uniqueness holds. The 17-clue core is bedrock. Everything above it is armor.
+
+We are building toward forging all puzzles from an **18-clue minimum base** — one clue above the mathematical floor. At 17 clues, 90% of puzzles solve with basic techniques alone. At 18 clues, the extra clue opens the door to harder, more interesting puzzles while still guaranteeing dimensional uniqueness. When a 24-clue puzzle is built on the forge, removing any clue above the 18-clue base never leads to multiple solutions. Boards that break when reduced to their minimum base are, in our view, backtracker-unreliable — verified at one snapshot, but fragile under interaction. We prefer puzzles with structural integrity all the way down.
+
 
 ## Python API
 
