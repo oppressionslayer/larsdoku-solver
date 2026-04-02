@@ -3454,6 +3454,16 @@ presets:
     parser.add_argument('--lforge-search', type=str, metavar='TECH',
                        help='Find all technique profiles containing a specific technique')
 
+    # ── Lars Seeds: DeepRes/D2B forge + provenance ──
+    parser.add_argument('--lforge-deepres', type=int, nargs='?', const=10, metavar='N',
+                       help='Forge N DeepRes puzzles from Lars Seeds (default 10)')
+    parser.add_argument('--lforge-d2b', type=int, nargs='?', const=10, metavar='N',
+                       help='Forge N D2B puzzles from Lars Seeds (default 10)')
+    parser.add_argument('--lars-provenance', type=str, metavar='PUZZLE',
+                       help='Check if a puzzle is derived from a Lars Seed')
+    parser.add_argument('--lars-seeds-stats', action='store_true',
+                       help='Show Lars Seeds registry statistics')
+
     args = parser.parse_args()
 
     # ── Solution mode: just print backtrack answer ──
@@ -4936,6 +4946,98 @@ presets:
         for p in result['puzzles']:
             print(f'  {p}')
         print(f'\n  # {result["count"]} puzzles requiring {", ".join(sorted(tech_set))}')
+        print()
+        return
+
+    # ── Lars Seeds Stats ──
+    if getattr(args, 'lars_seeds_stats', False):
+        from .lars_forge import lars_seeds_stats
+        stats = lars_seeds_stats()
+        if not stats.get('loaded'):
+            print('  Lars Seeds registry not loaded.')
+            return
+        print(f'\n  Lars Seeds Registry')
+        print(f'  {"=" * 55}')
+        print(f'  DeepRes seeds: {stats["deepres_count"]:,}')
+        print(f'  D2B seeds:     {stats["d2b_count"]:,}')
+        print(f'  Total seeds:   {stats["total_seeds"]:,}')
+        print(f'  Mask hashes:   {stats["mask_hashes"]:,}')
+        print(f'  Unique masks:  {stats["unique_masks"]:,}')
+        dr_puzzles = stats['deepres_count'] * 362880 * 3359232
+        d2b_puzzles = stats['d2b_count'] * 362880 * 3359232
+        print(f'\n  Forgeable puzzles:')
+        print(f'    DeepRes: {dr_puzzles:.2e}')
+        print(f'    D2B:     {d2b_puzzles:.2e}')
+        print(f'    Total:   {(dr_puzzles + d2b_puzzles):.2e}')
+        print()
+        return
+
+    # ── LForge DeepRes ──
+    if getattr(args, 'lforge_deepres', None) is not None:
+        from .lars_forge import lars_deepres_forge
+        n = args.lforge_deepres
+        print(f'\n  LForge — DeepRes Puzzle Forge')
+        print(f'  {"=" * 55}')
+        result = lars_deepres_forge(count=n, technique='deepres')
+        if not result['success']:
+            print(f'  {result.get("error", "Failed")}')
+            print()
+            return
+        print(f'  Lars Seeds: {result["seed_count"]:,} DeepRes seeds')
+        print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms')
+        print()
+        for p in result['puzzles']:
+            print(f'  {p}')
+        print(f'\n  # {result["count"]} DeepRes puzzles from Lars Seeds')
+        print()
+        return
+
+    # ── LForge D2B ──
+    if getattr(args, 'lforge_d2b', None) is not None:
+        from .lars_forge import lars_deepres_forge
+        n = args.lforge_d2b
+        print(f'\n  LForge — D2B Puzzle Forge')
+        print(f'  {"=" * 55}')
+        result = lars_deepres_forge(count=n, technique='d2b')
+        if not result['success']:
+            print(f'  {result.get("error", "Failed")}')
+            print()
+            return
+        print(f'  Lars Seeds: {result["seed_count"]:,} D2B seeds')
+        print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms')
+        print()
+        for p in result['puzzles']:
+            print(f'  {p}')
+        print(f'\n  # {result["count"]} D2B puzzles from Lars Seeds')
+        print()
+        return
+
+    # ── Lars Provenance ──
+    if getattr(args, 'lars_provenance', None) is not None:
+        from .lars_forge import lars_provenance
+        import time as _time
+
+        puzzle = args.lars_provenance
+        print(f'\n  Lars Provenance Registry')
+        print(f'  {"=" * 55}')
+        print(f'  Input: {puzzle[:60]}{"..." if len(puzzle) > 60 else ""}')
+
+        t0 = _time.time()
+        result = lars_provenance(puzzle)
+        elapsed = (_time.time() - t0) * 1000
+
+        print(f'  Clues: {result.get("n_clues", "?")}')
+        print(f'  Time:  {elapsed:.1f}ms')
+        print()
+
+        if result.get('matched'):
+            print(f'  >>> LARS SEED MATCH <<<')
+            print(f'  Technique: {", ".join(result["technique"])}')
+            print(f'  Hash: {result["hash"]}')
+            print(f'  This puzzle is derived from a Lars Seed.')
+        else:
+            print(f'  >>> NEW — Not in Lars registry <<<')
+            print(f'  {result.get("message", "")}')
         print()
         return
 

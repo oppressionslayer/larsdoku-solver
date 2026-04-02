@@ -1958,5 +1958,197 @@ def lars_technique_list():
     return sorted(LARS_TECH_INDEX.keys())
 
 
+# ══════════════════════════════════════════════════════════════════════
+# LARS SEEDS — DeepRes/D2B Provenance Registry
+# 384K seeds, 469 quadrillion forgeable puzzles
+# ══════════════════════════════════════════════════════════════════════
+
+# Load Lars Seeds from split files (part1 + part2)
+LARS_SEEDS = {'seeds': {'deepres': [], 'd2b': []}, 'meta': {}}
+LARS_SEEDS_HASHES = {}
+
+def _load_lars_seeds():
+    global LARS_SEEDS, LARS_SEEDS_HASHES
+    _pkg_dir = _os.path.dirname(__file__)
+    _lars_dir = _os.path.join(_pkg_dir, '..', '..', 'lars')
+
+    for _part_name in ['lars_seeds_part1.json', 'lars_seeds_part2.json']:
+        _loaded = False
+        for _base in [_pkg_dir, _lars_dir]:
+            _path = _os.path.join(_base, _part_name)
+            if _os.path.exists(_path):
+                try:
+                    with open(_path) as _f:
+                        _part = _json.load(_f)
+                    if 'meta' in _part:
+                        LARS_SEEDS['meta'] = _part['meta']
+                    for _tech in ['deepres', 'd2b']:
+                        if _tech in _part.get('seeds', {}):
+                            LARS_SEEDS['seeds'][_tech].extend(_part['seeds'][_tech])
+                    LARS_SEEDS_HASHES.update(_part.get('mask_hashes', {}))
+                    _loaded = True
+                except Exception:
+                    pass
+                break
+
+    # Also try single-file fallback
+    if not LARS_SEEDS_HASHES:
+        for _path in [_os.path.join(_pkg_dir, 'lars_deepres_seeds.json'),
+                      _os.path.join(_lars_dir, 'lars_deepres_seeds.json')]:
+            if _os.path.exists(_path):
+                try:
+                    with open(_path) as _f:
+                        _data = _json.load(_f)
+                    LARS_SEEDS.update(_data)
+                    LARS_SEEDS_HASHES.update(_data.get('mask_hashes', {}))
+                except Exception:
+                    pass
+                break
+
+_load_lars_seeds()
+
+
+def lars_deepres_seeds(count=10, seed=42, technique='deepres'):
+    """Get DeepRes or D2B seeds from the Lars registry.
+
+    Args:
+        count: number of seeds to return
+        seed: random seed
+        technique: 'deepres' or 'd2b'
+
+    Returns: list of puzzle strings
+    """
+    import random
+    seeds_data = LARS_SEEDS.get('seeds', {})
+    pool = seeds_data.get(technique, [])
+    if not pool:
+        return []
+
+    rng = random.Random(seed)
+    if count >= len(pool):
+        return list(pool)
+    return rng.sample(pool, count)
+
+
+def lars_deepres_forge(count=10, seed=42, technique='deepres'):
+    """Forge puzzles from Lars DeepRes/D2B seeds.
+
+    Each seed is transformed via lars_full_transform for maximum diversity.
+
+    Args:
+        count: number of puzzles to generate
+        seed: random seed
+        technique: 'deepres' or 'd2b'
+
+    Returns: dict with success, puzzles, seed_count, technique
+    """
+    import random
+    import time as _time
+
+    seeds_data = LARS_SEEDS.get('seeds', {})
+    pool = seeds_data.get(technique, [])
+    if not pool:
+        return {
+            'success': False,
+            'error': f'No {technique} seeds loaded',
+            'seed_count': 0,
+        }
+
+    rng = random.Random(seed)
+    t0 = _time.time()
+
+    puzzles = []
+    seen = set()
+    attempts = 0
+    while len(puzzles) < count and attempts < count * 20:
+        attempts += 1
+        base = rng.choice(pool)
+        transformed = lars_full_transform(base, rng=random.Random(rng.randint(0, 2**31)))
+        if transformed not in seen:
+            seen.add(transformed)
+            puzzles.append(transformed)
+
+    elapsed = (_time.time() - t0) * 1000
+
+    return {
+        'success': True,
+        'puzzles': puzzles,
+        'technique': technique,
+        'seed_count': len(pool),
+        'count': len(puzzles),
+        'elapsed_ms': elapsed,
+    }
+
+
+def lars_provenance(puzzle_or_mask):
+    """Check if a puzzle is derived from a Lars Seed.
+
+    Computes the mask hash and checks against the Lars Seeds registry.
+
+    Args:
+        puzzle_or_mask: 81-char puzzle string or mask string
+
+    Returns: dict with matched, seed_number, technique, etc.
+    """
+    if not LARS_SEEDS_HASHES:
+        return {'matched': False, 'error': 'Lars Seeds registry not loaded'}
+
+    s = puzzle_or_mask.strip().replace('.', '0')
+    is_mask = any(c in s for c in 'xX')
+
+    if is_mask:
+        mask = lars_parse_mask(puzzle_or_mask)
+    else:
+        mask = [1 if c != '0' else 0 for c in s]
+
+    h = str(lars_mask_hash(mask))
+
+    if h in LARS_SEEDS_HASHES:
+        matched_seed = LARS_SEEDS_HASHES[h]
+        # Determine technique
+        seeds_data = LARS_SEEDS.get('seeds', {})
+        is_dr = matched_seed in seeds_data.get('deepres', [])
+        is_d2b = matched_seed in seeds_data.get('d2b', [])
+        technique = []
+        if is_dr:
+            technique.append('DeepResonance')
+        if is_d2b:
+            technique.append('D2B')
+
+        return {
+            'matched': True,
+            'seed': matched_seed,
+            'technique': technique or ['unknown'],
+            'hash': h,
+            'n_clues': sum(mask),
+        }
+
+    return {
+        'matched': False,
+        'hash': h,
+        'n_clues': sum(mask),
+        'message': 'Not in Lars Seeds registry — this may be a new discovery!',
+    }
+
+
+def lars_seeds_stats():
+    """Statistics about the Lars Seeds registry."""
+    if not LARS_SEEDS:
+        return {'loaded': False}
+
+    meta = LARS_SEEDS.get('meta', {})
+    seeds_data = LARS_SEEDS.get('seeds', {})
+
+    return {
+        'loaded': True,
+        'meta': meta,
+        'deepres_count': len(seeds_data.get('deepres', [])),
+        'd2b_count': len(seeds_data.get('d2b', [])),
+        'total_seeds': len(seeds_data.get('deepres', [])) + len(seeds_data.get('d2b', [])),
+        'mask_hashes': len(LARS_SEEDS_HASHES),
+        'unique_masks': LARS_SEEDS.get('total_unique_masks', 0),
+    }
+
+
 if __name__ == '__main__':
     main()
