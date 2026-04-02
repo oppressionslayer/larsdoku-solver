@@ -35,7 +35,8 @@ from .engine import (
     BitBoard, BIT, ALL_DIGITS, POPCOUNT, BOX_OF, PEERS,
     propagate_l1l2, solve_backtrack, solve_bitwise,
     detect_fpc_bitwise, detect_fpce_bitwise,
-    detect_forcing_chain_bitwise, detect_forcing_net,
+    detect_forcing_chain_bitwise, detect_forcing_net, detect_forcing_net_v2,
+    detect_rectangle_elimination, detect_xy_chain,
     detect_d2b_bitwise, detect_fpf_bitwise,
     detect_xwing, detect_swordfish, detect_simple_coloring,
     detect_bug_plus1, detect_ur_type2, detect_ur_type4,
@@ -62,7 +63,7 @@ TECHNIQUE_LEVELS = {
     'ALS_XZ': 5, 'ALS_XYWing': 5, 'SueDeCoq': 5, 'AlignedPairExcl': 5,
     'DeathBlossom': 5,
     'FPC': 5, 'FPCE': 5,
-    'ForcingChain': 5, 'ForcingNet': 5,
+    'ForcingChain': 5, 'ForcingNet': 5, 'XYChain': 5, 'RectElim': 5, 'FNv2': 7,
     'BUG+1': 6, 'URType2': 6, 'URType4': 6,
     'JuniorExocet': 6, 'JETest': 6, 'Template': 6, 'BowmanBingo': 6,
     'KrakenFish': 6, 'SKLoop': 6,
@@ -72,7 +73,8 @@ TECHNIQUE_LEVELS = {
 }
 
 TECHNIQUE_ALIASES = {
-    'fpc': 'FPC', 'fpce': 'FPCE', 'fc': 'ForcingChain', 'fn': 'ForcingNet',
+    'fpc': 'FPC', 'fpce': 'FPCE', 'fc': 'ForcingChain', 'fn': 'ForcingNet', 'fnv2': 'FNv2',
+    'xychain': 'XYChain', 'xy': 'XYChain', 'rectelim': 'RectElim', 're': 'RectElim',
     'd2b': 'D2B', 'fpf': 'FPF', 'gf2': 'GF2_Lanczos',
     'gf2x': 'GF2_Extended', 'gf2p': 'GF2_Probe',
     'xwing': 'XWing', 'swordfish': 'Swordfish', 'coloring': 'SimpleColoring',
@@ -958,6 +960,40 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                     print(f"        ForcingNet: {', '.join(descs)}")
                 continue
 
+        # XY-Chain
+        if allowed('XYChain'):
+            xy_elims = detect_xy_chain(bb)
+            if xy_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'XYChain',
+                        'eliminations': list(xy_elims),
+                    })
+                for pos, d in xy_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['XYChain'] = technique_counts.get('XYChain', 0) + 1
+                if verbose:
+                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in xy_elims]
+                    print(f"        XYChain: {', '.join(descs)}")
+                continue
+
+        # Rectangle Elimination
+        if allowed('RectElim'):
+            re_elims = detect_rectangle_elimination(bb)
+            if re_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'RectElim',
+                        'eliminations': list(re_elims),
+                    })
+                for pos, d in re_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['RectElim'] = technique_counts.get('RectElim', 0) + 1
+                if verbose:
+                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in re_elims]
+                    print(f"        RectElim: {', '.join(descs)}")
+                continue
+
         # BUG+1
         if allowed('BUG+1'):
             bug_hits = detect_bug_plus1(bb)
@@ -1198,6 +1234,43 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                         print(f"  #{step_num:3d}  {entry['cell']}={val}  [FPF]")
                     break
             if placed:
+                continue
+
+        # Forcing Net v2 (L7 — after D2B/FPF, before DeepResonance)
+        if allowed('FNv2'):
+            fnv2_placements, fnv2_elims = detect_forcing_net_v2(bb)
+            if fnv2_placements:
+                for pos, val, fnv2_detail in fnv2_placements:
+                    if bb.board[pos] == 0:
+                        cands_before = _cands_list(bb, pos) if detail else None
+                        bb.place(pos, val)
+                        step_num += 1
+                        entry = {'step': step_num, 'pos': pos, 'digit': val,
+                                 'technique': 'FNv2', 'cell': _cell_name(pos),
+                                 'round': round_num}
+                        if detail:
+                            entry['cands_before'] = cands_before
+                            entry['explanation'] = fnv2_detail
+                        steps.append(entry)
+                        technique_counts['FNv2'] = technique_counts.get('FNv2', 0) + 1
+                        placed = True
+                        if verbose:
+                            print(f"  #{step_num:3d}  {entry['cell']}={val}  [FNv2]")
+                        break
+                if placed:
+                    continue
+            if fnv2_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'FNv2',
+                        'eliminations': list(fnv2_elims),
+                    })
+                for pos, d in fnv2_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['FNv2'] = technique_counts.get('FNv2', 0) + 1
+                if verbose:
+                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in fnv2_elims]
+                    print(f"        FNv2: {', '.join(descs)}")
                 continue
 
         # ── STALLED — try Zone Oracle / Rule Oracle if enabled ──
@@ -3465,6 +3538,9 @@ presets:
                        help='Show Lars Seeds registry statistics')
     parser.add_argument('--lforge-no-confirm', action='store_true',
                        help='Skip solving forged puzzles to confirm techniques (faster, no verification)')
+    parser.add_argument('--elite', action='store_true',
+                       help='Elite mode: only return puzzles that resist all expert techniques. '
+                            'These puzzles require DeepResonance/D2B — the hardest puzzles possible.')
 
     args = parser.parse_args()
 
@@ -4974,69 +5050,44 @@ presets:
         print()
         return
 
-    # ── LForge DeepRes ──
+    # ── LForge DeepRes / D2B shared handler ──
+    _lforge_tech = None
+    _lforge_n = None
     if getattr(args, 'lforge_deepres', None) is not None:
-        from .lars_forge import lars_deepres_forge
-        n = args.lforge_deepres
-        no_confirm = getattr(args, 'lforge_no_confirm', False)
-        label = 'DeepRes'
-        print(f'\n  LForge — {label} Puzzle Forge')
-        print(f'  {"=" * 55}')
-        result = lars_deepres_forge(count=n * (3 if not no_confirm else 1), technique='deepres')
-        if not result['success']:
-            print(f'  {result.get("error", "Failed")}')
-            print()
-            return
-        print(f'  Lars Seeds: {result["seed_count"]:,} {label} seeds')
-        if no_confirm:
-            print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms (unconfirmed)')
-            print()
-            for p in result['puzzles'][:n]:
-                print(f'  {p}')
-            print(f'\n  # {min(n, len(result["puzzles"]))} {label} puzzles (--lforge-no-confirm: not verified)')
-        else:
-            import time as _time
-            t0 = _time.time()
-            confirmed = []
-            skipped = 0
-            for p in result['puzzles']:
-                if len(confirmed) >= n:
-                    break
-                try:
-                    r = solve_selective(p)
-                    if r.get('success'):
-                        counts = r.get('technique_counts', {})
-                        advanced = sorted(t for t in counts if TECHNIQUE_LEVELS.get(t, 1) >= 5)
-                        confirmed.append((p, advanced))
-                    else:
-                        skipped += 1
-                except Exception:
-                    skipped += 1
-            elapsed_confirm = (_time.time() - t0) * 1000
-            skip_note = f' ({skipped} skipped)' if skipped else ''
-            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_confirm:.0f}ms{skip_note}')
-            print()
-            for p, techs in confirmed:
-                print(f'  {p}  [{", ".join(techs)}]')
-            print(f'\n  # {len(confirmed)} {label} puzzles (confirmed by solver)')
-        print()
-        return
+        _lforge_tech = 'deepres'
+        _lforge_n = args.lforge_deepres
+    elif getattr(args, 'lforge_d2b', None) is not None:
+        _lforge_tech = 'd2b'
+        _lforge_n = args.lforge_d2b
 
-    # ── LForge D2B ──
-    if getattr(args, 'lforge_d2b', None) is not None:
+    if _lforge_tech is not None:
         from .lars_forge import lars_deepres_forge
-        n = args.lforge_d2b
+        n = _lforge_n
         no_confirm = getattr(args, 'lforge_no_confirm', False)
-        label = 'D2B'
+        elite = getattr(args, 'elite', False)
+        label = 'DeepRes' if _lforge_tech == 'deepres' else 'D2B'
+
+        if elite:
+            label += ' ELITE'
+
         print(f'\n  LForge — {label} Puzzle Forge')
         print(f'  {"=" * 55}')
-        result = lars_deepres_forge(count=n * (3 if not no_confirm else 1), technique='d2b')
+
+        # Generate more candidates for elite (most get filtered)
+        multiplier = 1
+        if not no_confirm:
+            multiplier = 3
+        if elite:
+            multiplier = 12  # ~92% get filtered by elite
+
+        result = lars_deepres_forge(count=n * multiplier, technique=_lforge_tech)
         if not result['success']:
             print(f'  {result.get("error", "Failed")}')
             print()
             return
-        print(f'  Lars Seeds: {result["seed_count"]:,} {label} seeds')
-        if no_confirm:
+        print(f'  Lars Seeds: {result["seed_count"]:,} seeds')
+
+        if no_confirm and not elite:
             print(f'  Generated: {result["count"]} puzzles in {result["elapsed_ms"]:.1f}ms (unconfirmed)')
             print()
             for p in result['puzzles'][:n]:
@@ -5044,29 +5095,54 @@ presets:
             print(f'\n  # {min(n, len(result["puzzles"]))} {label} puzzles (--lforge-no-confirm: not verified)')
         else:
             import time as _time
+
+            # Elite mode: expert+FNv2 technique set for filtering
+            if elite:
+                expert_filter = EXPERT_APPROVED | {'FNv2', 'XYChain', 'RectElim'}
+
             t0 = _time.time()
             confirmed = []
             skipped = 0
+            elite_filtered = 0
             for p in result['puzzles']:
                 if len(confirmed) >= n:
                     break
                 try:
+                    # First: solve with full solver to confirm and get techniques
                     r = solve_selective(p)
-                    if r.get('success'):
-                        counts = r.get('technique_counts', {})
-                        advanced = sorted(t for t in counts if TECHNIQUE_LEVELS.get(t, 1) >= 5)
-                        confirmed.append((p, advanced))
-                    else:
+                    if not r.get('success'):
                         skipped += 1
+                        continue
+
+                    counts = r.get('technique_counts', {})
+                    advanced = sorted(t for t in counts if TECHNIQUE_LEVELS.get(t, 1) >= 5)
+
+                    if elite:
+                        # Elite filter: try expert+FNv2 — must STALL
+                        r_expert = solve_selective(p, only_techniques=expert_filter)
+                        if r_expert.get('success'):
+                            elite_filtered += 1
+                            continue  # expert can solve it — not elite enough
+
+                    confirmed.append((p, advanced))
                 except Exception:
                     skipped += 1
+
             elapsed_confirm = (_time.time() - t0) * 1000
-            skip_note = f' ({skipped} skipped)' if skipped else ''
+            skip_note = ''
+            if skipped:
+                skip_note += f', {skipped} skipped'
+            if elite and elite_filtered:
+                skip_note += f', {elite_filtered} too easy'
+
             print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_confirm:.0f}ms{skip_note}')
             print()
             for p, techs in confirmed:
                 print(f'  {p}  [{", ".join(techs)}]')
-            print(f'\n  # {len(confirmed)} {label} puzzles (confirmed by solver)')
+            if elite:
+                print(f'\n  # {len(confirmed)} {label} puzzles (resists all expert techniques)')
+            else:
+                print(f'\n  # {len(confirmed)} {label} puzzles (confirmed by solver)')
         print()
         return
 

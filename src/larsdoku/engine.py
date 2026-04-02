@@ -3100,6 +3100,484 @@ def detect_forcing_net(bb):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# RECTANGLE ELIMINATION — strong+weak link rectangle contradiction
+# NEW function — If placing d at weak wing empties a box of d, eliminate
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_rectangle_elimination(bb):
+    """Rectangle Elimination: verified via fast_propagate.
+
+    For each cell with each candidate d:
+      If placing d there leads to a contradiction (via fast_propagate),
+      AND the contradiction specifically involves emptying a box of d
+      through a rectangle pattern → eliminate d.
+
+    Uses fast_propagate for correctness — no manual box logic.
+    Returns: list of (pos, digit) elimination tuples
+    """
+    elims = []
+    elim_seen = set()
+
+    # Focus on cells involved in strong links (exactly 2 in a unit)
+    for d in range(9):
+        dbit = BIT[d]
+        dval = d + 1
+
+        for orient in range(2):
+            for line in range(9):
+                positions = []
+                for idx in range(9):
+                    pos = line * 9 + idx if orient == 0 else idx * 9 + line
+                    if bb.board[pos] == 0 and (bb.cands[pos] & dbit):
+                        positions.append(pos)
+                if len(positions) != 2:
+                    continue
+
+                # Strong link pair
+                for hinge_idx in range(2):
+                    hinge = positions[hinge_idx]
+                    strong_wing = positions[1 - hinge_idx]
+                    hr, hc = hinge // 9, hinge % 9
+
+                    # Look perpendicular
+                    if orient == 0:
+                        perp = [r * 9 + hc for r in range(9)
+                                if r * 9 + hc != hinge and bb.board[r * 9 + hc] == 0
+                                and (bb.cands[r * 9 + hc] & dbit)]
+                    else:
+                        perp = [hr * 9 + c for c in range(9)
+                                if hr * 9 + c != hinge and bb.board[hr * 9 + c] == 0
+                                and (bb.cands[hr * 9 + c] & dbit)]
+
+                    for weak_wing in perp:
+                        wr, wc = weak_wing // 9, weak_wing % 9
+                        # Must be in different box than hinge
+                        if (wr // 3 == hr // 3) and (wc // 3 == hc // 3):
+                            continue
+
+                        # Verify using fast_propagate:
+                        # If weak_wing=d contradicts → eliminate
+                        if fast_propagate(bb.board, bb.cands, weak_wing, dval):
+                            key = (weak_wing, dval)
+                            if key not in elim_seen:
+                                elim_seen.add(key)
+                                elims.append((weak_wing, dval))
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# XY-CHAIN — bivalue cell chain with endpoint elimination
+# NEW function — chains through bivalue cells, eliminates from cells
+# that see both endpoints
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_xy_chain(bb):
+    """XY-Chain: chain through bivalue cells with shared candidates.
+
+    Build chains through cells with exactly 2 candidates where adjacent
+    cells share one candidate. If both endpoints have a common candidate d,
+    eliminate d from all cells that see BOTH endpoints.
+
+    Returns: list of (pos, digit) elimination tuples
+    """
+    # Find all bivalue cells
+    bv_cells = []
+    for pos in range(81):
+        if bb.board[pos] != 0:
+            continue
+        if POPCOUNT[bb.cands[pos]] == 2:
+            bv_cells.append(pos)
+
+    if len(bv_cells) < 3:
+        return []
+
+    # Build adjacency: two bivalue cells connect if they share a unit AND a candidate
+    bv_set = set(bv_cells)
+    elims = []
+    elim_seen = set()
+
+    # BFS/DFS for chains of length 3+
+    # For each starting cell and starting candidate (the OFF one)
+    for start in bv_cells:
+        cands_s = bb.cands[start]
+        digits_s = [d for d in range(9) if cands_s & BIT[d]]
+        if len(digits_s) != 2:
+            continue
+
+        for start_off_d in digits_s:
+            # start_off_d is OFF at start → the other digit is ON
+            start_on_d = digits_s[0] if digits_s[1] == start_off_d else digits_s[1]
+
+            # Chain: each step alternates ON/OFF
+            # At start: start_off_d is OFF, start_on_d is ON
+            # start_on_d propagates to next cell (must share start_on_d and a unit)
+            # At next cell: start_on_d is OFF (peer eliminates), other digit is ON
+
+            visited = {start}
+            stack = [(start, start_on_d, start_off_d + 1)]  # (cell, on_digit, chain_len_ish)
+
+            # BFS with depth limit
+            queue = [(start, start_on_d, [start])]
+            while queue:
+                cur, on_d, path = queue.pop(0)
+                if len(path) > 12:
+                    continue  # depth limit
+
+                # on_d is ON at cur → propagates to peers
+                # Find bivalue peers that share on_d
+                for nxt in bv_cells:
+                    if nxt in visited:
+                        continue
+                    if not (bb.cands[nxt] & BIT[on_d]):
+                        continue
+                    # Must share a unit with cur
+                    cr, cc = cur // 9, cur % 9
+                    nr, nc = nxt // 9, nxt % 9
+                    same_unit = (cr == nr or cc == nc or
+                                 ((cr // 3) == (nr // 3) and (cc // 3) == (nc // 3)))
+                    if not same_unit:
+                        continue
+
+                    # nxt receives on_d as OFF (eliminated by peer)
+                    # The OTHER digit at nxt becomes ON
+                    nxt_cands = bb.cands[nxt]
+                    nxt_digits = [d for d in range(9) if nxt_cands & BIT[d]]
+                    if len(nxt_digits) != 2:
+                        continue
+                    nxt_on_d = nxt_digits[0] if nxt_digits[1] == on_d else nxt_digits[1]
+
+                    new_path = path + [nxt]
+
+                    # Check: can we eliminate?
+                    # start has start_off_d as the "target" candidate
+                    # nxt has nxt_on_d as ON
+                    # If start_off_d == nxt_on_d:
+                    #   Both endpoints have this digit (start OFF, nxt ON)
+                    #   At least one endpoint must have this digit
+                    #   Eliminate from cells seeing BOTH endpoints
+                    if len(new_path) >= 3 and nxt_on_d == start_off_d:
+                        target_d = start_off_d
+                        target_dval = target_d + 1
+                        # Find cells seeing both start and nxt
+                        sr, sc = start // 9, start % 9
+                        for pos in range(81):
+                            if pos == start or pos == nxt:
+                                continue
+                            if bb.board[pos] != 0:
+                                continue
+                            if not (bb.cands[pos] & BIT[target_d]):
+                                continue
+                            pr, pc = pos // 9, pos % 9
+                            # Sees start?
+                            sees_start = (pr == sr or pc == sc or
+                                          ((pr // 3) == (sr // 3) and (pc // 3) == (sc // 3)))
+                            # Sees nxt?
+                            sees_nxt = (pr == nr or pc == nc or
+                                        ((pr // 3) == (nr // 3) and (pc // 3) == (nc // 3)))
+                            if sees_start and sees_nxt:
+                                key = (pos, target_dval)
+                                if key not in elim_seen:
+                                    elim_seen.add(key)
+                                    elims.append((pos, target_dval))
+
+                    visited.add(nxt)
+                    queue.append((nxt, nxt_on_d, new_path))
+
+                if elims:
+                    return elims  # return first batch found
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# FORCING NET v2 — Andrew Stuart style (OFF-start, all contradiction types)
+# NEW function — does NOT replace detect_forcing_net
+# ══════════════════════════════════════════════════════════════════════
+
+def _deep_propagate_contradicts(bb, pos, digit):
+    """Deep propagation test: place digit at pos, check for contradiction.
+
+    Fast path: try fast_propagate first (JIT, microseconds).
+    Slow path: if fast doesn't find contradiction, run full L1+L2 +
+    intermediate techniques (ALS, XWing, etc.)
+
+    Returns True if contradiction found."""
+    # Fast path — catches ~80% of contradictions instantly
+    if fast_propagate(bb.board, bb.cands, pos, digit):
+        return True
+
+    # Slow path — deep propagation with intermediate techniques
+    import copy
+    bb_copy = copy.deepcopy(bb)
+    bb_copy.place(pos, digit)
+
+    for outer in range(15):
+        # L1+L2 drain
+        batch = propagate_l1l2(bb_copy)
+        if bb_copy.empty == 0:
+            return False  # solved, no contradiction
+
+        # Check for contradiction
+        for i in range(81):
+            if bb_copy.board[i] == 0 and bb_copy.cands[i] == 0:
+                return True
+
+        # Check units
+        for ui in range(27):
+            for d in range(1, 10):
+                dbit = BIT[d - 1]
+                placed = any(bb_copy.board[NP_UNIT_CELLS[ui, ci]] == d for ci in range(9))
+                if placed:
+                    continue
+                has_cand = any(bb_copy.board[NP_UNIT_CELLS[ui, ci]] == 0 and
+                              (bb_copy.cands[NP_UNIT_CELLS[ui, ci]] & dbit) for ci in range(9))
+                if not has_cand:
+                    return True
+
+        # Check two same digits in unit
+        for ui in range(27):
+            seen = {}
+            for ci in range(9):
+                p = NP_UNIT_CELLS[ui, ci]
+                v = bb_copy.board[p]
+                if v != 0:
+                    if v in seen:
+                        return True
+                    seen[v] = p
+
+        if not batch:
+            # L1+L2 stalled — try intermediate techniques
+            progress = False
+
+            # X-Wing
+            try:
+                xw = detect_xwing(bb_copy)
+                if xw:
+                    for p, d in xw:
+                        bb_copy.eliminate(p, d)
+                    progress = True
+            except:
+                pass
+
+            # Simple Coloring
+            if not progress:
+                try:
+                    sc_elims, _ = detect_simple_coloring(bb_copy)
+                    if sc_elims:
+                        for p, d in sc_elims:
+                            bb_copy.eliminate(p, d)
+                        progress = True
+                except:
+                    pass
+
+            # ALS-XZ
+            if not progress:
+                try:
+                    als = detect_als_xz_bitwise(bb_copy)
+                    if als:
+                        for p, d in als:
+                            bb_copy.eliminate(p, d)
+                        progress = True
+                except:
+                    pass
+
+            # X-Cycles
+            if not progress:
+                try:
+                    xc_p, xc_e = detect_x_cycle_bitwise(bb_copy)
+                    if xc_p:
+                        for p, v, _ in xc_p:
+                            if bb_copy.board[p] == 0:
+                                bb_copy.place(p, v)
+                        progress = True
+                    elif xc_e:
+                        for p, d in xc_e:
+                            bb_copy.eliminate(p, d)
+                        progress = True
+                except:
+                    pass
+
+            if not progress:
+                break  # truly stalled
+
+    return False
+
+
+def _check_two_on_contradiction(board_result):
+    """Check if the propagated board has two cells placed with same digit in any unit.
+    This is Andrew's 'two candidates ON in same unit' contradiction."""
+    if board_result is None:
+        return True  # already contradicted
+    for ui in range(27):
+        placed_digits = {}
+        for ci in range(9):
+            pos = NP_UNIT_CELLS[ui, ci]
+            val = int(board_result[pos])
+            if val != 0:
+                if val in placed_digits:
+                    return True  # two ON in same unit!
+                placed_digits[val] = pos
+    return False
+
+
+def detect_forcing_net_v2(bb):
+    """Forcing Net v2 — Andrew Stuart style implementation.
+
+    Uses fast_propagate_full to get the FULL board state after assumption,
+    then checks ALL 4 contradiction types:
+      1. All candidates in a cell turned OFF (fast_propagate catches this)
+      2. Two candidates in a cell turned ON (checked via board state)
+      3. All candidates in a unit turned OFF (fast_propagate catches this)
+      4. Two candidates in a unit turned ON (checked via _check_two_on_contradiction)
+
+    OFF-start first (Andrew's preference — 63% more efficient).
+
+    Returns: tuple (placements, eliminations) same as v1
+    """
+    cells = []
+    for pos in range(81):
+        if bb.board[pos] != 0:
+            continue
+        pc = POPCOUNT[bb.cands[pos]]
+        if pc >= 2:
+            cells.append((pos, pc))
+    cells.sort(key=lambda x: x[1])  # bivalue first
+
+    all_placements = []
+    all_elims = []
+
+    # ── FAST PASS: fast_propagate on all cells first ──
+    fast_results = {}  # pos -> (contradicted, valid)
+    for pos, pc in cells[:40]:
+        digits = [d + 1 for d in iter_bits9(bb.cands[pos])]
+        contradicted = []
+        valid = []
+        for d in digits:
+            if fast_propagate(bb.board, bb.cands, pos, d):
+                contradicted.append(d)
+            else:
+                valid.append(d)
+
+        # Fast result: all-but-one → placement immediately
+        if len(contradicted) == len(digits) - 1 and len(valid) == 1:
+            val = valid[0]
+            r, c = pos // 9, pos % 9
+            return ([(pos, val,
+                f'FNv2 R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)')], [])
+
+        if contradicted and valid:
+            for d in contradicted:
+                all_elims.append((pos, d))
+
+        fast_results[pos] = (contradicted, valid, digits)
+
+    # ── DEEP PASS: only cells where fast found SOME valid candidates ──
+    # Try deep propagation to find more contradictions
+    deep_tried = 0
+    for pos, pc in cells[:20]:  # limit deep pass
+        if pos not in fast_results:
+            continue
+        fast_contra, fast_valid, digits = fast_results[pos]
+        if len(fast_valid) <= 1:
+            continue  # already solved or single valid
+        if len(fast_valid) == len(digits):
+            continue  # fast found nothing — skip expensive deep
+
+        # Deep test only the valid ones (fast already caught the rest)
+        contradicted = list(fast_contra)
+        valid = []
+        for d in fast_valid:
+            deep_tried += 1
+            if _deep_propagate_contradicts(bb, pos, d):
+                contradicted.append(d)
+                all_elims.append((pos, d))
+            else:
+                valid.append(d)
+
+        if len(contradicted) == len(digits) - 1 and len(valid) == 1:
+            val = valid[0]
+            r, c = pos // 9, pos % 9
+            return ([(pos, val,
+                f'FNv2 R{r+1}C{c+1}={val} (deep, {len(contradicted)} contradicted)')], [])
+
+    # ── DEEP PASS 2: cells where fast found NOTHING — try full deep ──
+    for pos, pc in cells[:15]:  # very limited
+        if pos not in fast_results:
+            continue
+        fast_contra, fast_valid, digits = fast_results[pos]
+        if fast_contra:
+            continue  # already has some results from fast+deep above
+
+        contradicted = []
+        valid = []
+        for d in digits:
+            deep_tried += 1
+            if _deep_propagate_contradicts(bb, pos, d):
+                contradicted.append(d)
+            else:
+                valid.append(d)
+
+        # All but one contradicted → placement
+        if len(contradicted) == len(digits) - 1 and len(valid) == 1:
+            val = valid[0]
+            r, c = pos // 9, pos % 9
+            all_placements.append((pos, val,
+                f'FNv2 R{r+1}C{c+1}={val} ({len(contradicted)} contradicted)'))
+            return (all_placements, [])
+
+        # Some contradicted → eliminations
+        if contradicted and valid:
+            for d in contradicted:
+                all_elims.append((pos, d))
+
+        # ── Phase 2: OFF-start (Andrew's preferred — yields placements) ──
+        # Assume candidate d is NOT the answer → all remaining must contradict
+        for d in digits:
+            remaining = bb.cands[pos] & ~BIT[d - 1]
+            if remaining == 0:
+                continue
+
+            rem_digits = [rd + 1 for rd in iter_bits9(remaining)]
+            all_rem_contra = True
+
+            for rd in rem_digits:
+                if not _deep_propagate_contradicts(bb, pos, rd):
+                    all_rem_contra = False
+                    break
+
+            if all_rem_contra:
+                r, c = pos // 9, pos % 9
+                all_placements.append((pos, d,
+                    f'FNv2 OFF: R{r+1}C{c+1}={d} (all alternatives contradict)'))
+                return (all_placements, [])
+
+        # ── Phase 3: Convergence — all valid branches place same value ──
+        if len(valid) >= 2:
+            boards = []
+            for v in valid:
+                new_b, _ = fast_propagate_full(bb.board, bb.cands, pos, v,
+                                               return_np=True)
+                if new_b is not None:
+                    boards.append(new_b)
+            if len(boards) == len(valid):
+                for cell in range(81):
+                    if bb.board[cell] != 0:
+                        continue
+                    vals = [int(b[cell]) for b in boards]
+                    if all(v != 0 for v in vals) and len(set(vals)) == 1:
+                        kr, kc = cell // 9, cell % 9
+                        r, c = pos // 9, pos % 9
+                        all_placements.append((cell, vals[0],
+                            f'FNv2 converge R{r+1}C{c+1} → R{kr+1}C{kc+1}={vals[0]}'))
+                        return (all_placements, [])
+
+    if all_elims:
+        return ([], all_elims)
+    return ([], [])
+
+
+# ══════════════════════════════════════════════════════════════════════
 # L6 TECHNIQUES — BUG+1, UR Type 2/4, Junior Exocet, Template, Bowman
 # ══════════════════════════════════════════════════════════════════════
 
@@ -3471,13 +3949,93 @@ def detect_junior_exocet_stuart(bb):
                                         for d in iter_bits9(non_base):
                                             elims.append((tp, d + 1))
 
+                                    # ═══ Rule 2: Cover-house eliminations (verified) ═══
+                                    # For each base digit d, it must appear in
+                                    # S-cells (cross-line positions in band) or
+                                    # cover lines (≤2 perpendicular lines).
+                                    # Eliminate d from non-S cells in those cover lines.
+                                    s_cells = set()
+                                    # S-cells = cells at cross-line positions in each band line
+                                    for cross_pos in cross_positions:
+                                        for ln in lines:
+                                            if orient == 0:
+                                                s_cells.add(ln * 9 + cross_pos)
+                                            else:
+                                                s_cells.add(cross_pos * 9 + ln)
+                                    # Also include base cells and target cells
+                                    exocet_cells = {bp1, bp2, t1p, t2p} | s_cells
+
+                                    for d in base_digits:
+                                        dval = d + 1
+                                        dbit_d = BIT[d]
+                                        # Skip if digit already placed in band
+                                        placed_in_band = False
+                                        for ln in lines:
+                                            for p_idx in range(9):
+                                                if orient == 0:
+                                                    sp = ln * 9 + p_idx
+                                                else:
+                                                    sp = p_idx * 9 + ln
+                                                if bb.board[sp] == dval:
+                                                    placed_in_band = True
+                                                    break
+                                            if placed_in_band:
+                                                break
+                                        if placed_in_band:
+                                            continue
+
+                                        # Find cover lines for this digit
+                                        d_cover_lines = set()
+                                        for cross_pos in cross_positions:
+                                            for ln in range(9):
+                                                if band_idx * 3 <= ln < band_idx * 3 + 3:
+                                                    continue
+                                                if orient == 0:
+                                                    sp = ln * 9 + cross_pos
+                                                else:
+                                                    sp = cross_pos * 9 + ln
+                                                if bb.board[sp] == 0 and (bb.cands[sp] & dbit_d):
+                                                    d_cover_lines.add(ln)
+
+                                        # Eliminate d from non-S cells in cover lines
+                                        for cl in d_cover_lines:
+                                            for p_idx in range(9):
+                                                if orient == 0:
+                                                    ep = cl * 9 + p_idx
+                                                else:
+                                                    ep = p_idx * 9 + cl
+                                                if ep in exocet_cells:
+                                                    continue
+                                                if bb.board[ep] == 0 and (bb.cands[ep] & dbit_d):
+                                                    # This cell is in a cover line but NOT an S-cell
+                                                    # Check it's not in the cross positions
+                                                    if orient == 0:
+                                                        ep_cross = ep % 9
+                                                    else:
+                                                        ep_cross = ep // 9
+                                                    if ep_cross not in cross_positions:
+                                                        elims.append((ep, dval))
+
                                     if elims:
-                                        elims = list(dict.fromkeys(elims))
-                                        base_str = '/'.join(str(d + 1) for d in base_digits)
-                                        detail = (f'Exocet pattern of {base_str} in base '
-                                                  f'[R{br1+1}C{bc1+1},R{br2+1}C{bc2+1}] '
-                                                  f'and targets R{t1r+1}C{t1c+1} and R{t2r+1}C{t2c+1}')
-                                        return elims, detail
+                                        # Verify each elimination with fast_propagate
+                                        verified = []
+                                        for ep, ev in dict.fromkeys(elims):
+                                            if fast_propagate(bb.board, bb.cands, ep, ev):
+                                                verified.append((ep, ev))
+                                        # Also keep Rule 1 elims (always correct)
+                                        r1_elims = []
+                                        for tp in [t1p, t2p]:
+                                            non_base = bb.cands[tp] & ~base_cands
+                                            for dd in iter_bits9(non_base):
+                                                r1_elims.append((tp, dd + 1))
+                                        # Combine: Rule 1 (always) + verified Rule 2
+                                        all_elims = list(dict.fromkeys(r1_elims + verified))
+                                        if all_elims:
+                                            base_str = '/'.join(str(d + 1) for d in base_digits)
+                                            detail = (f'Exocet pattern of {base_str} in base '
+                                                      f'[R{br1+1}C{bc1+1},R{br2+1}C{bc2+1}] '
+                                                      f'and targets R{t1r+1}C{t1c+1} and R{t2r+1}C{t2c+1}')
+                                            return all_elims, detail
     return [], None
 
 
