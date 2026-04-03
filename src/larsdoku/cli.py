@@ -5800,10 +5800,39 @@ presets:
                 print(f'  Confidence: High (~{pct}%, L1 variant match)')
             print(f'  Techniques: {tech_str}')
             print(f'  Hash: {result["hash"]}')
-            print(f'  This puzzle is derived from a Lars Seed.')
+            print(f'  Database: 8,450 signatures | 394,204 seeds | 1.1 quintillion puzzles')
+            print(f'  This puzzle is derived from a Lars Database Seed.')
         else:
-            print(f'  >>> NEW — Not in Lars registry <<<')
-            print(f'  {result.get("message", "")}')
+            # Check Royle 17-clue set before declaring "new"
+            from .lars_forge import lars_mask_hash
+            s = puzzle.replace('.', '0')
+            mask = [1 if c != '0' else 0 for c in s]
+            h = str(lars_mask_hash(mask))
+            clue_count = sum(1 for c in s if c != '0')
+
+            royle_match = False
+            try:
+                import json as _json
+                import os as _os
+                _pkg = _os.path.dirname(__file__)
+                _royle_path = _os.path.join(_pkg, 'royle_17_hashes.json')
+                if _os.path.exists(_royle_path):
+                    with open(_royle_path) as _rf:
+                        _royle = _json.load(_rf)
+                    _royle_set = set(_royle.keys()) if isinstance(_royle, dict) else set(str(k) for k in _royle)
+                    if h in _royle_set:
+                        royle_match = True
+            except Exception:
+                pass
+
+            if royle_match:
+                print(f'  >>> ROYLE 17-CLUE BASE MATCH <<<')
+                print(f'  This is a known 17-clue puzzle from Royle\'s complete enumeration (49,158 puzzles).')
+                print(f'  It is a base skeleton — the mathematical floor for unique Sudoku.')
+                print(f'  Lars Database seeds are forged from these bases with added technique requirements.')
+            else:
+                print(f'  >>> NEW — Not in Lars registry <<<')
+                print(f'  {result.get("message", "")}')
         print()
         return
 
