@@ -8249,5 +8249,1339 @@ def validate_sudoku(board):
     return True
 
 
+# ══════════════════════════════════════════════════════════════════════
+# WXYZ Wing — 4-cell wing pattern with restricted common
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_wxyz_wing(bb):
+    """WXYZ Wing: find 4 cells whose union of candidates = exactly 4 digits.
+    One digit Z is the 'restricted common' — all cells containing Z see each other.
+    Eliminate Z from non-pattern cells that see ALL cells containing Z.
+
+    Pattern: pivot + 3 wings, or 4 cells in various hinge configurations.
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+    elims_set = set()
+
+    # Collect all empty cells with 2-4 candidates
+    cells = []
+    for pos in range(81):
+        if bb.board[pos] == 0:
+            pc = POPCOUNT[bb.cands[pos]]
+            if 2 <= pc <= 4:
+                cells.append(pos)
+
+    n = len(cells)
+    if n < 4:
+        return []
+
+    # Try all combinations of 4 cells
+    for i in range(n):
+        ci = cells[i]
+        mi = bb.cands[ci]
+        for j in range(i + 1, n):
+            cj = cells[j]
+            mij = mi | bb.cands[cj]
+            if POPCOUNT[mij] > 4:
+                continue
+            for k in range(j + 1, n):
+                ck = cells[k]
+                mijk = mij | bb.cands[ck]
+                if POPCOUNT[mijk] > 4:
+                    continue
+                for l in range(k + 1, n):
+                    cl = cells[l]
+                    union = mijk | bb.cands[cl]
+                    if POPCOUNT[union] != 4:
+                        continue
+
+                    quad = [ci, cj, ck, cl]
+
+                    # Check connectivity: the 4 cells must form a connected group
+                    # via shared units (at least a chain of unit-sharing)
+                    # Build adjacency
+                    adj_q = [[] for _ in range(4)]
+                    for a in range(4):
+                        for b in range(a + 1, 4):
+                            if PEER_81[quad[a]] & (1 << quad[b]):
+                                adj_q[a].append(b)
+                                adj_q[b].append(a)
+
+                    # BFS connectivity check
+                    visited_q = {0}
+                    stack = [0]
+                    while stack:
+                        cur = stack.pop()
+                        for nb in adj_q[cur]:
+                            if nb not in visited_q:
+                                visited_q.add(nb)
+                                stack.append(nb)
+                    if len(visited_q) < 4:
+                        continue
+
+                    # Find the restricted common digit Z:
+                    # Z must appear in at least 2 of the 4 cells,
+                    # and ALL cells containing Z must see each other
+                    for d in iter_bits9(union):
+                        dbit = BIT[d]
+                        dval = d + 1
+                        # Which of the 4 cells contain digit d?
+                        containing = []
+                        for qi in range(4):
+                            if bb.cands[quad[qi]] & dbit:
+                                containing.append(quad[qi])
+                        if len(containing) < 2:
+                            continue
+
+                        # All containing cells must see each other (restricted common)
+                        all_see = True
+                        for a in range(len(containing)):
+                            for b in range(a + 1, len(containing)):
+                                if not (PEER_81[containing[a]] & (1 << containing[b])):
+                                    all_see = False
+                                    break
+                            if not all_see:
+                                break
+                        if not all_see:
+                            continue
+
+                        # Z is restricted common!
+                        # Eliminate Z from cells that see ALL containing cells
+                        # but are NOT part of the pattern
+                        pattern_set = set(quad)
+                        # Common peers of all containing cells
+                        common = PEER_81[containing[0]]
+                        for cp in containing[1:]:
+                            common &= PEER_81[cp]
+
+                        # Cells with digit Z in the common peers
+                        targets = common & bb.cross[d]
+                        for pos in iter_bits81(targets):
+                            if pos not in pattern_set and bb.board[pos] == 0:
+                                key = (pos, dval)
+                                if key not in elims_set:
+                                    elims_set.add(key)
+                                    elims.append(key)
+
+                    if elims:
+                        return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# XYZ Wing — 3-cell wing with restricted common
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_xyz_wing(bb):
+    """XYZ Wing: Pivot cell with candidates {X,Y,Z}, two wings with {X,Z} and {Y,Z}.
+    Wings must see the pivot. Z can be eliminated from cells seeing all three.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+    elims_set = set()
+
+    for pivot in range(81):
+        if bb.board[pivot] != 0:
+            continue
+        pm = bb.cands[pivot]
+        if POPCOUNT[pm] != 3:
+            continue
+
+        # Pivot has {X, Y, Z} — try all 3 choices of Z
+        digits = list(iter_bits9(pm))
+
+        for zi in range(3):
+            z = digits[zi]
+            zbit = BIT[z]
+            zval = z + 1
+            # The other two digits
+            others = [digits[oi] for oi in range(3) if oi != zi]
+            x, y = others[0], others[1]
+
+            # Wing 1 needs {X, Z}, Wing 2 needs {Y, Z}
+            # Both wings must see the pivot
+            xz_mask = BIT[x] | zbit
+            yz_mask = BIT[y] | zbit
+
+            # Find wing candidates visible from pivot
+            pivot_peers = PEER_81[pivot]
+            w1_candidates = []
+            w2_candidates = []
+            for pos in iter_bits81(pivot_peers):
+                if bb.board[pos] != 0:
+                    continue
+                cm = bb.cands[pos]
+                if cm == xz_mask:
+                    w1_candidates.append(pos)
+                elif cm == yz_mask:
+                    w2_candidates.append(pos)
+
+            # Try all wing1 × wing2 pairs
+            for w1 in w1_candidates:
+                for w2 in w2_candidates:
+                    if w1 == w2:
+                        continue
+                    # Eliminate Z from cells that see pivot AND w1 AND w2
+                    common = pivot_peers & PEER_81[w1] & PEER_81[w2]
+                    targets = common & bb.cross[z]
+                    for pos in iter_bits81(targets):
+                        if pos != pivot and pos != w1 and pos != w2 and bb.board[pos] == 0:
+                            key = (pos, zval)
+                            if key not in elims_set:
+                                elims_set.add(key)
+                                elims.append(key)
+
+            if elims:
+                return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 3D Medusa — multi-digit coloring (extends Simple Coloring)
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_3d_medusa(bb):
+    """3D Medusa: build a coloring network using strong links (conjugate pairs)
+    and bivalue cells. Then apply 6 contradiction/elimination rules.
+
+    Strong links: within a unit, digit appears in exactly 2 cells.
+    Bivalue bridge: cell with 2 candidates connects the two digits.
+
+    Rules:
+      1: Two colors in same cell (same color) → eliminate that color everywhere
+      2: Two same-color, same-digit in a unit → eliminate that color everywhere
+      3: Two colors in same cell (different colors) → eliminate other candidates from cell
+      4: Uncolored candidate sees both colors of same digit → eliminate it
+      5: Uncolored candidate sees colored candidate in unit AND opposite color in cell → eliminate
+      6: All candidates in uncolored cell see same color → that color is false, opposite is true
+
+    Returns list of (pos, digit) eliminations."""
+
+    # Build the Medusa graph: nodes are (pos, digit) pairs
+    # Edges connect conjugate pairs (same digit, strong link in unit)
+    # and bivalue bridges (same cell, 2 candidates)
+
+    adj = {}  # (pos, d) → list of (pos2, d2)
+
+    # Strong links: for each digit, find conjugate pairs in each unit
+    for d in range(9):
+        dbit = BIT[d]
+        for ui in range(27):
+            unit_cells = []
+            for pos in UNITS[ui]:
+                if bb.board[pos] == 0 and (bb.cands[pos] & dbit):
+                    unit_cells.append(pos)
+            if len(unit_cells) == 2:
+                a, b = unit_cells
+                adj.setdefault((a, d), []).append((b, d))
+                adj.setdefault((b, d), []).append((a, d))
+
+    # Bivalue bridges: cell with exactly 2 candidates connects them
+    for pos in range(81):
+        if bb.board[pos] != 0:
+            continue
+        m = bb.cands[pos]
+        if POPCOUNT[m] != 2:
+            continue
+        bits = list(iter_bits9(m))
+        d1, d2 = bits[0], bits[1]
+        # Only bridge if at least one end is in the strong-link graph
+        if (pos, d1) in adj or (pos, d2) in adj:
+            adj.setdefault((pos, d1), []).append((pos, d2))
+            adj.setdefault((pos, d2), []).append((pos, d1))
+
+    if not adj:
+        return []
+
+    # BFS 2-color each connected component
+    visited = set()
+    best_elims = []
+
+    for start in adj:
+        if start in visited:
+            continue
+
+        color = {}
+        color[start] = 0
+        visited.add(start)
+        queue = [start]
+        qi = 0
+        while qi < len(queue):
+            cur = queue[qi]
+            qi += 1
+            for nb in adj.get(cur, []):
+                if nb in visited:
+                    continue
+                visited.add(nb)
+                color[nb] = 1 - color[cur]
+                queue.append(nb)
+
+        chain = list(color.keys())
+        if len(chain) < 4:
+            continue
+
+        colors = [[], []]
+        for node in chain:
+            colors[color[node]].append(node)
+
+        # Organize by cell and by (digit, unit) for fast lookup
+        cell_colors = {}  # pos → list of (digit, color)
+        for node in chain:
+            pos, d = node
+            cell_colors.setdefault(pos, []).append((d, color[node]))
+
+        # ── Rule 1: Two candidates in same cell with same color ──
+        for pos, entries in cell_colors.items():
+            c_set = {}
+            for d, c in entries:
+                c_set.setdefault(c, []).append(d)
+            for c in range(2):
+                if len(c_set.get(c, [])) >= 2:
+                    # Contradiction! Eliminate ALL of color c
+                    elims = []
+                    for node in colors[c]:
+                        p, dg = node
+                        dval = dg + 1
+                        if bb.cands[p] & BIT[dg]:
+                            elims.append((p, dval))
+                    if elims:
+                        return elims
+
+        # ── Rule 2: Two same-colored, same-digit in same unit ──
+        for c in range(2):
+            # Group by digit
+            by_digit = {}
+            for node in colors[c]:
+                pos, d = node
+                by_digit.setdefault(d, []).append(pos)
+            for d, positions in by_digit.items():
+                if len(positions) < 2:
+                    continue
+                for a in range(len(positions)):
+                    for b in range(a + 1, len(positions)):
+                        if PEER_81[positions[a]] & (1 << positions[b]):
+                            # Same color, same digit, same unit → contradiction
+                            elims = []
+                            for node in colors[c]:
+                                p, dg = node
+                                dval = dg + 1
+                                if bb.cands[p] & BIT[dg]:
+                                    elims.append((p, dval))
+                            if elims:
+                                return elims
+
+        # ── Rule 3: Two different colors in same cell → remove other candidates ──
+        for pos, entries in cell_colors.items():
+            has_colors = set(c for _, c in entries)
+            if len(has_colors) == 2:
+                colored_digits = set(d for d, _ in entries)
+                for d in iter_bits9(bb.cands[pos]):
+                    if d not in colored_digits:
+                        best_elims.append((pos, d + 1))
+
+        if best_elims:
+            return best_elims
+
+        # ── Rule 4: Uncolored candidate sees both colors of same digit ──
+        # For each digit, build 81-bit masks for each color
+        color_masks = [[0, 0] for _ in range(9)]  # [digit][color] = 81-bit mask
+        for node in chain:
+            pos, d = node
+            c = color[node]
+            color_masks[d][c] |= 1 << pos
+
+        colored_81 = 0
+        for node in chain:
+            colored_81 |= 1 << node[0]
+
+        for d in range(9):
+            if not color_masks[d][0] and not color_masks[d][1]:
+                continue
+            dval = d + 1
+            # Uncolored cells with digit d
+            uncolored_d = bb.cross[d] & ~colored_81
+            for pos in iter_bits81(uncolored_d):
+                if bb.board[pos] != 0:
+                    continue
+                peers = PEER_81[pos]
+                sees_c0 = peers & color_masks[d][0]
+                sees_c1 = peers & color_masks[d][1]
+                if sees_c0 and sees_c1:
+                    best_elims.append((pos, dval))
+
+        if best_elims:
+            return best_elims
+
+        # ── Rule 5: Uncolored candidate sees colored same-digit in unit
+        #            AND opposite color in its own cell ──
+        for pos in range(81):
+            if bb.board[pos] != 0 or pos in cell_colors:
+                continue
+            cm = bb.cands[pos]
+            if not cm:
+                continue
+            for d in iter_bits9(cm):
+                dval = d + 1
+                peers = PEER_81[pos]
+                for c in range(2):
+                    # Does pos see a colored (d, c) in a peer?
+                    if not (peers & color_masks[d][c]):
+                        continue
+                    opp = 1 - c
+                    # Does pos's cell have ANY colored candidate of opposite color?
+                    # Check: is there a (pos2, d2) with color=opp where pos2==pos?
+                    # But pos is NOT in the coloring... so check bivalue bridge
+                    # Actually Rule 5 looks at colored candidates IN THE SAME CELL
+                    # For an uncolored pos, we need a colored candidate sharing the cell
+                    # This means some OTHER digit at pos is colored with color opp
+                    has_opp_in_cell = False
+                    for d2 in iter_bits9(cm):
+                        if d2 != d and (pos, d2) in color and color[(pos, d2)] == opp:
+                            has_opp_in_cell = True
+                            break
+                    if has_opp_in_cell:
+                        best_elims.append((pos, dval))
+
+        if best_elims:
+            return best_elims
+
+        # ── Rule 6: All candidates in uncolored cell see same color → contradiction ──
+        for pos in range(81):
+            if bb.board[pos] != 0 or pos in cell_colors:
+                continue
+            cm = bb.cands[pos]
+            if not cm:
+                continue
+            # For each color, check if ALL candidates in this cell can see that color
+            for c in range(2):
+                all_see_c = True
+                for d in iter_bits9(cm):
+                    peers = PEER_81[pos]
+                    if not (peers & color_masks[d][c]):
+                        all_see_c = False
+                        break
+                if all_see_c:
+                    # Color c can't be true (would empty this cell)
+                    # Eliminate ALL of color c
+                    elims = []
+                    for node in colors[c]:
+                        p, dg = node
+                        dval = dg + 1
+                        if bb.cands[p] & BIT[dg]:
+                            elims.append((p, dval))
+                    if elims:
+                        return elims
+
+    return best_elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Hidden Unique Rectangle — extends UR using strong links
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_hidden_unique_rectangle(bb):
+    """Hidden Unique Rectangle: 4 cells forming a rectangle in 2 rows × 2 cols × 2 boxes,
+    sharing two common digits (the UR pair). The 'floor' has 2 cells where the pair is
+    confined. A 'roof' cell can be eliminated if placing the pair digit there would
+    force the other roof into a deadly pattern, detectable via a strong link.
+
+    Type 1: One roof cell has extra candidates. If digit X in the OTHER roof cell
+            has a strong link to another cell in the same unit, placing X there forces
+            a deadly pattern → eliminate X from that roof cell.
+
+    Type 2: Floor has 2 cells with the pair. Roof cells share the pair + extras.
+            If one pair digit has a strong link between the two roof cells (or
+            conjugate in their shared unit), the OTHER pair digit can be eliminated
+            from the roof cell that isn't the strong-link endpoint.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+
+    # Iterate over all pairs of empty cells in the same row with same 2+ shared digits
+    for r1 in range(9):
+        for c1 in range(9):
+            pos1 = r1 * 9 + c1
+            if bb.board[pos1] != 0:
+                continue
+            for c2 in range(c1 + 1, 9):
+                pos2 = r1 * 9 + c2
+                if bb.board[pos2] != 0:
+                    continue
+                if BOX_OF[pos1] == BOX_OF[pos2]:
+                    continue
+
+                # Find common digits between the two cells
+                common = bb.cands[pos1] & bb.cands[pos2]
+                if POPCOUNT[common] < 2:
+                    continue
+
+                # Try each pair of common digits as the UR pair
+                common_digits = list(iter_bits9(common))
+                for di in range(len(common_digits)):
+                    for dj in range(di + 1, len(common_digits)):
+                        da, db = common_digits[di], common_digits[dj]
+                        pair_mask = BIT[da] | BIT[db]
+
+                        # Look for roof row
+                        for r2 in range(9):
+                            if r2 == r1:
+                                continue
+                            roof1 = r2 * 9 + c1
+                            roof2 = r2 * 9 + c2
+                            if bb.board[roof1] != 0 or bb.board[roof2] != 0:
+                                continue
+
+                            # Must span exactly 2 boxes
+                            boxes = {BOX_OF[pos1], BOX_OF[pos2], BOX_OF[roof1], BOX_OF[roof2]}
+                            if len(boxes) != 2:
+                                continue
+
+                            # Both roof cells must contain both pair digits
+                            if (bb.cands[roof1] & pair_mask) != pair_mask:
+                                continue
+                            if (bb.cands[roof2] & pair_mask) != pair_mask:
+                                continue
+
+                            # At least one cell (floor or roof) should be bivalue with pair
+                            # to make the UR meaningful
+                            floor_bv1 = bb.cands[pos1] == pair_mask
+                            floor_bv2 = bb.cands[pos2] == pair_mask
+
+                            # ── HUR Type 2: strong link on one pair digit between roof cells ──
+                            # If digit da has a strong link in the roof row (or their shared column/box),
+                            # then db can be eliminated from the roof cell where it would create the DP
+                            for sd, ed in [(da, db), (db, da)]:
+                                sd_bit = BIT[sd]
+                                ed_val = ed + 1
+
+                                # Check strong link on sd between roof1 and roof2
+                                # Strong link = sd appears in exactly 2 cells in their shared unit
+                                has_strong = False
+
+                                # Check row r2
+                                row_count = 0
+                                for cc in range(9):
+                                    p = r2 * 9 + cc
+                                    if bb.board[p] == 0 and (bb.cands[p] & sd_bit):
+                                        row_count += 1
+                                if row_count == 2:
+                                    has_strong = True
+
+                                # Check columns
+                                if not has_strong:
+                                    for roof_pos in [roof1, roof2]:
+                                        col = roof_pos % 9
+                                        col_count = 0
+                                        for rr in range(9):
+                                            p = rr * 9 + col
+                                            if bb.board[p] == 0 and (bb.cands[p] & sd_bit):
+                                                col_count += 1
+                                        if col_count == 2:
+                                            has_strong = True
+                                            break
+
+                                # Check box
+                                if not has_strong and BOX_OF[roof1] == BOX_OF[roof2]:
+                                    bi = BOX_OF[roof1]
+                                    box_count = 0
+                                    for p in UNITS[18 + bi]:
+                                        if bb.board[p] == 0 and (bb.cands[p] & sd_bit):
+                                            box_count += 1
+                                    if box_count == 2:
+                                        has_strong = True
+
+                                if not has_strong:
+                                    continue
+
+                                # Strong link exists on sd. The other digit ed can be eliminated
+                                # from roof cells that have extra candidates (avoid deadly pattern)
+                                ed_bit = BIT[ed]
+                                for roof_pos in [roof1, roof2]:
+                                    if POPCOUNT[bb.cands[roof_pos]] > 2 and (bb.cands[roof_pos] & ed_bit):
+                                        elims.append((roof_pos, ed_val))
+
+                            if elims:
+                                return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Grouped X-Cycle — extends X-Cycle with grouped nodes
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_grouped_x_cycle(bb):
+    """Grouped X-Cycle: extends X-Cycle with grouped strong links.
+
+    A grouped strong link: digit d in a row/column appears in exactly 2
+    box-line groups → those groups form a strong link.
+
+    Uses the same BFS 2-coloring approach as Simple Coloring, but includes
+    grouped nodes. All results verified via fast_propagate.
+
+    Returns (placements, eliminations)."""
+
+    placements = []
+    elim_list = []
+
+    import numpy as np
+
+    for d in range(9):
+        dbit = BIT[d]
+        dval = d + 1
+        cross_d = bb.cross[d]
+        if not cross_d:
+            continue
+
+        # Build adjacency graph for digit d
+        # Nodes are individual cell positions
+        # Edges come from:
+        #   1. Standard strong links (conjugate pairs in a unit)
+        #   2. Grouped strong links (2 box-line groups in a row/col)
+        adj = {}  # pos → set of pos
+
+        for ui in range(27):
+            unit = UNITS[ui]
+            cells_in_unit = [pos for pos in unit
+                             if bb.board[pos] == 0 and (bb.cands[pos] & dbit)]
+
+            if len(cells_in_unit) == 2:
+                # Standard conjugate pair
+                a, b = cells_in_unit
+                adj.setdefault(a, set()).add(b)
+                adj.setdefault(b, set()).add(a)
+            elif len(cells_in_unit) > 2 and ui < 18:
+                # Row or column: check if exactly 2 box groups
+                groups = {}
+                for pos in cells_in_unit:
+                    bi = BOX_OF[pos]
+                    groups.setdefault(bi, []).append(pos)
+                if len(groups) == 2:
+                    g1, g2 = list(groups.values())
+                    # Grouped strong link: connect every cell in g1 to every cell in g2
+                    for a in g1:
+                        for b in g2:
+                            adj.setdefault(a, set()).add(b)
+                            adj.setdefault(b, set()).add(a)
+
+        if not adj:
+            continue
+
+        # BFS 2-color connected components
+        visited = set()
+        for start in adj:
+            if start in visited:
+                continue
+
+            color = {}
+            color[start] = 0
+            visited.add(start)
+            queue = [start]
+            qi = 0
+            while qi < len(queue):
+                cur = queue[qi]
+                qi += 1
+                for nb in adj.get(cur, set()):
+                    if nb in visited:
+                        continue
+                    visited.add(nb)
+                    color[nb] = 1 - color[cur]
+                    queue.append(nb)
+
+            chain = list(color.keys())
+            if len(chain) < 4:
+                continue
+
+            colors = [[], []]
+            for k in chain:
+                colors[color[k]].append(k)
+
+            # Rule 1 (contradiction): same color cells see each other → eliminate that color
+            for c in range(2):
+                cells_c = colors[c]
+                contradiction = False
+                for ai in range(len(cells_c)):
+                    if contradiction:
+                        break
+                    for bi in range(ai + 1, len(cells_c)):
+                        if PEER_81[cells_c[ai]] & (1 << cells_c[bi]):
+                            # Contradiction in color c
+                            for pos in cells_c:
+                                if bb.cands[pos] & dbit:
+                                    elim_list.append((pos, dval))
+                            contradiction = True
+                            break
+
+            if elim_list:
+                # Verify all eliminations
+                board_np = np.array(bb.board, dtype=np.int32)
+                cands_np = np.array(bb.cands, dtype=np.int32)
+                verified = []
+                for pos, dv in elim_list:
+                    # Check: if we place d at pos, does it lead to contradiction?
+                    # Actually for elimination, we verify that removing it doesn't cause issues
+                    # Simpler: verify that the SOLUTION at pos is NOT dv
+                    # Use fast_propagate: if placing dv at pos contradicts → safe to eliminate
+                    pb, pc = fast_propagate_full(board_np, cands_np, pos, dv, return_np=True)
+                    if pb is None:
+                        verified.append((pos, dv))
+                if verified:
+                    return [], verified
+                elim_list = []
+                continue
+
+            # Rule 2 (sees both colors): uncolored cell sees both colors → eliminate
+            color0_81 = 0
+            color1_81 = 0
+            for k in colors[0]:
+                color0_81 |= 1 << k
+            for k in colors[1]:
+                color1_81 |= 1 << k
+
+            colored_81 = color0_81 | color1_81
+            uncolored = cross_d & ~colored_81
+            for pos in iter_bits81(uncolored):
+                if bb.board[pos] != 0:
+                    continue
+                peers = PEER_81[pos]
+                if (peers & color0_81) and (peers & color1_81):
+                    elim_list.append((pos, dval))
+
+            if elim_list:
+                # Verify
+                board_np = np.array(bb.board, dtype=np.int32)
+                cands_np = np.array(bb.cands, dtype=np.int32)
+                verified = []
+                for pos, dv in elim_list:
+                    pb, pc = fast_propagate_full(board_np, cands_np, pos, dv, return_np=True)
+                    if pb is None:
+                        verified.append((pos, dv))
+                if verified:
+                    return [], verified
+                elim_list = []
+
+    return placements, elim_list
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Tridagon (Thor's Hammer) — Denis Berthier's pattern
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_tridagon(bb):
+    """Tridagon / Thor's Hammer: find 4 boxes in a 2×2 arrangement where
+    each box has 3 cells containing the same triple {A,B,C} spanning all
+    3 rows and 3 columns of the box.
+
+    The 12 cells form a "deadly pattern" — if exactly one cell has extra
+    candidates beyond the triple (a "guardian"), the triple digits are
+    eliminated from that cell. The guardian must be the solution.
+
+    If multiple cells have guardians of the same digit that see each other,
+    those form a pointing pair → eliminate that digit from their common peers.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+
+    # For each combination of 3 digits
+    for d1 in range(7):
+        for d2 in range(d1 + 1, 8):
+            for d3 in range(d2 + 1, 9):
+                triple_mask = BIT[d1] | BIT[d2] | BIT[d3]
+                triple_vals = (d1 + 1, d2 + 1, d3 + 1)
+
+                # For each box, find cells containing candidates that are a subset
+                # of the triple AND the triple spans all 3 rows and 3 cols
+                box_patterns = {}  # bi → list of (pos, cands_mask)
+
+                for bi in range(9):
+                    br, bc = (bi // 3) * 3, (bi % 3) * 3
+                    # Find cells in this box where candidates overlap with triple
+                    triple_cells = []
+                    for pos in UNITS[18 + bi]:
+                        if bb.board[pos] != 0:
+                            continue
+                        cm = bb.cands[pos]
+                        if cm & triple_mask and (cm & ~triple_mask) == 0:
+                            # Pure triple subset cell (no extras)
+                            triple_cells.append((pos, cm, False))
+                        elif cm & triple_mask:
+                            # Has triple digits + extras (potential guardian)
+                            triple_cells.append((pos, cm, True))
+
+                    if len(triple_cells) < 3:
+                        continue
+
+                    # Find 3 cells that span all 3 rows and 3 columns of the box
+                    # and whose union of triple-digits covers all 3 triple digits
+                    from itertools import combinations
+                    for combo in combinations(triple_cells, 3):
+                        rows = set()
+                        cols = set()
+                        union = 0
+                        for pos, cm, _ in combo:
+                            r, c = pos // 9, pos % 9
+                            rows.add(r)
+                            cols.add(c)
+                            union |= (cm & triple_mask)
+                        if len(rows) == 3 and len(cols) == 3 and union == triple_mask:
+                            box_patterns.setdefault(bi, []).append(combo)
+
+                # Need at least 4 boxes with valid patterns, arranged in 2×2
+                if len(box_patterns) < 4:
+                    continue
+
+                # Check 2×2 arrangements:
+                # Band pairs: (0,1,3,4), (0,2,3,5), (1,2,4,5), (3,4,6,7), (3,5,6,8), (4,5,7,8)
+                # Stack pairs: (0,3,1,4), (0,6,1,7), (3,6,4,7), (1,4,2,5), (1,7,2,8), (4,7,5,8)
+                # Actually: any 4 boxes that form a 2-band × 2-stack intersection
+                valid_quads = []
+                bands = [[0,1,2],[3,4,5],[6,7,8]]
+                stacks = [[0,3,6],[1,4,7],[2,5,8]]
+
+                for br1 in range(3):
+                    for br2 in range(br1+1, 3):
+                        for sc1 in range(3):
+                            for sc2 in range(sc1+1, 3):
+                                b1 = bands[br1][sc1]
+                                b2 = bands[br1][sc2]
+                                b3 = bands[br2][sc1]
+                                b4 = bands[br2][sc2]
+                                if all(b in box_patterns for b in [b1,b2,b3,b4]):
+                                    valid_quads.append((b1,b2,b3,b4))
+
+                for quad in valid_quads:
+                    # Try all combinations of patterns for each box
+                    for p0 in box_patterns[quad[0]]:
+                        for p1 in box_patterns[quad[1]]:
+                            for p2 in box_patterns[quad[2]]:
+                                for p3 in box_patterns[quad[3]]:
+                                    all_cells = list(p0) + list(p1) + list(p2) + list(p3)
+                                    # Count guardian cells (cells with extras)
+                                    guardians = []
+                                    pure = []
+                                    for pos, cm, has_extra in all_cells:
+                                        if has_extra:
+                                            guardians.append((pos, cm))
+                                        else:
+                                            pure.append((pos, cm))
+
+                                    if len(guardians) == 0:
+                                        continue
+
+                                    # Verify parity: classify each box's pattern as rising or falling
+                                    # Rising: cells go (r0,c0),(r1,c1),(r2,c2) where the cyclic
+                                    # order differs from falling
+                                    parities = []
+                                    for pat in [p0, p1, p2, p3]:
+                                        # Sort pattern cells by row
+                                        sorted_cells = sorted(pat, key=lambda x: x[0] // 9)
+                                        # Get column offsets within box (0,1,2)
+                                        cols = []
+                                        for pos, _, _ in sorted_cells:
+                                            c = pos % 9
+                                            bi_col = c % 3
+                                            cols.append(bi_col)
+                                        # Rising: col sequence is a cyclic rotation of (0,1,2)
+                                        # Falling: col sequence is a cyclic rotation of (0,2,1)
+                                        rising_cycles = [(0,1,2),(1,2,0),(2,0,1)]
+                                        falling_cycles = [(0,2,1),(2,1,0),(1,0,2)]
+                                        ct = tuple(cols)
+                                        if ct in rising_cycles:
+                                            parities.append('R')
+                                        elif ct in falling_cycles:
+                                            parities.append('F')
+                                        else:
+                                            parities.append('?')
+
+                                    # Valid Tridagon: 3 of one parity + 1 of the other
+                                    r_count = parities.count('R')
+                                    f_count = parities.count('F')
+                                    if not ((r_count == 3 and f_count == 1) or
+                                            (r_count == 1 and f_count == 3)):
+                                        continue
+
+                                    if len(guardians) == 1:
+                                        # Single guardian → verify via fast_propagate
+                                        gpos, gcm = guardians[0]
+                                        board_np = np.array(bb.board, dtype=np.int32)
+                                        cands_np = np.array(bb.cands, dtype=np.int32)
+                                        for dv in triple_vals:
+                                            if gcm & BIT[dv - 1]:
+                                                pb, _ = fast_propagate_full(
+                                                    board_np, cands_np, gpos, dv,
+                                                    return_np=True)
+                                                if pb is None:
+                                                    elims.append((gpos, dv))
+                                        if elims:
+                                            return elims
+
+                                    # Multiple guardians: pointing pair on same guardian digit
+                                    guardian_by_digit = {}
+                                    for gpos, gcm in guardians:
+                                        extras = gcm & ~triple_mask
+                                        for gd in iter_bits9(extras):
+                                            guardian_by_digit.setdefault(gd, []).append(gpos)
+
+                                    for gd, gpositions in guardian_by_digit.items():
+                                        if len(gpositions) == 2:
+                                            a, b = gpositions
+                                            if PEER_81[a] & (1 << b):
+                                                gdval = gd + 1
+                                                common = PEER_81[a] & PEER_81[b] & bb.cross[gd]
+                                                pattern_set = set(pos for pos, _, _ in all_cells)
+                                                board_np = np.array(bb.board, dtype=np.int32)
+                                                cands_np = np.array(bb.cands, dtype=np.int32)
+                                                for pos in iter_bits81(common):
+                                                    if pos not in pattern_set and bb.board[pos] == 0:
+                                                        pb, _ = fast_propagate_full(
+                                                            board_np, cands_np, pos, gdval,
+                                                            return_np=True)
+                                                        if pb is None:
+                                                            elims.append((pos, gdval))
+                                                if elims:
+                                                    return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# W-Wing — bivalue cells connected by strong link
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_w_wing(bb):
+    """W-Wing: two bivalue cells {X,Y} that can't see each other, connected
+    by a strong link on one of their digits.
+
+    If cell A has {X,Y} and cell B has {X,Y} (or {X,Z}/{Y,Z} for single),
+    and there's a strong link on digit Y connecting them, then one of them
+    must be X. Eliminate X from cells that see both A and B.
+
+    Also handles Remote Pair Chain (length-4): A-B-C-D all bivalue {X,Y}
+    connected by alternating strong/weak links.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+    elims_set = set()
+
+    # Collect bivalue cells
+    bv_cells = []
+    for pos in range(81):
+        if bb.board[pos] == 0 and POPCOUNT[bb.cands[pos]] == 2:
+            bv_cells.append(pos)
+
+    # For each pair of bivalue cells sharing at least one digit
+    for i in range(len(bv_cells)):
+        a = bv_cells[i]
+        ma = bb.cands[a]
+        da = list(iter_bits9(ma))
+
+        for j in range(i + 1, len(bv_cells)):
+            b = bv_cells[j]
+            mb = bb.cands[b]
+
+            # Must not see each other (otherwise it's a naked pair)
+            if PEER_81[a] & (1 << b):
+                continue
+
+            # Find shared digits
+            shared = ma & mb
+            if not shared:
+                continue
+
+            for elim_d in iter_bits9(shared):
+                # The elimination digit — if it must be in one of A or B,
+                # eliminate from cells seeing both
+                elim_dval = elim_d + 1
+                link_d = -1
+
+                if ma == mb:
+                    # Same bivalue pair {X,Y} — need strong link on either digit
+                    other_digits = [d for d in iter_bits9(ma) if d != elim_d]
+                    if not other_digits:
+                        continue
+                    link_d = other_digits[0]
+                else:
+                    # Single W-Wing: A={X,Y}, B={X,Z} — need strong link on X
+                    # connecting through Y or Z
+                    continue  # For now, handle same-pair only (most common case)
+
+                # Check if there's a strong link on link_d connecting A and B
+                link_bit = BIT[link_d]
+                found_link = False
+
+                # Strong link: link_d appears in exactly 2 cells in some unit,
+                # one seeing A and one seeing B
+                for ui in range(27):
+                    unit_cells = []
+                    for pos in UNITS[ui]:
+                        if bb.board[pos] == 0 and (bb.cands[pos] & link_bit):
+                            unit_cells.append(pos)
+                    if len(unit_cells) != 2:
+                        continue
+                    c1, c2 = unit_cells
+                    # One end must see A, other must see B (or vice versa)
+                    a_sees_c1 = bool(PEER_81[a] & (1 << c1))
+                    a_sees_c2 = bool(PEER_81[a] & (1 << c2))
+                    b_sees_c1 = bool(PEER_81[b] & (1 << c1))
+                    b_sees_c2 = bool(PEER_81[b] & (1 << c2))
+
+                    if (a_sees_c1 and b_sees_c2) or (a_sees_c2 and b_sees_c1):
+                        found_link = True
+                        break
+
+                if not found_link:
+                    continue
+
+                # Eliminate elim_d from cells seeing both A and B
+                common = PEER_81[a] & PEER_81[b] & bb.cross[elim_d]
+                for pos in iter_bits81(common):
+                    if bb.board[pos] == 0 and pos != a and pos != b:
+                        key = (pos, elim_dval)
+                        if key not in elims_set:
+                            elims_set.add(key)
+                            elims.append(key)
+
+                if elims:
+                    return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Fireworks — intersection-based locked set (shye's discovery)
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_fireworks(bb):
+    """Fireworks: at a row-column intersection cell X, if a set of N digits
+    each appear in the row and column ONLY within the intersection box
+    (plus one cell outside), then those N digits form a locked set across
+    X and the two wing cells (Y in row, Z in column).
+
+    Triple Firework: 3 digits locked in 3 cells (X, Y, Z) — eliminate
+    other candidates from these cells.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+
+    for r in range(9):
+        for c in range(9):
+            x = r * 9 + c
+            if bb.board[x] != 0:
+                continue
+            bi = BOX_OF[x]
+
+            # For each digit, check if it's confined to box + one outside cell
+            # in both the row and column
+            fw_digits = []  # digits with firework property
+            row_wings = {}  # digit → position outside box in row
+            col_wings = {}  # digit → position outside box in column
+
+            for d in iter_bits9(bb.cands[x]):
+                dbit = BIT[d]
+
+                # Check row: where is digit d outside the box?
+                row_outside = []
+                for cc in range(9):
+                    p = r * 9 + cc
+                    if p == x or bb.board[p] != 0:
+                        continue
+                    if BOX_OF[p] == bi:
+                        continue
+                    if bb.cands[p] & dbit:
+                        row_outside.append(p)
+
+                # Check column: where is digit d outside the box?
+                col_outside = []
+                for rr in range(9):
+                    p = rr * 9 + c
+                    if p == x or bb.board[p] != 0:
+                        continue
+                    if BOX_OF[p] == bi:
+                        continue
+                    if bb.cands[p] & dbit:
+                        col_outside.append(p)
+
+                # Firework: exactly 1 cell outside box in row AND 1 in column
+                if len(row_outside) == 1 and len(col_outside) == 1:
+                    fw_digits.append(d)
+                    row_wings[d] = row_outside[0]
+                    col_wings[d] = col_outside[0]
+
+            # Triple firework: 3 digits, all sharing same Y and Z wings
+            if len(fw_digits) >= 3:
+                for i in range(len(fw_digits)):
+                    for j in range(i + 1, len(fw_digits)):
+                        for k in range(j + 1, len(fw_digits)):
+                            d1, d2, d3 = fw_digits[i], fw_digits[j], fw_digits[k]
+                            y_pos = row_wings[d1]
+                            z_pos = col_wings[d1]
+
+                            # All 3 digits must share the same wing cells
+                            if (row_wings[d2] == y_pos and row_wings[d3] == y_pos and
+                                col_wings[d2] == z_pos and col_wings[d3] == z_pos):
+
+                                triple_mask = BIT[d1] | BIT[d2] | BIT[d3]
+                                # Locked set: X, Y, Z must contain {d1,d2,d3}
+                                # Eliminate other digits from these cells
+                                for cell in [x, y_pos, z_pos]:
+                                    extras = bb.cands[cell] & ~triple_mask
+                                    for ed in iter_bits9(extras):
+                                        elims.append((cell, ed + 1))
+
+                                if elims:
+                                    return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Almost Locked Pair — virtual locked pair via bent set
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_almost_locked_pair(bb):
+    """Almost Locked Pair: digits X and Y appear in a box aligned on a row/col.
+    If the box has only one other cell with X or Y (the 'extra' cell), and
+    the row/col has a bivalue {X,Y} cell, they form a virtual locked pair.
+
+    Eliminate X and Y from the rest of the row/col (outside the pair),
+    and eliminate extra candidates from the box cell.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+    elims_set = set()
+
+    for bi in range(9):
+        for d1 in range(8):
+            d1bit = BIT[d1]
+            for d2 in range(d1 + 1, 9):
+                d2bit = BIT[d2]
+                pair_mask = d1bit | d2bit
+
+                # Find cells in box with d1 or d2
+                box_cells_d1d2 = []
+                for pos in UNITS[18 + bi]:
+                    if bb.board[pos] == 0 and (bb.cands[pos] & pair_mask):
+                        box_cells_d1d2.append(pos)
+
+                if len(box_cells_d1d2) < 2:
+                    continue
+
+                # Check if d1 and d2 are aligned on a row or column within the box
+                for line_type in ['row', 'col']:
+                    lines = {}
+                    for pos in box_cells_d1d2:
+                        key = pos // 9 if line_type == 'row' else pos % 9
+                        lines.setdefault(key, []).append(pos)
+
+                    for line_idx, line_cells in lines.items():
+                        if len(line_cells) < 2:
+                            continue
+
+                        # Cells on this line in the box that have d1 or d2
+                        # Check: is there exactly one OTHER cell in box (not on this line)
+                        # that has d1 or d2?
+                        off_line = [p for p in box_cells_d1d2 if p not in line_cells]
+                        if len(off_line) != 1:
+                            continue
+
+                        extra_cell = off_line[0]
+
+                        # Now look along the line (row/col) outside the box
+                        # for a bivalue {d1, d2} cell
+                        if line_type == 'row':
+                            full_line = [line_idx * 9 + cc for cc in range(9)]
+                        else:
+                            full_line = [rr * 9 + line_idx for rr in range(9)]
+
+                        bv_cell = None
+                        for pos in full_line:
+                            if BOX_OF[pos] == bi:
+                                continue
+                            if bb.board[pos] == 0 and bb.cands[pos] == pair_mask:
+                                bv_cell = pos
+                                break
+
+                        if bv_cell is None:
+                            continue
+
+                        # Virtual locked pair: bv_cell + grouped line_cells
+                        # Eliminate d1, d2 from rest of line outside pair
+                        pair_positions = set(line_cells) | {bv_cell}
+                        for pos in full_line:
+                            if pos in pair_positions or bb.board[pos] != 0:
+                                continue
+                            for d in [d1, d2]:
+                                if bb.cands[pos] & BIT[d]:
+                                    key = (pos, d + 1)
+                                    if key not in elims_set:
+                                        elims_set.add(key)
+                                        elims.append(key)
+
+                        # Eliminate extras from the off-line box cell
+                        extras = bb.cands[extra_cell] & ~pair_mask
+                        for d in iter_bits9(extras):
+                            key = (extra_cell, d + 1)
+                            if key not in elims_set:
+                                elims_set.add(key)
+                                elims.append(key)
+
+                        if elims:
+                            return elims
+
+    return elims
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Chute Remote Pair — cross-chute bivalue chain
+# ══════════════════════════════════════════════════════════════════════
+
+def detect_chute_remote_pair(bb):
+    """Chute Remote Pair: two bivalue cells {X,Y} in different boxes of the
+    same band or stack, connected by the chute structure. If the pair digits
+    are confined to specific chute intersections, eliminations follow.
+
+    A 'chute' is a band-box or stack-box intersection (3 cells).
+    If {X,Y} bivalue cells appear in two different chutes of the same band/stack,
+    and digit X has a strong link between the chutes, then Y can be eliminated
+    from cells that see both bivalue cells.
+
+    Returns list of (pos, digit) eliminations."""
+
+    elims = []
+    elims_set = set()
+
+    # Collect bivalue cells grouped by band and stack
+    bv_by_band = [[] for _ in range(3)]  # band 0,1,2
+    bv_by_stack = [[] for _ in range(3)]  # stack 0,1,2
+
+    for pos in range(81):
+        if bb.board[pos] == 0 and POPCOUNT[bb.cands[pos]] == 2:
+            r, c = pos // 9, pos % 9
+            bv_by_band[r // 3].append(pos)
+            bv_by_stack[c // 3].append(pos)
+
+    # Check bands
+    for band_cells in bv_by_band:
+        for i in range(len(band_cells)):
+            a = band_cells[i]
+            ma = bb.cands[a]
+            for j in range(i + 1, len(band_cells)):
+                b = band_cells[j]
+                if bb.cands[b] != ma:
+                    continue
+                if BOX_OF[a] == BOX_OF[b]:
+                    continue
+                if PEER_81[a] & (1 << b):
+                    continue
+
+                # Same bivalue, different boxes in same band
+                digits = list(iter_bits9(ma))
+                for di in range(2):
+                    elim_d = digits[di]
+                    link_d = digits[1 - di]
+                    elim_dval = elim_d + 1
+
+                    # Check strong link on link_d in any shared column
+                    link_bit = BIT[link_d]
+                    found = False
+                    for cc in range(9):
+                        col_count = 0
+                        for rr in range(9):
+                            p = rr * 9 + cc
+                            if bb.board[p] == 0 and (bb.cands[p] & link_bit):
+                                col_count += 1
+                        if col_count == 2:
+                            # Check if one sees A and other sees B
+                            col_cells_d = []
+                            for rr in range(9):
+                                p = rr * 9 + cc
+                                if bb.board[p] == 0 and (bb.cands[p] & link_bit):
+                                    col_cells_d.append(p)
+                            if len(col_cells_d) == 2:
+                                c1, c2 = col_cells_d
+                                if ((PEER_81[a] & (1 << c1)) and (PEER_81[b] & (1 << c2))) or \
+                                   ((PEER_81[a] & (1 << c2)) and (PEER_81[b] & (1 << c1))):
+                                    found = True
+                                    break
+                    if not found:
+                        continue
+
+                    common = PEER_81[a] & PEER_81[b] & bb.cross[elim_d]
+                    for pos in iter_bits81(common):
+                        if bb.board[pos] == 0 and pos != a and pos != b:
+                            key = (pos, elim_dval)
+                            if key not in elims_set:
+                                elims_set.add(key)
+                                elims.append(key)
+
+                    if elims:
+                        return elims
+
+    # Check stacks (same logic, transposed)
+    for stack_cells in bv_by_stack:
+        for i in range(len(stack_cells)):
+            a = stack_cells[i]
+            ma = bb.cands[a]
+            for j in range(i + 1, len(stack_cells)):
+                b = stack_cells[j]
+                if bb.cands[b] != ma:
+                    continue
+                if BOX_OF[a] == BOX_OF[b]:
+                    continue
+                if PEER_81[a] & (1 << b):
+                    continue
+
+                digits = list(iter_bits9(ma))
+                for di in range(2):
+                    elim_d = digits[di]
+                    link_d = digits[1 - di]
+                    elim_dval = elim_d + 1
+                    link_bit = BIT[link_d]
+
+                    found = False
+                    for rr in range(9):
+                        row_count = 0
+                        for cc in range(9):
+                            p = rr * 9 + cc
+                            if bb.board[p] == 0 and (bb.cands[p] & link_bit):
+                                row_count += 1
+                        if row_count == 2:
+                            row_cells_d = []
+                            for cc in range(9):
+                                p = rr * 9 + cc
+                                if bb.board[p] == 0 and (bb.cands[p] & link_bit):
+                                    row_cells_d.append(p)
+                            if len(row_cells_d) == 2:
+                                c1, c2 = row_cells_d
+                                if ((PEER_81[a] & (1 << c1)) and (PEER_81[b] & (1 << c2))) or \
+                                   ((PEER_81[a] & (1 << c2)) and (PEER_81[b] & (1 << c1))):
+                                    found = True
+                                    break
+                    if not found:
+                        continue
+
+                    common = PEER_81[a] & PEER_81[b] & bb.cross[elim_d]
+                    for pos in iter_bits81(common):
+                        if bb.board[pos] == 0 and pos != a and pos != b:
+                            key = (pos, elim_dval)
+                            if key not in elims_set:
+                                elims_set.add(key)
+                                elims.append(key)
+
+                    if elims:
+                        return elims
+
+    return elims
+
+
 if __name__ == '__main__':
     main()

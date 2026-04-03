@@ -2187,5 +2187,170 @@ def lars_seeds_stats():
     }
 
 
+# ══════════════════════════════════════════════════════════════
+# SIGNATURE CATALOG — technique-tagged seed lookup
+# ══════════════════════════════════════════════════════════════
+
+_SIG_CATALOG = None  # lazy-loaded
+
+
+def _load_sig_catalog():
+    """Load signature catalog from JSON. Lazy — only on first use."""
+    global _SIG_CATALOG
+    if _SIG_CATALOG is not None:
+        return _SIG_CATALOG
+
+    import json
+    import gzip
+
+    # Try gzipped first (shipped in package), then plain JSON (dev)
+    for ext, opener in [('.json.gz', lambda p: gzip.open(p, 'rt')), ('.json', lambda p: open(p))]:
+        for base_dir in [
+            _os.path.join(_os.path.dirname(__file__)),                     # package dir
+            _os.path.join(_os.path.dirname(__file__), '..', '..', 'lars'), # dev dir
+        ]:
+            catalog_path = _os.path.join(base_dir, 'signature_catalog' + ext)
+            if _os.path.exists(catalog_path):
+                with opener(catalog_path) as f:
+                    _SIG_CATALOG = json.load(f)
+                return _SIG_CATALOG
+
+    return None
+
+
+# Signature abbreviation mapping (short → full technique name)
+SIG_ABBREV = {
+    'ALS': 'ALS_XZ', 'ALSXY': 'ALS_XYWing', 'APE': 'AlignedPairExcl',
+    'BB': 'BowmanBingo', 'D2B': 'D2B', 'DB': 'DeathBlossom',
+    'DR': 'DeepResonance', 'FC': 'ForcingChain', 'FN': 'ForcingNet',
+    'FPC': 'FPC', 'FPCE': 'FPCE', 'FPF': 'FPF',
+    'JE': 'JuniorExocet', 'KF': 'KrakenFish', 'RE': 'RectElim',
+    'SC': 'SimpleColoring', 'SDC': 'SueDeCoq', 'SF': 'Swordfish',
+    'XC': 'XCycle', 'XW': 'XWing',
+}
+SIG_ABBREV_REV = {v: k for k, v in SIG_ABBREV.items()}
+
+
+def lars_sig_forge(techniques, count=10, seed=None, exact=False, clues=None):
+    """Forge puzzles from seeds matching a technique signature.
+
+    Args:
+        techniques: set of technique names (full or abbreviated)
+        count: number of puzzles to generate
+        seed: random seed (None = time-based)
+        exact: if True, match EXACT signature; if False, match superset
+        clues: optional clue count filter (e.g., 26)
+
+    Returns: dict with success, puzzles, signature, seeds_matched, etc.
+    """
+    import random
+    import time as _time
+
+    catalog = _load_sig_catalog()
+    if catalog is None:
+        return {'success': False, 'error': 'Signature catalog not found'}
+
+    # Normalize technique names to abbreviations used in signatures
+    query_abbrevs = set()
+    for t in techniques:
+        t_upper = t.upper().strip()
+        if t_upper in SIG_ABBREV:
+            query_abbrevs.add(t_upper)
+        elif t in SIG_ABBREV_REV:
+            query_abbrevs.add(SIG_ABBREV_REV[t])
+        else:
+            # Try case-insensitive match
+            for full, abbr in SIG_ABBREV_REV.items():
+                if full.lower() == t.lower():
+                    query_abbrevs.add(abbr)
+                    break
+
+    if not query_abbrevs:
+        return {'success': False, 'error': f'No recognized techniques in query: {techniques}'}
+
+    # Find matching signatures
+    sigs = catalog.get('signatures', {})
+    matched_sigs = []
+
+    for sig_str, entries in sigs.items():
+        sig_parts = set(sig_str.split('+'))
+        if exact:
+            if sig_parts == query_abbrevs:
+                matched_sigs.append((sig_str, entries))
+        else:
+            if query_abbrevs.issubset(sig_parts):
+                matched_sigs.append((sig_str, entries))
+
+    if not matched_sigs:
+        mode = 'exact' if exact else 'superset'
+        return {
+            'success': False,
+            'error': f'No signatures match {"+".join(sorted(query_abbrevs))} ({mode})',
+            'query': '+'.join(sorted(query_abbrevs)),
+        }
+
+    # Collect all matching seeds, optionally filter by clue count
+    pool = []
+    for sig_str, entries in matched_sigs:
+        for entry in entries:
+            puzzle = entry.get('puzzle', '')
+            if clues is not None:
+                pc = sum(1 for c in puzzle if c != '0' and c != '.')
+                if pc != clues:
+                    continue
+            pool.append((puzzle, sig_str, entry.get('source', '')))
+
+    if not pool:
+        return {
+            'success': False,
+            'error': f'No seeds at {clues} clues for {"+".join(sorted(query_abbrevs))}',
+            'query': '+'.join(sorted(query_abbrevs)),
+            'matched_sigs': len(matched_sigs),
+        }
+
+    # Forge
+    if seed is None:
+        seed = int(_time.time()) % (2**31)
+    rng = random.Random(seed)
+    t0 = _time.time()
+
+    puzzles = []
+    puzzle_sigs = []
+    seen = set()
+    attempts = 0
+    while len(puzzles) < count and attempts < count * 20:
+        attempts += 1
+        base, sig_str, source = rng.choice(pool)
+        transformed = lars_full_transform(base, rng=random.Random(rng.randint(0, 2**31)))
+        if transformed not in seen:
+            seen.add(transformed)
+            puzzles.append(transformed)
+            puzzle_sigs.append(sig_str)
+
+    elapsed = (_time.time() - t0) * 1000
+
+    return {
+        'success': True,
+        'puzzles': puzzles,
+        'signatures': puzzle_sigs,
+        'query': '+'.join(sorted(query_abbrevs)),
+        'exact': exact,
+        'clues_filter': clues,
+        'matched_sigs': len(matched_sigs),
+        'pool_size': len(pool),
+        'seed': seed,
+        'count': len(puzzles),
+        'elapsed_ms': elapsed,
+    }
+
+
+def lars_sig_catalog_stats():
+    """Return catalog statistics."""
+    catalog = _load_sig_catalog()
+    if catalog is None:
+        return {'error': 'Signature catalog not found'}
+    return catalog.get('meta', {})
+
+
 if __name__ == '__main__':
     main()

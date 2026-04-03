@@ -37,6 +37,11 @@ from .engine import (
     detect_fpc_bitwise, detect_fpce_bitwise,
     detect_forcing_chain_bitwise, detect_forcing_net, detect_forcing_net_v2,
     detect_rectangle_elimination, detect_xy_chain, detect_dpi,
+    detect_wxyz_wing, detect_xyz_wing, detect_3d_medusa,
+    detect_hidden_unique_rectangle, detect_grouped_x_cycle,
+    detect_tridagon,
+    detect_w_wing, detect_fireworks, detect_almost_locked_pair,
+    detect_chute_remote_pair,
     detect_d2b_bitwise, detect_fpf_bitwise,
     detect_xwing, detect_swordfish, detect_simple_coloring,
     detect_bug_plus1, detect_ur_type2, detect_ur_type4,
@@ -64,6 +69,9 @@ TECHNIQUE_LEVELS = {
     'DeathBlossom': 5,
     'FPC': 5, 'FPCE': 5,
     'ForcingChain': 5, 'ForcingNet': 5, 'XYChain': 5, 'RectElim': 5, 'FNv2': 7,
+    'XYZWing': 4, 'WXYZWing': 5, '3DMedusa': 5, 'HiddenUR': 5, 'GroupedXCycle': 4,
+    'Tridagon': 6, 'WWing': 4, 'Fireworks': 5, 'AlmostLockedPair': 4,
+    'ChuteRemotePair': 4,
     'BUG+1': 6, 'URType2': 6, 'URType4': 6,
     'JuniorExocet': 6, 'JETest': 6, 'Template': 6, 'BowmanBingo': 6,
     'KrakenFish': 6, 'SKLoop': 6,
@@ -76,6 +84,16 @@ TECHNIQUE_ALIASES = {
     'fpc': 'FPC', 'fpce': 'FPCE', 'fc': 'ForcingChain', 'fn': 'ForcingNet', 'fnv2': 'FNv2',
     'xychain': 'XYChain', 'xy': 'XYChain', 'rectelim': 'RectElim', 're': 'RectElim',
     'dpi': 'DPI', 'deeppath': 'DPI', 'pathincompat': 'DPI',
+    'xyzwing': 'XYZWing', 'xyz': 'XYZWing',
+    'wxyzwing': 'WXYZWing', 'wxyz': 'WXYZWing',
+    '3dmedusa': '3DMedusa', 'medusa': '3DMedusa', '3dm': '3DMedusa',
+    'hiddenur': 'HiddenUR', 'hur': 'HiddenUR',
+    'groupedxcycle': 'GroupedXCycle', 'gxc': 'GroupedXCycle',
+    'tridagon': 'Tridagon', 'thor': 'Tridagon', 'thorshammer': 'Tridagon',
+    'wwing': 'WWing', 'ww': 'WWing', 'remotepair': 'WWing',
+    'fireworks': 'Fireworks', 'fw': 'Fireworks',
+    'alp': 'AlmostLockedPair', 'almostlockedpair': 'AlmostLockedPair',
+    'chutepair': 'ChuteRemotePair', 'crp': 'ChuteRemotePair', 'chuteremotepair': 'ChuteRemotePair',
     'd2b': 'D2B', 'fpf': 'FPF', 'gf2': 'GF2_Lanczos',
     'gf2x': 'GF2_Extended', 'gf2p': 'GF2_Probe',
     'xwing': 'XWing', 'swordfish': 'Swordfish', 'coloring': 'SimpleColoring',
@@ -1354,6 +1372,107 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                                 print(f"  #{step_num:3d}  {entry['cell']}={rval}  [RULE ORACLE]")
                 continue
 
+        # ── Last-resort: new techniques (fire only when ALL existing stall) ──
+
+        last_resort_hit = False
+
+        if not last_resort_hit and allowed('GroupedXCycle'):
+            gxc_place, gxc_elim = detect_grouped_x_cycle(bb)
+            if gxc_place:
+                pos, digit, tech = gxc_place[0]
+                if bb.board[pos] == 0:
+                    cands_before = _cands_list(bb, pos) if detail else None
+                    bb.place(pos, digit)
+                    step_num += 1
+                    entry = {'step': step_num, 'pos': pos, 'digit': digit,
+                             'technique': 'GroupedXCycle', 'cell': _cell_name(pos),
+                             'round': round_num}
+                    if detail:
+                        entry['cands_before'] = cands_before
+                    steps.append(entry)
+                    technique_counts['GroupedXCycle'] = technique_counts.get('GroupedXCycle', 0) + 1
+                    last_resort_hit = True
+            if not last_resort_hit and gxc_elim:
+                for pos, d in gxc_elim:
+                    bb.eliminate(pos, d)
+                technique_counts['GroupedXCycle'] = technique_counts.get('GroupedXCycle', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('XYZWing'):
+            xyz_elims = detect_xyz_wing(bb)
+            if xyz_elims:
+                for pos, d in xyz_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['XYZWing'] = technique_counts.get('XYZWing', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('3DMedusa'):
+            med_elims = detect_3d_medusa(bb)
+            if med_elims:
+                for pos, d in med_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['3DMedusa'] = technique_counts.get('3DMedusa', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('WXYZWing'):
+            wxyz_elims = detect_wxyz_wing(bb)
+            if wxyz_elims:
+                for pos, d in wxyz_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['WXYZWing'] = technique_counts.get('WXYZWing', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('HiddenUR'):
+            hur_elims = detect_hidden_unique_rectangle(bb)
+            if hur_elims:
+                for pos, d in hur_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['HiddenUR'] = technique_counts.get('HiddenUR', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('Tridagon'):
+            tri_elims = detect_tridagon(bb)
+            if tri_elims:
+                for pos, d in tri_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['Tridagon'] = technique_counts.get('Tridagon', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('WWing'):
+            ww_elims = detect_w_wing(bb)
+            if ww_elims:
+                for pos, d in ww_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['WWing'] = technique_counts.get('WWing', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('Fireworks'):
+            fw_elims = detect_fireworks(bb)
+            if fw_elims:
+                for pos, d in fw_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['Fireworks'] = technique_counts.get('Fireworks', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('AlmostLockedPair'):
+            alp_elims = detect_almost_locked_pair(bb)
+            if alp_elims:
+                for pos, d in alp_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['AlmostLockedPair'] = technique_counts.get('AlmostLockedPair', 0) + 1
+                last_resort_hit = True
+
+        if not last_resort_hit and allowed('ChuteRemotePair'):
+            crp_elims = detect_chute_remote_pair(bb)
+            if crp_elims:
+                for pos, d in crp_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['ChuteRemotePair'] = technique_counts.get('ChuteRemotePair', 0) + 1
+                last_resort_hit = True
+
+        if last_resort_hit:
+            continue
+
         stalled = True
         break
 
@@ -2129,6 +2248,310 @@ def query_cell(bd81, row, col, max_level=99, only_techniques=None, autotrust=Fal
                        f'but NOT reachable with selected techniques. '
                        f'Stalled at step {result["n_steps"]} with {result.get("empty_remaining", 0)} cells remaining.'),
         }
+
+
+# ══════════════════════════════════════════════════════════════
+# BATCH / FAST SOLVE
+# ══════════════════════════════════════════════════════════════
+
+def solve_batch(puzzles, max_level=99, only_techniques=None, exclude_techniques=None,
+                **kwargs):
+    """Solve multiple puzzles efficiently. Returns list of result dicts.
+
+    Reuses solve_selective but avoids repeated Python setup overhead.
+    For forge confirmation, use solve_fast() instead."""
+    return [solve_selective(p, max_level=max_level, only_techniques=only_techniques,
+                            exclude_techniques=exclude_techniques, **kwargs)
+            for p in puzzles]
+
+
+def solve_fast(bd81, sigboost=None):
+    """Fast solve for forge confirmation — minimal overhead, no detail tracking.
+
+    Args:
+        bd81: 81-char puzzle string
+        sigboost: optional set of technique names from known signature.
+                  When provided, ONLY runs techniques in this set + L1/L2.
+                  Skips expensive detectors (DR=178ms, FC=99ms) when not needed.
+                  Safe because technique signatures are invariant under symmetry.
+
+    Returns dict with 'success', 'technique_counts', 'empty_remaining'."""
+
+    bb = BitBoard.from_string(bd81)
+
+    technique_counts = {}
+
+    # Sigboost: only run techniques the signature says we need
+    def need(tech):
+        if sigboost is None:
+            return True
+        return tech in sigboost
+
+    # ── Phase 1: L1+L2 drain (handles ~80% of easy puzzles completely) ──
+    while True:
+        hits = propagate_l1l2(bb)
+        if not hits:
+            break
+        for pos, digit, tech in hits:
+            technique_counts[tech] = technique_counts.get(tech, 0) + 1
+
+    if bb.empty == 0:
+        return {'success': True, 'technique_counts': technique_counts,
+                'empty_remaining': 0}
+
+    # ── Phase 2: L3-L5 techniques (fast, handles ~15% more) ──
+    max_rounds = 200
+    for _ in range(max_rounds):
+        if bb.empty == 0:
+            break
+
+        # L1+L2 drain
+        hits = propagate_l1l2(bb)
+        if hits:
+            for pos, digit, tech in hits:
+                technique_counts[tech] = technique_counts.get(tech, 0) + 1
+            continue
+
+        if bb.empty == 0:
+            break
+
+        # XWing (<0.2ms)
+        if need('XWing') and detect_xwing(bb):
+            technique_counts['XWing'] = technique_counts.get('XWing', 0) + 1
+            continue
+
+        # Swordfish (<0.2ms)
+        if need('Swordfish') and detect_swordfish(bb):
+            technique_counts['Swordfish'] = technique_counts.get('Swordfish', 0) + 1
+            continue
+
+        # Simple Coloring (<0.2ms)
+        if need('SimpleColoring'):
+            sc_elims, _ = detect_simple_coloring(bb)
+            if sc_elims:
+                for pos, d in sc_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['SimpleColoring'] = technique_counts.get('SimpleColoring', 0) + 1
+                continue
+
+        # X-Cycle (<1ms)
+        if need('XCycle'):
+            xc_place, xc_elim = detect_x_cycle_bitwise(bb)
+            if xc_place:
+                pos, digit, tech = xc_place[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, digit)
+                technique_counts['XCycle'] = technique_counts.get('XCycle', 0) + 1
+                continue
+            if xc_elim:
+                for pos, d in xc_elim:
+                    bb.eliminate(pos, d)
+                technique_counts['XCycle'] = technique_counts.get('XCycle', 0) + 1
+                continue
+
+        # ALS-XZ (<0.2ms)
+        if need('ALS_XZ'):
+            als_elims = detect_als_xz_bitwise(bb)
+            if als_elims:
+                for pos, d in als_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['ALS_XZ'] = technique_counts.get('ALS_XZ', 0) + 1
+                continue
+
+        # Sue De Coq
+        if need('SueDeCoq'):
+            sdc_elims = detect_sue_de_coq_bitwise(bb)
+            if sdc_elims:
+                for pos, d in sdc_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['SueDeCoq'] = technique_counts.get('SueDeCoq', 0) + 1
+                continue
+
+        # APE
+        if need('AlignedPairExcl'):
+            ape_elims = detect_aligned_pair_exclusion_bitwise(bb)
+            if ape_elims:
+                for pos, d in ape_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['AlignedPairExcl'] = technique_counts.get('AlignedPairExcl', 0) + 1
+                continue
+
+        # ALS-XY Wing
+        if need('ALS_XYWing'):
+            alsxy_elims = detect_als_xy_wing_bitwise(bb)
+            if alsxy_elims:
+                for pos, d in alsxy_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['ALS_XYWing'] = technique_counts.get('ALS_XYWing', 0) + 1
+                continue
+
+        # Death Blossom
+        if need('DeathBlossom'):
+            db_elims = detect_death_blossom_bitwise(bb)
+            if db_elims:
+                for pos, d in db_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['DeathBlossom'] = technique_counts.get('DeathBlossom', 0) + 1
+                continue
+
+        # Kraken Fish (<0.3ms)
+        if need('KrakenFish'):
+            kf_elims = detect_kraken_fish_bitwise(bb)
+            if kf_elims:
+                kf_elims = validate_eliminations(bb, kf_elims)
+                if kf_elims:
+                    for pos, d in kf_elims:
+                        bb.eliminate(pos, d)
+                    technique_counts['KrakenFish'] = technique_counts.get('KrakenFish', 0) + 1
+                    continue
+
+        # FPC (~2ms)
+        if need('FPC'):
+            fpc_hits = detect_fpc_bitwise(bb)
+            if fpc_hits:
+                pos, val, _ = fpc_hits[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['FPC'] = technique_counts.get('FPC', 0) + 1
+                continue
+
+        # FPCE (~6ms)
+        if need('FPCE'):
+            fpce_p, fpce_e = detect_fpce_bitwise(bb)
+            if fpce_e:
+                for pos, d in fpce_e:
+                    bb.eliminate(pos, d)
+            if fpce_p:
+                pos, val, _ = fpce_p[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['FPCE'] = technique_counts.get('FPCE', 0) + 1
+                continue
+            if fpce_e:
+                technique_counts['FPCE'] = technique_counts.get('FPCE', 0) + 1
+                continue
+
+        # ForcingChain (~99ms — sigboost skips this when not needed!)
+        if need('ForcingChain'):
+            fc_hits = detect_forcing_chain_bitwise(bb)
+            if fc_hits:
+                pos, val, _ = fc_hits[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['ForcingChain'] = technique_counts.get('ForcingChain', 0) + 1
+                continue
+
+        # ForcingNet (~2.5ms)
+        if need('ForcingNet'):
+            fn_p, fn_e = detect_forcing_net(bb)
+            if fn_p:
+                pos, val, _ = fn_p[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                continue
+            if fn_e:
+                for pos, d in fn_e:
+                    bb.eliminate(pos, d)
+                technique_counts['ForcingNet'] = technique_counts.get('ForcingNet', 0) + 1
+                continue
+
+        # ── Phase 3: L6-L7 heavy hitters ──
+        if need('BUG+1'):
+            bug_hits = detect_bug_plus1(bb)
+            if bug_hits:
+                pos, val, _ = bug_hits[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['BUG+1'] = technique_counts.get('BUG+1', 0) + 1
+                continue
+
+        if need('URType2'):
+            ur2_elims, _ = detect_ur_type2(bb)
+            if ur2_elims:
+                for pos, d in ur2_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['URType2'] = technique_counts.get('URType2', 0) + 1
+                continue
+
+        if need('URType4'):
+            ur4_elims, _ = detect_ur_type4(bb)
+            if ur4_elims:
+                for pos, d in ur4_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
+                continue
+
+        if need('JuniorExocet'):
+            je_elims, _ = detect_junior_exocet_stuart(bb)
+            if je_elims:
+                for pos, d in je_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['JuniorExocet'] = technique_counts.get('JuniorExocet', 0) + 1
+                continue
+
+        if need('Template'):
+            tmpl_p, tmpl_e = detect_template(bb)
+            if tmpl_e:
+                for pos, d in tmpl_e:
+                    bb.eliminate(pos, d)
+            if tmpl_p:
+                pos, val, _ = tmpl_p[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['Template'] = technique_counts.get('Template', 0) + 1
+                continue
+            if tmpl_e:
+                technique_counts['Template'] = technique_counts.get('Template', 0) + 1
+                continue
+
+        # D2B
+        if need('D2B'):
+            d2b_hits = detect_d2b_bitwise(bb)
+            if d2b_hits:
+                pos, val, _ = d2b_hits[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['D2B'] = technique_counts.get('D2B', 0) + 1
+                continue
+
+        # SK Loop
+        if need('SKLoop'):
+            skl_elims = detect_sk_loop_bitwise(bb)
+            if skl_elims:
+                for pos, d in skl_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['SKLoop'] = technique_counts.get('SKLoop', 0) + 1
+                continue
+
+        # DeepResonance (~178ms — sigboost skips this when not needed!)
+        if need('DeepResonance'):
+            dr_elims = detect_deep_resonance(bb)
+            if dr_elims:
+                for pos, d in dr_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['DeepResonance'] = technique_counts.get('DeepResonance', 0) + 1
+                continue
+
+        # FPF
+        if need('FPF'):
+            fpf_hits = detect_fpf_bitwise(bb)
+            if fpf_hits:
+                pos, val, _ = fpf_hits[0]
+                if bb.board[pos] == 0:
+                    bb.place(pos, val)
+                technique_counts['FPF'] = technique_counts.get('FPF', 0) + 1
+                continue
+
+        # Stalled
+        break
+
+    solved = bb.empty == 0 and validate_sudoku(bb.board)
+    return {
+        'success': solved,
+        'technique_counts': technique_counts,
+        'empty_remaining': bb.empty,
+    }
 
 
 # ══════════════════════════════════════════════════════════════
@@ -3544,6 +3967,11 @@ presets:
                        help='List all available technique tags')
     parser.add_argument('--lforge-search', type=str, metavar='TECH',
                        help='Find all technique profiles containing a specific technique')
+    parser.add_argument('--lforge', type=str, metavar='TECHS',
+                       help='Forge puzzles requiring specific techniques (comma-separated). '
+                            'E.g.: --lforge als,kraken,d2b')
+    parser.add_argument('--lforge-exact', action='store_true',
+                       help='Match EXACT technique signature (default: superset/at-least)')
 
     # ── Lars Seeds: DeepRes/D2B forge + provenance ──
     parser.add_argument('--lforge-deepres', type=int, nargs='?', const=10, metavar='N',
@@ -3556,6 +3984,8 @@ presets:
                        help='Show Lars Seeds registry statistics')
     parser.add_argument('--lforge-no-confirm', action='store_true',
                        help='Skip solving forged puzzles to confirm techniques (faster, no verification)')
+    parser.add_argument('--sigboost', action='store_true',
+                       help='Use signature-aware fast solver for forge confirmation (skips unneeded techniques, ~2-3x faster)')
     parser.add_argument('--lforge-seed', type=int, default=None, metavar='N',
                        help='Random seed for lforge generation (for reproducible output)')
     parser.add_argument('--lforge-batch', type=str, default=None, metavar='BATCH',
@@ -5073,6 +5503,91 @@ presets:
         print()
         return
 
+    # ── LForge by Signature (technique catalog) ──
+    if getattr(args, 'lforge', None) is not None:
+        from .lars_forge import lars_sig_forge, SIG_ABBREV
+
+        techs_str = args.lforge
+        techs = set(t.strip() for t in techs_str.split(',') if t.strip())
+        # Resolve aliases
+        resolved = set()
+        for t in techs:
+            t_lower = t.lower()
+            if t_lower in TECHNIQUE_ALIASES:
+                full = TECHNIQUE_ALIASES[t_lower]
+                resolved.add(full)
+            elif t.upper() in SIG_ABBREV:
+                resolved.add(t.upper())
+            else:
+                resolved.add(t)
+
+        n = getattr(args, 'lforge_count', 10) or 10
+        exact = getattr(args, 'lforge_exact', False)
+        clue_filter = getattr(args, 'lforge_clues', None)
+        no_confirm = getattr(args, 'lforge_no_confirm', False)
+        lforge_seed = getattr(args, 'lforge_seed', None)
+        if lforge_seed is None:
+            import time as _t
+            lforge_seed = int(_t.time()) % (2**31)
+
+        result = lars_sig_forge(resolved, count=n * 3, seed=lforge_seed,
+                                exact=exact, clues=clue_filter)
+
+        if not result.get('success'):
+            print(f'\n  LForge Signature Query')
+            print(f'  {"=" * 55}')
+            print(f'  Error: {result.get("error", "unknown")}')
+            print()
+            return
+
+        mode = 'exact' if exact else 'superset'
+        clue_note = f', {clue_filter} clues' if clue_filter else ''
+        print(f'\n  LForge — Signature Forge ({mode})')
+        print(f'  {"=" * 55}')
+        print(f'  Query: {result["query"]} ({mode}{clue_note})')
+        print(f'  Matched: {result["matched_sigs"]} signatures, {result["pool_size"]} seeds (seed={lforge_seed})')
+
+        if no_confirm:
+            puzzles_out = result['puzzles'][:n]
+            sigs_out = result.get('signatures', [])[:n]
+            print(f'  Generated: {len(puzzles_out)} puzzles (no-confirm)')
+            print()
+            for i, p in enumerate(puzzles_out):
+                sig_tag = sigs_out[i] if i < len(sigs_out) else ''
+                print(f'  {p}  [{sig_tag}]')
+            print(f'\n  # {len(puzzles_out)} puzzles ({mode}, --lforge-no-confirm)')
+        else:
+            import time as _time
+            use_sigboost = getattr(args, 'sigboost', False)
+
+            t0 = _time.time()
+            confirmed = []
+            skipped = 0
+            for i, p in enumerate(result['puzzles']):
+                if len(confirmed) >= n:
+                    break
+                try:
+                    r = solve_selective(p)
+                    if not (r.get('success') or r.get('empty_remaining', 99) == 0):
+                        skipped += 1
+                        continue
+                    counts = r.get('technique_counts', {})
+                    advanced = sorted(t for t in counts if TECHNIQUE_LEVELS.get(t, 1) >= 3)
+                    sig_tag = result['signatures'][i] if i < len(result.get('signatures', [])) else ''
+                    confirmed.append((p, advanced, sig_tag))
+                except Exception:
+                    skipped += 1
+
+            elapsed_ms = (_time.time() - t0) * 1000
+            skip_note = f', {skipped} skipped' if skipped else ''
+            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_ms:.0f}ms{skip_note}')
+            print()
+            for p, techs_list, sig_tag in confirmed:
+                print(f'  {p}  [{", ".join(techs_list)}]')
+            print(f'\n  # {len(confirmed)} puzzles (confirmed, {mode})')
+        print()
+        return
+
     # ── LForge DeepRes / D2B shared handler ──
     _lforge_tech = None
     _lforge_n = None
@@ -5181,6 +5696,17 @@ presets:
             if elite:
                 expert_filter = EXPERT_APPROVED | {'FNv2', 'XYChain', 'RectElim'}
 
+            use_sigboost = getattr(args, 'sigboost', False)
+
+            # Build sigboost set from seed's known technique profile
+            _sigboost_set = None
+            if use_sigboost:
+                # Solve one seed to get the signature, then reuse for all variants
+                _seed_r = solve_fast(result['puzzles'][0])
+                _seed_tc = _seed_r.get('technique_counts', {})
+                _l1_techs = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
+                _sigboost_set = set(t for t in _seed_tc if t not in _l1_techs)
+
             t0 = _time.time()
             confirmed = []
             skipped = 0
@@ -5189,9 +5715,12 @@ presets:
                 if len(confirmed) >= n:
                     break
                 try:
-                    # First: solve with full solver to confirm and get techniques
-                    r = solve_selective(p)
-                    if not r.get('success'):
+                    # Solve with sigboost or full solver
+                    if use_sigboost and _sigboost_set:
+                        r = solve_fast(p, sigboost=_sigboost_set)
+                    else:
+                        r = solve_selective(p)
+                    if not (r.get('success') or r.get('empty_remaining', 99) == 0):
                         skipped += 1
                         continue
 
@@ -5216,7 +5745,8 @@ presets:
             if elite and elite_filtered:
                 skip_note += f', {elite_filtered} too easy'
 
-            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_confirm:.0f}ms{skip_note}')
+            boost_tag = ' ⚡sigboost' if use_sigboost else ''
+            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed_confirm:.0f}ms{skip_note}{boost_tag}')
             print()
             for p, techs in confirmed:
                 print(f'  {p}  [{", ".join(techs)}]')
@@ -6805,16 +7335,57 @@ presets:
                 from rich.panel import Panel
                 from rich.text import Text
                 _rc = Console()
-                _rc.print(Panel("[bold magenta]DETAILED SOLVE LOG[/]", width=60))
+                _rc.print(Panel(f"[bold magenta]DETAILED SOLVE LOG ({result.get('rounds', '?')} rounds)[/]", width=60))
+
+                # Build elimination events by round for display
+                _elim_by_round = {}
+                for ev in result.get('elim_events', []):
+                    rnd = ev.get('round', 0)
+                    _elim_by_round.setdefault(rnd, []).append(ev)
+
                 current_round = 0
                 for step in result.get('steps', []):
                     if step.get('round', 0) != current_round:
                         current_round = step['round']
                         _rc.print()
                         _rc.print(Panel(f"[bold]ROUND {current_round}[/]", style="magenta", width=50))
+
+                        # Show elimination events for this round
+                        if current_round in _elim_by_round:
+                            for ev in _elim_by_round[current_round]:
+                                etech = ev.get('technique', '?')
+                                elims = ev.get('eliminations', [])
+                                wsrf_tag = ' [red]*[/]' if etech in WSRF_INVENTIONS else ''
+                                et = Text()
+                                et.append(f"  {etech}", style="bold yellow")
+                                et.append(f" {len(elims)} elimination{'s' if len(elims) != 1 else ''}", style="dim")
+                                et.append("\n")
+                                # Show eliminated candidates grouped by cell
+                                by_cell = {}
+                                for pos, d in elims:
+                                    r, c = pos // 9, pos % 9
+                                    cn = f'R{r+1}C{c+1}'
+                                    by_cell.setdefault(cn, []).append(str(d))
+                                shown = 0
+                                for cn, ds in sorted(by_cell.items()):
+                                    if shown < 6:
+                                        et.append(f"    {cn}: {','.join(ds)}", style="dim red")
+                                        et.append("\n")
+                                        shown += 1
+                                if len(by_cell) > 6:
+                                    et.append(f"    ...+{len(by_cell)-6} more cells", style="dim")
+                                    et.append("\n")
+                                detail_str = ev.get('detail', '')
+                                if detail_str:
+                                    et.append(f"    {detail_str}", style="dim white")
+                                    et.append("\n")
+                                _rc.print(Panel(et, border_style="yellow", width=60, padding=(0, 1)))
+                            del _elim_by_round[current_round]
+
                     tech = step.get('technique', '?')
                     cell = step.get('cell', '?')
                     digit = step.get('digit', 0)
+                    wsrf = tech in WSRF_INVENTIONS
                     # Color by technique
                     if tech in ('crossHatch','lastRemaining','fullHouse','nakedSingle'):
                         border, ts = 'cyan', 'bold cyan'
@@ -6830,11 +7401,24 @@ presets:
                         border, ts = 'blue', 'bold blue'
                     t = Text()
                     t.append(f"  {tech}", style=ts)
+                    if wsrf:
+                        t.append(" *", style="bold red")
                     t.append(f"  {cell}", style="white")
                     if digit:
                         t.append(f" = ", style="dim")
                         t.append(f"{digit}", style="bold white on blue")
                     t.append("\n")
+                    # Candidate notes
+                    cands = step.get('cands_before', [])
+                    if cands:
+                        t.append(f"    Notes: {' '.join(str(c) for c in cands)}", style="dim")
+                        t.append(f" -> placed {digit}", style="bold white")
+                        t.append("\n")
+                    # Explanation
+                    explanation = step.get('explanation', '')
+                    if explanation:
+                        t.append(f"    {explanation}", style="dim white")
+                        t.append("\n")
                     _rc.print(Panel(t, border_style=border, width=60, padding=(0, 1)))
             except ImportError:
                 print("Install 'rich' for rich output: pip install rich")
