@@ -8,7 +8,7 @@
    
   *"Solved the whole damn game like it's just another Tuesday"*    
   
-
+800900005007080010020006400005000030070004600900800002002070000100200000030001000
 **Documentation: [larsdoku-docs.netlify.app](https://larsdoku-docs.netlify.app/)**
 
 **Web App (WIP): [larsdoku.netlify.app](https://larsdoku.netlify.app/)** — click Expert mode tab to open the Top-N Solver
@@ -32,7 +32,7 @@ We are building toward forging all puzzles from an **18-clue minimum base** — 
 
 ```bash
 # 6ms uniqueness oracle — no backtracker needed
-larsdoku --lars-certify "000000010400000000020000000000050407008000300001090000300400200050100000000806000"
+larsdoku --lars-800900005007080010020006400005000030070004600900800002002070000100200000030001000certify "000000010400000000020000000000050407008000300001090000300400200050100000000806000"
 # >>> UNIQUE <<<  Royle-certified
 
 # Match ANY mask to a seed in 7ms (Final Boss Mode)
@@ -46,7 +46,7 @@ larsdoku --lforge-attempt kraken --lforge-clues 23 --lforge-count 5
 
 # See all available technique tags
 larsdoku --lforge-stats
-```
+```800900005007080010020006400005000030070004600900800002002070000100200000030001000
 
 | Feature | What it does |
 |---------|-------------|
@@ -67,7 +67,7 @@ The **Lars Seeds Registry** contains 384,505 seeds for the hardest Sudoku techni
 $ larsdoku --lforge-deepres 3
 
   LForge — DeepRes Puzzle Forge
-  =======================================================
+  =============800900005007080010020006400005000030070004600900800002002070000100200000030001000==========================================
   Lars Seeds: 209,762 DeepRes seeds
   Confirmed: 3/3 in 722ms
 
@@ -80,7 +80,7 @@ $ larsdoku --lforge-deepres 3
 
 ### Forge D2B Puzzles (confirmed by solver)
 ```
-$ larsdoku --lforge-d2b 3
+$ larsdoku --lfo800900005007080010020006400005000030070004600900800002002070000100200000030001000rge-d2b 3
 
   LForge — D2B Puzzle Forge
   =======================================================
@@ -150,7 +150,7 @@ $ larsdoku --lars-certify "00000001040000000002000000000005040700800030000109000
 
 ```
 # Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
-pip install larsdoku==3.1.4
+pip install larsdoku==3.1.6
 larsdoku --warmup 
 ```
 
