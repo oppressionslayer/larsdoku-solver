@@ -5596,9 +5596,8 @@ presets:
         n = getattr(args, 'lforge_count', 10) or 10
         no_confirm = getattr(args, 'lforge_no_confirm', False)
 
-        # Load hardest bases
-        _base_dir = _os.path.join(_os.path.dirname(__file__), '..', '..', 'lars')
-        _hard_path = _os.path.join(_base_dir, 'hardest_base_seeds.json')
+        # Load hardest bases from package dir
+        _hard_path = _os.path.join(_os.path.dirname(__file__), 'hardest_base_seeds.json')
         if not _os.path.exists(_hard_path):
             print(f'\n  Hardest base seeds file not found')
             print()
