@@ -3967,6 +3967,18 @@ presets:
                        help='List all available technique tags')
     parser.add_argument('--lforge-search', type=str, metavar='TECH',
                        help='Find all technique profiles containing a specific technique')
+    parser.add_argument('--lforge-promote-hard', type=int, metavar='CLUES',
+                       help='Promote from hardest 20-21 clue diabolical bases to target clue count. '
+                            'These bases need ALSXY+ALS+D2B+DR+FPCE — the toughest seeds in the catalog.')
+    parser.add_argument('--lforge-base-clues', type=int, default=None, metavar='N',
+                       help='Filter promote-hard bases by clue count (20 or 21)')
+    parser.add_argument('--lforge-fnfc', type=int, nargs='?', const=10, metavar='N',
+                       help='Forge N puzzles from FN/FC expert-level seed collection (default 10). '
+                            'Use --lforge-clues and --lforge-fn/--lforge-fc to filter.')
+    parser.add_argument('--lforge-fn', type=int, default=None, metavar='N',
+                       help='Filter FN/FC forge by minimum ForcingNet count (e.g. --lforge-fn 10)')
+    parser.add_argument('--lforge-fc', type=int, default=None, metavar='N',
+                       help='Filter FN/FC forge by minimum ForcingChain count (e.g. --lforge-fc 5)')
     parser.add_argument('--lforge', type=str, metavar='TECHS',
                        help='Forge puzzles requiring specific techniques (comma-separated). '
                             'E.g.: --lforge als,kraken,d2b')
@@ -5405,6 +5417,43 @@ presets:
         print(f'\n  Techniques:')
         for tech, count in stats['tech_freq'].items():
             print(f'    {tech:25s} {count:4d} seeds')
+
+        # Signature catalog stats
+        from .lars_forge import _load_sig_catalog
+        catalog = _load_sig_catalog()
+        if catalog:
+            cmeta = catalog.get('meta', {})
+            csigs = catalog.get('signatures', {})
+            ctotal = cmeta.get('total_seeds', sum(len(v) for v in csigs.values()))
+
+            # Clue distribution from catalog
+            cat_clues = {}
+            cat_techs = {}
+            for sig, entries in csigs.items():
+                for e in entries:
+                    p = e.get('puzzle', '')
+                    cc = sum(1 for c in p if c != '0' and c != '.')
+                    cat_clues[cc] = cat_clues.get(cc, 0) + 1
+                for t in sig.split('+'):
+                    cat_techs[t] = cat_techs.get(t, 0) + len(entries)
+
+            print(f'\n  {"═" * 55}')
+            print(f'  Signature Catalog (full database)')
+            print(f'  {"═" * 55}')
+            print(f'  Signatures: {cmeta.get("total_signatures", len(csigs)):,}')
+            print(f'  Seeds: {ctotal:,}')
+            print(f'  Puzzles: 1.1 quintillion (via symmetry forge)')
+
+            print(f'\n  By clue count:')
+            for cc in sorted(cat_clues.keys()):
+                count = cat_clues[cc]
+                bar = '#' * max(1, count // 2000)
+                print(f'    {cc} clues: {count:6,d} {bar}')
+
+            print(f'\n  Techniques:')
+            for tech, count in sorted(cat_techs.items(), key=lambda x: -x[1]):
+                print(f'    {tech:15s} {count:7,d} seeds')
+
         print()
         return
 
@@ -5496,10 +5545,264 @@ presets:
         print(f'  Unique masks:  {stats["unique_masks"]:,}')
         dr_puzzles = stats['deepres_count'] * 362880 * 3359232
         d2b_puzzles = stats['d2b_count'] * 362880 * 3359232
+        total_puzzles = dr_puzzles + d2b_puzzles
+
+        def _word_number(n):
+            """Convert large number to word form."""
+            if n >= 1e18:
+                return f'{n/1e18:.1f} quintillion'
+            elif n >= 1e15:
+                return f'{n/1e15:.1f} quadrillion'
+            elif n >= 1e12:
+                return f'{n/1e12:.1f} trillion'
+            elif n >= 1e9:
+                return f'{n/1e9:.1f} billion'
+            elif n >= 1e6:
+                return f'{n/1e6:.1f} million'
+            else:
+                return f'{n:,.0f}'
+
         print(f'\n  Forgeable puzzles:')
-        print(f'    DeepRes: {dr_puzzles:.2e}')
-        print(f'    D2B:     {d2b_puzzles:.2e}')
-        print(f'    Total:   {(dr_puzzles + d2b_puzzles):.2e}')
+        print(f'    DeepRes: {dr_puzzles:.2e}  ({_word_number(dr_puzzles)})')
+        print(f'    D2B:     {d2b_puzzles:.2e}  ({_word_number(d2b_puzzles)})')
+        print(f'    Total:   {total_puzzles:.2e}  ({_word_number(total_puzzles)})')
+
+        # Signature catalog totals
+        from .lars_forge import _load_sig_catalog
+        catalog = _load_sig_catalog()
+        if catalog:
+            cmeta = catalog.get('meta', {})
+            cat_seeds = cmeta.get('total_seeds', 0)
+            cat_sigs = cmeta.get('total_signatures', 0)
+            cat_puzzles = cat_seeds * 362880 * 3359232
+            print(f'\n  Signature Catalog:')
+            print(f'    Signatures: {cat_sigs:,}')
+            print(f'    Seeds:      {cat_seeds:,}')
+            print(f'    Puzzles:    {cat_puzzles:.2e}  ({_word_number(cat_puzzles)})')
+
+        print()
+        return
+
+    # ── LForge Promote Hard (diabolical bases) ──
+    if getattr(args, 'lforge_promote_hard', None) is not None:
+        import json as _json
+        import time as _time
+        import random as _rand
+        import os as _os
+        from .lars_forge import lars_full_transform, lars_promote_batch
+        from .engine import solve_backtrack
+
+        target = args.lforge_promote_hard
+        n = getattr(args, 'lforge_count', 10) or 10
+        no_confirm = getattr(args, 'lforge_no_confirm', False)
+
+        # Load hardest bases
+        _base_dir = _os.path.join(_os.path.dirname(__file__), '..', '..', 'lars')
+        _hard_path = _os.path.join(_base_dir, 'hardest_base_seeds.json')
+        if not _os.path.exists(_hard_path):
+            print(f'\n  Hardest base seeds file not found')
+            print()
+            return
+
+        with open(_hard_path) as f:
+            hard_data = _json.load(f)
+
+        base_clue_filter = getattr(args, 'lforge_base_clues', None)
+        if base_clue_filter == 20:
+            pool = hard_data.get('seeds_20', [])
+        elif base_clue_filter == 21:
+            pool = hard_data.get('seeds_21', [])
+        else:
+            pool = hard_data.get('seeds_20', []) + hard_data.get('seeds_21', [])
+        if not pool:
+            print(f'\n  No hardest base seeds available at {base_clue_filter} clues')
+            print()
+            return
+
+        lforge_seed = getattr(args, 'lforge_seed', None)
+        if lforge_seed is None:
+            lforge_seed = int(_time.time()) % (2**31)
+        rng = _rand.Random(lforge_seed)
+
+        print(f'\n  LForge — Promote Hard (Diabolical Bases)')
+        print(f'  {"=" * 55}')
+        print(f'  Pool: {len(pool)} hardest seeds (20-21 clues) (seed={lforge_seed})')
+        print(f'  Techniques: ALSXY+ALS+D2B+DR+FPCE (and more)')
+
+        t0 = _time.time()
+        puzzles_out = []
+
+        while len(puzzles_out) < n:
+            entry = rng.choice(pool)
+            base = entry['puzzle']
+            sig = entry.get('sig', '')
+            base_clues = sum(1 for c in base if c != '0')
+
+            # Shuffle the base for diversity
+            shuffled = lars_full_transform(base, rng=_rand.Random(rng.randint(0, 2**31)))
+
+            if target <= base_clues:
+                # Already at or above target, just use the shuffled base
+                puzzles_out.append((shuffled, base_clues, sig, shuffled))
+            else:
+                # Promote to target
+                promoted = lars_promote_batch(shuffled, target, count=1)
+                if promoted:
+                    puzzles_out.append((promoted[0], base_clues, sig, shuffled))
+
+        elapsed = (_time.time() - t0) * 1000
+
+        if elapsed < 1:
+            time_str = f'{elapsed*1000:.0f}us'
+        else:
+            time_str = f'{elapsed:.0f}ms'
+        print(f'  Target: {target} clues')
+        print(f'  Generated: {len(puzzles_out)} puzzles in {time_str}')
+        print()
+
+        def _show_promotion(promoted, base, sig, techs_str, base_cc, pc):
+            """Show base skeleton on top, promoted puzzle below with added digits."""
+            added = []
+            for i in range(81):
+                if base[i] == '0' and promoted[i] != '0':
+                    r, c = i // 9, i % 9
+                    added.append(f'{promoted[i]}@R{r+1}C{c+1}')
+            added_str = ', '.join(added) if added else 'none'
+            print(f'  {base}  [base {base_cc}-clue skeleton]  added: {added_str}')
+            print(f'  {promoted}  [{techs_str}] ({base_cc} -> {pc} clues)')
+            print()
+
+        if no_confirm:
+            for p, base_cc, sig, base_shuf in puzzles_out:
+                pc = sum(1 for c in p if c != '0')
+                _show_promotion(p, base_shuf, sig, sig, base_cc, pc)
+            print(f'  Base skeleton preserved — all puzzles inherit diabolical DNA')
+        else:
+            print(f'  Confirming...')
+            confirmed = []
+            for p, base_cc, sig, base_shuf in puzzles_out:
+                r = solve_selective(p)
+                ok = r.get('success') or r.get('empty_remaining', 99) == 0
+                if ok:
+                    tc = r.get('technique_counts', {})
+                    advanced = sorted(t for t in tc if t not in {'crossHatch','nakedSingle','fullHouse','lastRemaining'})
+                    pc = sum(1 for c in p if c != '0')
+                    confirmed.append((p, base_cc, sig, advanced, pc, base_shuf))
+
+            print(f'  Confirmed: {len(confirmed)}/{len(puzzles_out)}')
+            print()
+            for p, base_cc, sig, techs, pc, base_shuf in confirmed:
+                _show_promotion(p, base_shuf, sig, ', '.join(techs), base_cc, pc)
+            print(f'  Base skeleton preserved — all inherit diabolical technique requirements')
+
+        print()
+        return
+
+    # ── LForge FN/FC (expert-level collection) ──
+    if getattr(args, 'lforge_fnfc', None) is not None:
+        import json as _json
+        import time as _time
+        import random as _rand
+        from .lars_forge import lars_full_transform
+
+        n = args.lforge_fnfc
+        min_fn = getattr(args, 'lforge_fn', None)
+        min_fc = getattr(args, 'lforge_fc', None)
+        clue_filter = getattr(args, 'lforge_clues', None)
+        no_confirm = getattr(args, 'lforge_no_confirm', False)
+
+        # Load from both day 1 and day 2 jsonl files
+        import os as _os
+        _base = _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__)))
+        pool = []
+        for fname in ['lars/fn_fc_overnight.jsonl', 'lars/fn_fc_overnight_day2.jsonl']:
+            fpath = _os.path.join(_base, fname)
+            if not _os.path.exists(fpath):
+                fpath = _os.path.join(_os.path.dirname(__file__), '..', '..', fname)
+            try:
+                with open(fpath) as f:
+                    for line in f:
+                        e = _json.loads(line)
+                        if min_fn is not None and e.get('fn', 0) < min_fn:
+                            continue
+                        if min_fc is not None and e.get('fc', 0) < min_fc:
+                            continue
+                        if clue_filter is not None and e.get('clues', 0) != clue_filter:
+                            continue
+                        pool.append(e)
+            except FileNotFoundError:
+                pass
+
+        if not pool:
+            print(f'\n  LForge FN/FC — no matching puzzles found')
+            filters = []
+            if min_fn: filters.append(f'FN>={min_fn}')
+            if min_fc: filters.append(f'FC>={min_fc}')
+            if clue_filter: filters.append(f'{clue_filter} clues')
+            if filters:
+                print(f'  Filters: {", ".join(filters)}')
+            print()
+            return
+
+        lforge_seed = getattr(args, 'lforge_seed', None)
+        if lforge_seed is None:
+            lforge_seed = int(_time.time()) % (2**31)
+        rng = _rand.Random(lforge_seed)
+
+        print(f'\n  LForge — FN/FC Expert Collection')
+        print(f'  {"=" * 55}')
+        filters = []
+        if min_fn: filters.append(f'FN>={min_fn}')
+        if min_fc: filters.append(f'FC>={min_fc}')
+        if clue_filter: filters.append(f'{clue_filter} clues')
+        filter_str = f' ({", ".join(filters)})' if filters else ''
+        print(f'  Pool: {len(pool):,} seeds{filter_str} (seed={lforge_seed})')
+
+        t0 = _time.time()
+        puzzles = []
+        seen = set()
+        attempts = 0
+        while len(puzzles) < n and attempts < n * 20:
+            attempts += 1
+            entry = rng.choice(pool)
+            transformed = lars_full_transform(entry['puzzle'], rng=_rand.Random(rng.randint(0, 2**31)))
+            if transformed not in seen:
+                seen.add(transformed)
+                puzzles.append((transformed, entry))
+
+        elapsed = (_time.time() - t0) * 1000
+
+        if no_confirm:
+            if elapsed < 1:
+                time_str = f'{elapsed*1000:.0f}us'
+            else:
+                time_str = f'{elapsed:.0f}ms'
+            print(f'  Generated: {len(puzzles)} puzzles in {time_str} (no-confirm)')
+            print()
+            for p, entry in puzzles:
+                print(f'  {p}  [FN={entry["fn"]} FC={entry["fc"]}]')
+            print(f'\n  # {len(puzzles)} FN/FC puzzles (expert-level, no-confirm)')
+        else:
+            confirmed = []
+            skipped = 0
+            for p, entry in puzzles:
+                r = solve_selective(p)
+                ok = r.get('success') or r.get('empty_remaining', 99) == 0
+                if not ok:
+                    skipped += 1
+                    continue
+                tc = r.get('technique_counts', {})
+                advanced = sorted(t for t in tc if t not in {'crossHatch','nakedSingle','fullHouse','lastRemaining'})
+                confirmed.append((p, entry, advanced))
+                if len(confirmed) >= n:
+                    break
+            elapsed = (_time.time() - t0) * 1000
+            skip_note = f', {skipped} skipped' if skipped else ''
+            print(f'  Confirmed: {len(confirmed)}/{n} in {elapsed:.0f}ms{skip_note}')
+            print()
+            for p, entry, techs in confirmed:
+                print(f'  {p}  [FN={entry["fn"]} FC={entry["fc"]}, {", ".join(techs)}]')
+            print(f'\n  # {len(confirmed)} FN/FC puzzles (expert-level, confirmed)')
         print()
         return
 
@@ -5550,7 +5853,12 @@ presets:
         if no_confirm:
             puzzles_out = result['puzzles'][:n]
             sigs_out = result.get('signatures', [])[:n]
-            print(f'  Generated: {len(puzzles_out)} puzzles (no-confirm)')
+            elapsed_forge = result.get('elapsed_ms', 0)
+            if elapsed_forge < 1:
+                time_str = f'{elapsed_forge*1000:.0f}µs'
+            else:
+                time_str = f'{elapsed_forge:.0f}ms'
+            print(f'  Generated: {len(puzzles_out)} puzzles in {time_str} (no-confirm)')
             print()
             for i, p in enumerate(puzzles_out):
                 sig_tag = sigs_out[i] if i < len(sigs_out) else ''
@@ -5800,7 +6108,7 @@ presets:
                 print(f'  Confidence: High (~{pct}%, L1 variant match)')
             print(f'  Techniques: {tech_str}')
             print(f'  Hash: {result["hash"]}')
-            print(f'  Database: 8,450 signatures | 394,204 seeds | 1.1 quintillion puzzles')
+            print(f'  Database: 10,698 signatures | 438,564 seeds | 534.6 quadrillion puzzles')
             print(f'  This puzzle is derived from a Lars Database Seed.')
         else:
             # Check Royle 17-clue set before declaring "new"
@@ -5953,6 +6261,7 @@ presets:
             # Shuffle for diversity
             source = lars_full_transform(seed, rng=_rand.Random())
             print(f'  Source: 17-clue seed (shuffled + digit-permuted)')
+            print(f'  Base17: {source}')
 
         src_clues = sum(1 for c in source if c != '0')
         print(f'  Source clues: {src_clues}')
@@ -5971,8 +6280,11 @@ presets:
         print(f'  All guaranteed unique (inherits from {src_clues}-clue parent)')
         print()
         for p in puzzles:
-            print(f'  {p}')
-        print(f'\n  # {len(puzzles)} unique {target}-clue puzzles')
+            # Show which clues were added (diff from source)
+            added = sum(1 for i in range(81) if source[i] == '0' and p[i] != '0')
+            print(f'  {p}  (+{added} clues from base)')
+        print(f'\n  Base: {source}')
+        print(f'  # {len(puzzles)} unique {target}-clue puzzles (all share the same 17-clue skeleton)')
         print()
         return
 
