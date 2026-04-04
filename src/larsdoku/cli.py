@@ -5710,27 +5710,25 @@ presets:
         clue_filter = getattr(args, 'lforge_clues', None)
         no_confirm = getattr(args, 'lforge_no_confirm', False)
 
-        # Load from both day 1 and day 2 jsonl files
+        # Load from puzzle_collection.json.gz in package
         import os as _os
-        _base = _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__)))
+        import gzip as _gzip
         pool = []
-        for fname in ['lars/fn_fc_overnight.jsonl', 'lars/fn_fc_overnight_day2.jsonl']:
-            fpath = _os.path.join(_base, fname)
-            if not _os.path.exists(fpath):
-                fpath = _os.path.join(_os.path.dirname(__file__), '..', '..', fname)
-            try:
-                with open(fpath) as f:
-                    for line in f:
-                        e = _json.loads(line)
-                        if min_fn is not None and e.get('fn', 0) < min_fn:
-                            continue
-                        if min_fc is not None and e.get('fc', 0) < min_fc:
-                            continue
-                        if clue_filter is not None and e.get('clues', 0) != clue_filter:
-                            continue
-                        pool.append(e)
-            except FileNotFoundError:
-                pass
+        _collection_path = _os.path.join(_os.path.dirname(__file__), 'puzzle_collection.json.gz')
+        try:
+            with _gzip.open(_collection_path, 'rt') as f:
+                _coll = _json.load(f)
+            for source_key in ['fn_fc_day1', 'fn_fc_day2', 'dr_d2b_mega', 'unsolvable_combo', 'killer_combo']:
+                for e in _coll.get(source_key, []):
+                    if min_fn is not None and e.get('fn', 0) < min_fn:
+                        continue
+                    if min_fc is not None and e.get('fc', 0) < min_fc:
+                        continue
+                    if clue_filter is not None and e.get('clues', 0) != clue_filter:
+                        continue
+                    pool.append(e)
+        except (FileNotFoundError, Exception):
+            pass
 
         if not pool:
             print(f'\n  LForge FN/FC — no matching puzzles found')
