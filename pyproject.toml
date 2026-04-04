@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "larsdoku"
-version = "3.1.2"
+version = "3.1.4"
 description = "Pure logic Sudoku solver — 45 techniques, signature catalog, zero backtracking, 100% on Top1465"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [tool.setuptools.package-data]
-larsdoku = ["seed_bank_64.json", "seed_bank_128.json", "zone_grid_db_full.json", "royle_17_hashes.json", "royle_17_hashes.pkl", "technique_seed_bank.json", "lars_seeds_part1.json", "lars_seeds_part2.json", "lars_seeds_l1_part1.json", "lars_seeds_l1_part2.json", "lars_seeds_l1_2step_part1.json", "lars_seeds_l1_2step_part2.json", "lars_seeds_l1_3step_part1.json", "lars_seeds_l1_3step_part2.json", "lars_seeds_rotate180_part1.json", "lars_seeds_rotate180_part2.json", "lars_seeds_shuffle_l1_part1.json", "lars_seeds_shuffle_l1_part2.json", "signature_catalog.json.gz"]
+larsdoku = ["seed_bank_64.json", "seed_bank_128.json", "zone_grid_db_full.json", "royle_17_hashes.json", "royle_17_hashes.pkl", "technique_seed_bank.json", "lars_seeds_part1.json", "lars_seeds_part2.json", "lars_seeds_l1_part1.json", "lars_seeds_l1_part2.json", "lars_seeds_l1_2step_part1.json", "lars_seeds_l1_2step_part2.json", "lars_seeds_l1_3step_part1.json", "lars_seeds_l1_3step_part2.json", "lars_seeds_rotate180_part1.json", "lars_seeds_rotate180_part2.json", "lars_seeds_shuffle_l1_part1.json", "lars_seeds_shuffle_l1_part2.json", "signature_catalog.json.gz", "hardest_base_seeds.json"]
 
 [project.urls]
 Homepage = "https://github.com/oppressionslayer/larsdoku-solver"
