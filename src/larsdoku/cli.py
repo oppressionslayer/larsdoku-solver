@@ -5590,7 +5590,6 @@ presets:
         import random as _rand
         import os as _os
         from .lars_forge import lars_full_transform, lars_promote_batch
-        from .engine import solve_backtrack
 
         target = args.lforge_promote_hard
         n = getattr(args, 'lforge_count', 10) or 10
