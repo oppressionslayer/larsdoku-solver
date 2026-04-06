@@ -1,4 +1,4 @@
-"""Auto-reduce puzzles to find seed ancestry + reverse-lookup seeds in the Lars Database.
+"""Auto-reduce puzzles to find seed ancestry + reverse-lookup seeds in the Lars Seed Database.
 
 Strategies:
   #1  Check Lars signature at EVERY strip step (not just the end)
@@ -213,8 +213,18 @@ def exhaustive_reduce(puzzle, max_try_remove=3):
 # Command: --auto-reduce
 # ══════════════════════════════════════════════════════════════
 
+def _normalize_puzzle(puzzle):
+    """Normalize puzzle: replace 0 with . for display."""
+    return puzzle.replace("0", ".")
+
+
+def _count_clues(puzzle):
+    return sum(1 for ch in puzzle if ch != "." and ch != "0")
+
+
 def cmd_auto_reduce(puzzle):
-    clue_count = sum(1 for ch in puzzle if ch != ".")
+    puzzle = _normalize_puzzle(puzzle)
+    clue_count = _count_clues(puzzle)
     t0 = time.time()
     print("=" * 70)
     print("  AUTO-REDUCE: Full Seed Ancestry Analysis")
@@ -230,13 +240,28 @@ def cmd_auto_reduce(puzzle):
         seed = raw_prov.get("seed", "N/A")
         techs = _seed_technique(seed)
         idx = _seed_index(seed)
-        print(f"  >>> INPUT already matches Lars Database! <<<")
-        print(f"  Seed bd81:  {seed}")
-        print(f"  Technique:  {', '.join(techs)}")
-        if idx is not None:
-            print(f"  Seed index: #{idx}")
+        conf = raw_prov.get("confidence", "unknown")
+        conf_str = "core seed 100%" if conf == "exact" else "L1 variant ~99%"
+        idx_str = f", #{idx}" if idx is not None else ""
+        print(f"  >>> Already in Lars Seed Database ({conf_str}, {', '.join(techs)}{idx_str}) <<<")
+        print()
+        # Solve it normally
+        r = _larsdoku_solve(puzzle)
+        print(f"  Status: {r['status']}")
+        if r['wsrf']:
+            print(f"  WSRF:   {r['wsrf']}")
+        if r['techniques']:
+            print(f"  Techniques:")
+            for t in r['techniques']:
+                print(f"    {t}")
+        elapsed = time.time() - t0
+        print()
+        print(f"  No reduction needed — puzzle is already a known seed derivative.")
+        print(f"  Time: {elapsed:.1f}s")
+        print("=" * 70)
+        return
     else:
-        print(f"  Input: NOT in Lars Database (need reduction)")
+        print(f"  Input: NOT in Lars Seed Database (need reduction)")
     print()
     clue_positions = [i for i, ch in enumerate(puzzle) if ch != "." and ch != "0"]
     orderings = [
@@ -447,7 +472,7 @@ def _seed_lookup_by_hash(hash_str):
         print(_indent(board_diagram(seed.replace("0", ".")), "    "))
         print()
     else:
-        print(f"  NOT FOUND in Lars Database.")
+        print(f"  NOT FOUND in Lars Seed Database.")
         print(f"  Hash: {hash_str}")
         print()
 
@@ -517,7 +542,7 @@ def _seed_lookup_by_bd81(bd81):
         print(_indent(board_diagram(matched_seed.replace("0", ".")), "    "))
         print()
     else:
-        print(f"  NO MATCH in Lars Database for this mask hash.")
+        print(f"  NO MATCH in Lars Seed Database for this mask hash.")
         print()
     print(f"  Input board:")
     print(_indent(board_diagram(bd81.replace("0", ".")), "    "))
@@ -574,10 +599,11 @@ def _solve_with_je_fallback_cli(puzzle):
 
 
 def cmd_reduce_solve(puzzle):
-    clue_count = sum(1 for ch in puzzle if ch != ".")
+    puzzle = _normalize_puzzle(puzzle)
+    clue_count = _count_clues(puzzle)
     t0 = time.time()
     print("=" * 70)
-    print("  REDUCE-SOLVE: Strip Disguise, Solve, Map Back")
+    print("  REDUCE-SOLVE: Strip Promotions, Solve, Map Back")
     print("=" * 70)
     print(f"  Input:  {puzzle}")
     print(f"  Clues:  {clue_count}")
@@ -589,6 +615,39 @@ def cmd_reduce_solve(puzzle):
         return
     print(f"  Solution: {solution}")
     print()
+
+    # If already in provenance, skip reduction and just solve normally
+    raw_prov = lars_provenance(puzzle)
+    if raw_prov.get("matched"):
+        seed = raw_prov.get("seed", "N/A")
+        techs = _seed_technique(seed)
+        idx = _seed_index(seed)
+        conf = raw_prov.get("confidence", "unknown")
+        conf_str = "core seed 100%" if conf == "exact" else "L1 variant ~99%"
+        idx_str = f", #{idx}" if idx is not None else ""
+        print(f"  >>> Already in Lars Seed Database ({conf_str}, {', '.join(techs)}{idx_str}) <<<")
+        print()
+
+        # Just solve it normally
+        r = _larsdoku_solve(puzzle)
+        print(f"  Status: {r['status']}")
+        if r['wsrf']:
+            print(f"  WSRF:   {r['wsrf']}")
+        print()
+        if r['techniques']:
+            print(f"  Techniques:")
+            for t in r['techniques']:
+                print(f"    {t}")
+        print()
+        print(f"  SOLUTION: {solution}")
+        print()
+        print(board_diagram(solution))
+        elapsed = time.time() - t0
+        print()
+        print(f"  Total time: {elapsed:.1f}s")
+        print("=" * 70)
+        return
+
     print("  Reducing...")
     clue_positions = [i for i, ch in enumerate(puzzle) if ch != "." and ch != "0"]
     orderings = [

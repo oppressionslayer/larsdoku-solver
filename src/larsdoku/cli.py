@@ -6141,7 +6141,7 @@ presets:
             print(f'  Techniques: {tech_str}')
             print(f'  Hash: {result["hash"]}')
             print(f'  Database: 10,698 signatures | 438,564 seeds | 534.6 quadrillion puzzles')
-            print(f'  This puzzle is derived from a Lars Database Seed.')
+            print(f'  This puzzle is derived from a Lars Seed Database Seed.')
         else:
             # Check Royle 17-clue set before declaring "new"
             from .lars_forge import lars_mask_hash
@@ -6169,7 +6169,7 @@ presets:
                 print(f'  >>> ROYLE 17-CLUE BASE MATCH <<<')
                 print(f'  This is a known 17-clue puzzle from Royle\'s complete enumeration (49,158 puzzles).')
                 print(f'  It is a base skeleton — the mathematical floor for unique Sudoku.')
-                print(f'  Lars Database seeds are forged from these bases with added technique requirements.')
+                print(f'  Lars Seed Database seeds are forged from these bases with added technique requirements.')
             else:
                 print(f'  >>> NEW — Not in Lars registry <<<')
                 print(f'  {result.get("message", "")}')
