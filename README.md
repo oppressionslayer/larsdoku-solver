@@ -31,6 +31,8 @@ Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduc
 
 > **Note:** There is a rare bug where JuniorExocet can cause a stall on a very very very small number of puzzles  If you encounter a STALL, try running with `--exclude JuniorExocet` as a workaround. A fix is in progress.
 
+## LarsForge: --auto-reduce Over a UniDecillion reduction to unsolvable seeds from the Lars Seed Variant Database
+
 ## LarsForge: 60 Quadrillion Indestructible Puzzles
 
 LarsForge generates **60 quadrillion unique 17-clue puzzles** from the complete Royle enumeration (49,158 seeds). Every puzzle is backed by a mathematically proven 17-clue skeleton — the minimum information needed to determine a unique Sudoku solution.
