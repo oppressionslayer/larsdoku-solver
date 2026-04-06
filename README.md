@@ -40,6 +40,85 @@ LarsForge generates **60 quadrillion unique 17-clue puzzles** from the complete 
 We are building toward forging all puzzles from an **18-clue minimum base** — one clue above the mathematical floor. At 17 clues, 90% of puzzles solve with basic techniques alone. At 18 clues, the extra clue opens the door to harder, more interesting puzzles while still guaranteeing dimensional uniqueness. When a 24-clue puzzle is built on the forge, removing any clue above the 18-clue base never leads to multiple solutions. Boards that break when reduced to their minimum base are, in our view, backtracker-unreliable — verified at one snapshot, but fragile under interaction. We prefer puzzles with structural integrity all the way down.
 
 ```bash
+larsdoku --reduce-solve ..345...945...9.3...93..4.52..59.34.39.2.4.5..45...9.25.2.4..9..3.9.25..91.7.582. 2018381088
+======================================================================
+  REDUCE-SOLVE: Strip Promotions, Solve, Map Back
+======================================================================
+  Input:  ..345...945...9.3...93..4.52..59.34.39.2.4.5..45...9.25.2.4..9..3.9.25..91.7.582.
+  Clues:  40
+
+  Solution: 123456789457189236689327415276598341391274658845631972562843197738912564914765823
+
+  Reducing...
+
+----------------------------------------------------------------------
+  SOLVE MATRIX
+----------------------------------------------------------------------
+  Puzzle                       Clues      Status  Mode            WSRF
+  ──────────────────────────── ─────  ──────────  ──────────────  ────────────────────
+  Original                        40      SOLVED  default         D2B, FPC
+  Reduced 29cl                    29      SOLVED  default         D2B, FPC
+  Seed Unknown                    29      SOLVED  default         D2B, FPC
+  Reduced 28cl                    28      SOLVED  default         D2B, FPC
+  Seed Unknown                    28      SOLVED  default         D2B, FPC
+  Reduced 28cl                    28      SOLVED  default         D2B, FPC
+  Seed Unknown                    28      SOLVED  default         D2B, FPC, FPCE
+  Reduced 27cl                    27      SOLVED  default         D2B, FPC
+  Seed Unknown                    27      SOLVED  default         
+  Reduced 27cl                    27      SOLVED  default         D2B, FPC
+  Seed Unknown                    27      SOLVED  default         FPC
+  Reduced 27cl                    27      SOLVED  default         D2B, FPC
+  Seed Unknown                    27      SOLVED  default         FPC
+  Reduced 26cl                    26      SOLVED  default         D2B, FPC
+  Seed DeepResonance,D2B #198446    26      SOLVED  default         D2B, FPC
+  Reduced 26cl                    26      SOLVED  default         D2B, FPC
+  Seed D2B #23979                 26      SOLVED  default         D2B, FPC
+  Reduced 26cl                    26      SOLVED  default         D2B, FPC
+  Seed D2B #19126                 26      SOLVED  default         D2B, FPC
+  Reduced 25cl                    25      SOLVED  default         D2B, FPC
+  Seed DeepResonance #209146      25      SOLVED  default         FPC, FPCE, FPF
+  Reduced 25cl                    25      SOLVED  default         D2B, FPC
+  Seed DeepResonance #206841      25      SOLVED  default         FPC
+
+----------------------------------------------------------------------
+  BEST SOLVE PATH
+----------------------------------------------------------------------
+  Solved via:   Reduced 25cl (25 clues, default)
+  WSRF:         D2B, FPC
+  Puzzle:       ....5....4....9.3...93....52...9.34.3..2.4.....5.....2..2.4..9..3...25...1.7..8..
+
+  Techniques:
+    crossHatch              29 ( 41.4%)  L1  █████████████
+    nakedSingle             14 ( 20.0%)  L1  ██████
+    lastRemaining            8 ( 11.4%)  L1  ███
+    ALS_XZ                   4 (  5.7%)  L5  █
+    DeepResonance            3 (  4.3%)  L7  █
+    fullHouse                3 (  4.3%)  L1  █
+    SimpleColoring           3 (  4.3%)  L4  █
+    D2B                      1 (  1.4%)  L6  █ ★
+    ALS_XYWing               1 (  1.4%)  L5  █
+    KrakenFish               1 (  1.4%)  L6  █
+    AlignedPairExcl          1 (  1.4%)  L5  █
+    FPC                      1 (  1.4%)  L5  █ ★
+    Swordfish                1 (  1.4%)  L3  █
+
+  SOLUTION: 123456789457189236689327415276598341391274658845631972562843197738912564914765823
+
+1 2 3 | 4 5 6 | 7 8 9
+4 5 7 | 1 8 9 | 2 3 6
+6 8 9 | 3 2 7 | 4 1 5
+------+-------+------
+2 7 6 | 5 9 8 | 3 4 1
+3 9 1 | 2 7 4 | 6 5 8
+8 4 5 | 6 3 1 | 9 7 2
+------+-------+------
+5 6 2 | 8 4 3 | 1 9 7
+7 3 8 | 9 1 2 | 5 6 4
+9 1 4 | 7 6 5 | 8 2 3
+
+  Total time: 22.8s
+
+
 # 6ms uniqueness oracle — no backtracker needed
 larsdoku --lars-800900005007080010020006400005000030070004600900800002002070000100200000030001000certify "000000010400000000020000000000050407008000300001090000300400200050100000000806000"
 # >>> UNIQUE <<<  Royle-certified
