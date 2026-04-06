@@ -2,6 +2,15 @@
 
 **Pure logic Sudoku solver. Zero guessing. Every step proven.**
 
+```
+# Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
+
+pip install larsdoku==3.1.9
+
+# Run this for JIT speedups 10x-100x faster!
+larsdoku --warmup 
+```
+
  ## The Anthem                                                                                                                                                     
                                                             
   [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/nyShx2dKO3Qd3s3C)                                                                
@@ -150,7 +159,7 @@ $ larsdoku --lars-certify "00000001040000000002000000000005040700800030000109000
 
 ```
 # Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
-pip install larsdoku==3.1.9
+pip insta64291 core + 129828 variant hashes.    ll larsdoku==3.1.9
 larsdoku --warmup 
 ```
 
