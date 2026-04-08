@@ -13,7 +13,7 @@ larsdoku --warmup
 
  ## The Anthem                                                                                                                                                     
                                                             
-  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/nyShx2dKO3Qd3s3C)                                                                
+  [Just Another Tuesday — Larsdoku Style (Country Epic Anthem)](https://suno.com/s/iXu40bwUXWs02n2o)                                                                
    
   *"Solved the whole damn game like it's just another Tuesday"*    
   
