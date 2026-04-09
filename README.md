@@ -8,7 +8,9 @@
 pip install larsdoku==3.4.2
 
 # Run this for JIT speedups 10x-100x faster!
-larsdoku --warmup 
+larsdoku --warmup
+
+https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 ```
 
 
