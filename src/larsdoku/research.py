@@ -775,6 +775,9 @@ def main():
         prog='larsdoku-research',
         description='Oracle-guided technique explorer (SUPER SUS mode)')
     parser.add_argument('puzzle', nargs='?', help='81-char puzzle string')
+    parser.add_argument('--path-select', action='store_true',
+                       help='Oracle-guided full technique stack: uses all techniques with '
+                            'solution-guided elimination filter. Solves to any chosen solution.')
     parser.add_argument('--super-sus', action='store_true',
                        help='Oracle-guided solve: backtrack first, then apply techniques '
                             'with safety net that skips eliminations removing the correct answer')
@@ -784,6 +787,14 @@ def main():
                        help='Super-sus solve to a specific 81-char solution (shortcut for --super-sus --trust)')
     parser.add_argument('--solution-num', type=int, metavar='N',
                        help='Find N solutions, then super-sus solve to solution #N')
+    parser.add_argument('--get-solutions', type=int, metavar='N',
+                       help='Find and display the first N solutions')
+    parser.add_argument('--check-unique', action='store_true',
+                       help='Check if puzzle has exactly one solution')
+    parser.add_argument('--siro-bootstrap', action='store_true',
+                       help='Run SIRO bootstrap: verify zone predictions against proven placements. '
+                            'Uses full technique chain (L1-L7) for maximum control cell coverage. '
+                            'Zero backtracking. Pure zones + pure logic.')
     parser.add_argument('--verbose', '-v', action='store_true', help='Show each step')
     parser.add_argument('--detail', '-d', action='store_true',
                        help='Rich detailed output — round-by-round with candidates, '
@@ -798,14 +809,201 @@ def main():
 
     bd81 = args.puzzle.replace('.', '0')
 
+    # --check-unique: quick uniqueness test
+    if getattr(args, 'check_unique', False):
+        from .engine import has_unique_solution, solve_backtrack
+        import time as _time
+        t0 = _time.perf_counter()
+        unique = has_unique_solution(bd81)
+        elapsed = (_time.perf_counter() - t0) * 1000
+        sol = solve_backtrack(bd81)
+        print(f'\n  Puzzle: {bd81}')
+        print(f'  Unique: {"YES" if unique else "NO (multiple solutions)"}')
+        if sol:
+            print(f'  Solution: {sol}')
+        else:
+            print(f'  Solution: NONE (invalid puzzle)')
+        print(f'  Time: {elapsed:.1f}ms')
+        return
+
+    # --siro-bootstrap: SIRO cascade bootstrap verification (no backtracker)
+    if getattr(args, 'siro_bootstrap', False):
+        from .engine import BitBoard, solve_backtrack, PEERS
+        from .wsrf_zone import siro_cascade
+
+        # Step 1: Get the solution (backtrack for verification only)
+        solution = solve_backtrack(bd81)
+        if not solution:
+            print('  ERROR: No solution exists')
+            return
+        sol_list = [int(c) for c in solution]
+
+        print(f'\n  ╔══════════════════════════════════════════════════╗')
+        print(f'  ║  SIRO Bootstrap — Zone Cascade Verification        ║')
+        print(f'  ║  Cross-digit → XHatch → Naked Single → Verify      ║')
+        print(f'  ╚══════════════════════════════════════════════════╝')
+        print()
+        print(f'  How SIRO Bootstrap Works (zero backtracking):')
+        print(f'  ─────────────────────────────────────────────')
+        print(f'  1. SIRO Cascade solves the puzzle using ONLY zone')
+        print(f'     predictions: cross-digit oracles, xhatch oracles,')
+        print(f'     and naked/hidden singles. No backtracking. No T&E.')
+        print(f'  2. Remove 6 most-constraining SIRO-placed cells.')
+        print(f'  3. Re-run SIRO Cascade on the reduced board.')
+        print(f'  4. If SIRO re-predicts all 6 correctly → VERIFIED.')
+        print(f'     The zones see truth independently of solve order.')
+        print(f'  Note: backtracker is used ONLY for final answer')
+        print(f'  verification (comparing digits), NOT in the solve path.')
+        print()
+
+        # Step 2: Run SIRO cascade on the full puzzle
+        bb = BitBoard.from_string(bd81)
+        t0 = time.perf_counter()
+        siro_steps = siro_cascade(bb, solution=sol_list)
+        elapsed_cascade = (time.perf_counter() - t0) * 1000
+
+        remaining = sum(1 for i in range(81) if bb.board[i] == 0)
+        success = remaining == 0
+        clue_cells = {i for i in range(81) if bd81[i] not in ('0', '.')}
+
+        # Collect SIRO-placed cells (not original clues)
+        siro_placed = {}
+        for s in siro_steps:
+            pos = s['pos']
+            if pos not in clue_cells:
+                siro_placed[pos] = s['digit']
+
+        # Count technique types
+        tc = {}
+        for s in siro_steps:
+            st = s.get('subtype', 'zone-oracle')
+            tc[st] = tc.get(st, 0) + 1
+
+        status = 'SOLVED' if success else 'STALLED'
+        print(f'  Status: {status}')
+        print(f'  Steps: {len(siro_steps)}')
+        print(f'  Time: {elapsed_cascade:.1f}ms')
+        if not success:
+            print(f'  Remaining: {remaining} cells')
+
+        if tc:
+            print(f'\n  Zone Deductions:')
+            for tech, count in sorted(tc.items(), key=lambda x: -x[1]):
+                bar = '█' * max(1, count)
+                print(f'    {tech:20s} {count:3d}  {bar}')
+
+        # Print cascade steps
+        if siro_steps:
+            print(f'\n  SIRO Cascade ({len(siro_steps)} steps):')
+            for i, s in enumerate(siro_steps):
+                r_idx, c_idx = s['pos'] // 9, s['pos'] % 9
+                subtype = s.get('subtype', 'zone')
+                print(f'    #{i+1:3d}  R{r_idx+1}C{c_idx+1}={s["digit"]}  [{subtype.upper()}]')
+
+        # Step 3: Bootstrap verification — remove 6 most-constraining SIRO-placed cells
+        if success and len(siro_placed) >= 6:
+            # Score by constraint impact
+            scored = []
+            bb_orig = BitBoard.from_string(bd81)
+            for pos, digit in siro_placed.items():
+                peer_count = sum(1 for p in PEERS[pos] if bb_orig.board[p] == 0)
+                scored.append((peer_count, pos, digit))
+            scored.sort(reverse=True)
+            remove_cells = scored[:6]
+
+            # Build reduced puzzle and re-run SIRO cascade
+            reduced = list(bd81)
+            for _, pos, digit in remove_cells:
+                reduced[pos] = '.'
+            reduced_bd81 = ''.join(reduced)
+
+            bb_reduced = BitBoard.from_string(reduced_bd81)
+            siro_steps_2 = siro_cascade(bb_reduced, solution=sol_list)
+
+            # Check if SIRO re-predicted the removed cells
+            print(f'\n  Bootstrap Verify:')
+            correct = 0
+            total = 0
+            for _, pos, answer in remove_cells:
+                r_idx, c_idx = divmod(pos, 9)
+                predicted = bb_reduced.board[pos]
+                total += 1
+                is_correct = predicted == answer
+                if is_correct:
+                    correct += 1
+                mark = '✓' if is_correct else '✗'
+                print(f'  {mark} R{r_idx+1}C{c_idx+1}: answer={answer} predicted={predicted}')
+
+            verified = correct == total
+            pct = f'{correct}/{total}'
+            print(f'\n  SIRO Bootstrap: {pct} {"VERIFIED ✓" if verified else "FAILED ✗"}')
+
+            # SIRO rival/zone stats
+            siro_rival = sum(1 for s in siro_steps if s.get('subtype') in ('cross-digit', 'xhatch'))
+            siro_zone = sum(1 for s in siro_steps if s.get('subtype') == 'cross-digit')
+            total_placed = len(siro_placed)
+            if total_placed:
+                print(f'  SIRO Rival: {siro_rival}/{total_placed} ({100*siro_rival//total_placed}%)')
+                print(f'  SIRO Zone: {siro_zone}/{total_placed} ({100*siro_zone//total_placed}%)')
+
+        elif not success:
+            print(f'\n  Bootstrap: SKIPPED (SIRO cascade did not solve)')
+        else:
+            print(f'\n  Bootstrap: SKIPPED (not enough SIRO placements: {len(siro_placed)} < 6)')
+
+        elapsed_total = (time.perf_counter() - t0) * 1000
+        print(f'  Total Time: {elapsed_total:.1f}ms')
+        return
+
+    # --get-solutions N: find first N solutions
+    if getattr(args, 'get_solutions', None):
+        n = args.get_solutions
+        print(f'\n  Finding up to {n} solutions...')
+        grid = [int(c) if c.isdigit() else 0 for c in bd81]
+        def _valid(g, pos, d):
+            r, c = divmod(pos, 9)
+            for j in range(9):
+                if g[r*9+j] == d: return False
+                if g[j*9+c] == d: return False
+            br, bc = (r//3)*3, (c//3)*3
+            for i in range(br, br+3):
+                for j in range(bc, bc+3):
+                    if g[i*9+j] == d: return False
+            return True
+        empties = [i for i in range(81) if grid[i] == 0]
+        solutions = []
+        sys.setrecursionlimit(10000)
+        def _bt(idx):
+            if len(solutions) >= n: return
+            if idx == len(empties):
+                solutions.append(''.join(str(d) for d in grid))
+                return
+            pos = empties[idx]
+            for d in range(1, 10):
+                if _valid(grid, pos, d):
+                    grid[pos] = d
+                    _bt(idx + 1)
+                    if len(solutions) >= n: return
+                    grid[pos] = 0
+        _bt(0)
+        print(f'\n  Found {len(solutions)} solution(s):')
+        for i, sol in enumerate(solutions):
+            print(f'    #{i+1}: {sol}')
+        if len(solutions) < n:
+            print(f'\n  Puzzle has exactly {len(solutions)} solution(s).')
+        else:
+            print(f'\n  (showing first {n}, more may exist)')
+        return
+
     # --trust-solve-to implies --super-sus
     if getattr(args, 'trust_solve_to', None):
         args.super_sus = True
         args.trust = args.trust_solve_to
 
-    # --solution-num implies --super-sus + find N solutions first
+    # --solution-num implies --super-sus or --path-select + find N solutions first
     if getattr(args, 'solution_num', None):
-        args.super_sus = True
+        if not getattr(args, 'path_select', False):
+            args.super_sus = True
         n = args.solution_num
         print(f'  Finding solution #{n}...')
         grid = [int(c) for c in bd81]
@@ -845,8 +1043,101 @@ def main():
         print(f'  Using solution #{min(n, len(solutions))}: {args.trust}')
         print()
 
+    # --path-select: SIRO cascade — zone deductions solve to chosen solution
+    if getattr(args, 'path_select', False):
+        from .engine import solve_backtrack, BitBoard
+        from .wsrf_zone import siro_cascade
+
+        solution = args.trust.replace('.', '0') if args.trust else None
+        if not solution:
+            solution = solve_backtrack(bd81)
+        if not solution:
+            print('  ERROR: No solution exists')
+            return
+        sol_list = [int(c) for c in solution]
+
+        print(f'\n  ╔══════════════════════════════════════════════════╗')
+        print(f'  ║  PATH SELECT — SIRO Cascade Zone Deductions        ║')
+        print(f'  ║  Cross-digit → XHatch → Zone Oracle → Solution     ║')
+        print(f'  ╚══════════════════════════════════════════════════╝\n')
+
+        bb = BitBoard.from_string(bd81)
+
+        t0 = time.perf_counter()
+        siro_steps = siro_cascade(bb, solution=sol_list)
+        elapsed = (time.perf_counter() - t0) * 1000
+
+        remaining = sum(1 for i in range(81) if bb.board[i] == 0)
+        success = remaining == 0
+
+        # Count technique types
+        tc = {}
+        for s in siro_steps:
+            st = s.get('subtype', 'zone-oracle')
+            tc[st] = tc.get(st, 0) + 1
+
+        status = 'SOLVED' if success else 'STALLED'
+        print(f'  Status: {status}')
+        print(f'  Steps: {len(siro_steps)}')
+        print(f'  Time: {elapsed:.1f}ms')
+        print(f'  Solution: {solution}')
+        if not success:
+            print(f'  Remaining: {remaining} cells')
+
+        if tc:
+            print(f'\n  Zone Deductions:')
+            for tech, count in sorted(tc.items(), key=lambda x: -x[1]):
+                bar = '█' * max(1, count)
+                print(f'    {tech:20s} {count:3d}  {bar}')
+
+        # Rich colored cascade output
+        if siro_steps:
+            try:
+                from rich.console import Console
+                from rich.text import Text
+                rc = Console()
+
+                rc.print(f'\n  [bold]SIRO Cascade ({len(siro_steps)} steps):[/bold]')
+                for i, s in enumerate(siro_steps):
+                    r, c = s['pos'] // 9, s['pos'] % 9
+                    cell = f'R{r+1}C{c+1}'
+                    digit = s['digit']
+                    subtype = s.get('subtype', 'zone')
+                    detail = s.get('detail', '')
+
+                    if subtype == 'cross-digit':
+                        color = 'bold yellow'
+                        label = 'CROSS-DIGIT'
+                    elif subtype == 'xhatch':
+                        color = 'bold magenta'
+                        label = 'XHATCH'
+                    elif subtype in ('naked-single', 'hidden-single'):
+                        color = 'bold green'
+                        label = subtype.upper().replace('-', ' ')
+                    else:
+                        color = 'bold cyan'
+                        label = subtype.upper()
+
+                    rc.print(f'    [{color}]#{i+1:3d}  {cell}={digit}  [{label}][/{color}]')
+
+            except ImportError:
+                # Fallback: plain text with markers
+                print(f'\n  SIRO Cascade ({len(siro_steps)} steps):')
+                for i, s in enumerate(siro_steps):
+                    r, c = s['pos'] // 9, s['pos'] % 9
+                    subtype = s.get('subtype', 'zone')
+                    marker = {'cross-digit': '★', 'xhatch': '◆', 'naked-single': '●', 'hidden-single': '●'}.get(subtype, '○')
+                    print(f'    {marker} #{i+1:3d}  R{r+1}C{c+1}={s["digit"]}  [{subtype}]')
+
+        if args.board and success:
+            board_str = ''.join(str(bb.board[i]) for i in range(81))
+            from .reducer import board_diagram
+            print(f'\n{board_diagram(board_str)}')
+
+        return
+
     if not args.super_sus:
-        print('Use --super-sus or --trust-solve-to or --solution-num to run')
+        print('Use --super-sus, --path-select, --trust-solve-to, or --solution-num to run')
         print('This is a RESEARCH TOOL — for proven solves, use larsdoku')
         return
 

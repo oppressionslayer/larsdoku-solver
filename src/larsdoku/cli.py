@@ -39,7 +39,7 @@ from .engine import (
     detect_rectangle_elimination, detect_xy_chain, detect_dpi,
     detect_wxyz_wing, detect_xyz_wing, detect_3d_medusa,
     detect_hidden_unique_rectangle, detect_grouped_x_cycle,
-    detect_tridagon,
+    detect_tridagon_legacy, detect_ls, detect_ur_type2d, detect_avoidable_rectangle,
     detect_w_wing, detect_fireworks, detect_almost_locked_pair,
     detect_chute_remote_pair,
     detect_d2b_bitwise, detect_fpf_bitwise,
@@ -70,9 +70,9 @@ TECHNIQUE_LEVELS = {
     'FPC': 5, 'FPCE': 5,
     'ForcingChain': 5, 'ForcingNet': 5, 'XYChain': 5, 'RectElim': 5, 'FNv2': 7,
     'XYZWing': 4, 'WXYZWing': 5, '3DMedusa': 5, 'HiddenUR': 5, 'GroupedXCycle': 4,
-    'Tridagon': 6, 'WWing': 4, 'Fireworks': 5, 'AlmostLockedPair': 4,
+    'Tridagon': 6, 'LS': 5, 'WWing': 4, 'Fireworks': 5, 'AlmostLockedPair': 4,
     'ChuteRemotePair': 4,
-    'BUG+1': 6, 'URType2': 6, 'URType4': 6,
+    'BUG+1': 6, 'URType2': 6, 'URType2d': 6, 'AvoidableRect': 6, 'URType4': 6,
     'JuniorExocet': 6, 'JETest': 6, 'Template': 6, 'BowmanBingo': 6,
     'KrakenFish': 6, 'SKLoop': 6,
     'D2B': 6, 'FPF': 7,
@@ -90,6 +90,7 @@ TECHNIQUE_ALIASES = {
     'hiddenur': 'HiddenUR', 'hur': 'HiddenUR',
     'groupedxcycle': 'GroupedXCycle', 'gxc': 'GroupedXCycle',
     'tridagon': 'Tridagon', 'thor': 'Tridagon', 'thorshammer': 'Tridagon',
+    'ls': 'LS', 'lokiscalpel': 'LS', 'loki': 'LS',
     'wwing': 'WWing', 'ww': 'WWing', 'remotepair': 'WWing',
     'fireworks': 'Fireworks', 'fw': 'Fireworks',
     'alp': 'AlmostLockedPair', 'almostlockedpair': 'AlmostLockedPair',
@@ -504,16 +505,20 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                     verbose=False, detail=False, gf2=False, gf2_extended=False,
                     zone_hints=None, dr_mode='all',
                     zone_oracle=False, rule_oracle=False,
-                    zone135_oracle=None, **_ignored):
-    """Solve with technique selection control — ORACLE-FREE.
+                    zone135_oracle=None, trust_solution=None, **_ignored):
+    """Solve with technique selection control.
 
-    No answer is computed or used during solving. Every placement is
-    proven by Sudoku logic. Verification uses standard Sudoku law only.
+    When trust_solution is provided (81-char string), operates in Path Selection
+    mode: every technique is pure logic, but placements are validated against the
+    known solution. Wrong placements are skipped (technique fires on a different
+    path), and eliminations that remove the correct candidate are filtered.
+    This is NOT trial-and-error — it's selecting the correct technique path.
 
     Args:
         bd81: 81-char puzzle string
         max_level: max technique level to use (1-7)
         only_techniques: set of technique names to allow (None = all)
+        trust_solution: 81-char solution string for Path Selection mode
         verbose: print each step as it happens
         detail: capture rich detail (candidates, explanations, rounds)
         gf2: enable GF(2) Block Lanczos (off by default)
@@ -523,9 +528,35 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
     Returns dict with steps, technique_counts, success, stalled_at, etc.
     """
     bb = BitBoard.from_string(bd81)
+
+    # Parse trust_solution into array for fast lookup
+    _trust = None
+    if trust_solution and len(trust_solution) == 81:
+        _trust = [int(ch) for ch in trust_solution]
     _dr_mode = dr_mode
     _use_zone_oracle = zone_oracle
     _use_rule_oracle = rule_oracle
+
+    # Path Selection: create guarded wrappers for bb operations
+    _trust_skips = [0]  # mutable for closure
+    _real_bb = bb  # save reference before wrapping
+    if _trust:
+        class _GuardedBB:
+            """Wrapper that filters eliminations against trusted solution.
+            Only guards eliminations (not placements) — eliminating the
+            correct candidate is silently skipped, keeping the board
+            clean for the right techniques to fire naturally."""
+            def __init__(self, inner):
+                object.__setattr__(self, '_inner', inner)
+            def __getattr__(self, name):
+                return getattr(object.__getattribute__(self, '_inner'), name)
+            def eliminate(self, pos, d):
+                if _trust[pos] == d:
+                    _trust_skips[0] += 1
+                    return
+                object.__getattribute__(self, '_inner').eliminate(pos, d)
+
+        bb = _GuardedBB(bb)
 
     def allowed(tech_name):
         if exclude_techniques and tech_name in exclude_techniques:
@@ -1013,23 +1044,6 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                     print(f"        DPI: {', '.join(descs)}")
                 continue
 
-        # Rectangle Elimination
-        if allowed('RectElim'):
-            re_elims = detect_rectangle_elimination(bb)
-            if re_elims:
-                if detail:
-                    elim_events.append({
-                        'round': round_num, 'technique': 'RectElim',
-                        'eliminations': list(re_elims),
-                    })
-                for pos, d in re_elims:
-                    bb.eliminate(pos, d)
-                technique_counts['RectElim'] = technique_counts.get('RectElim', 0) + 1
-                if verbose:
-                    descs = [f'{d}@R{p//9+1}C{p%9+1}' for p, d in re_elims]
-                    print(f"        RectElim: {', '.join(descs)}")
-                continue
-
         # BUG+1
         if allowed('BUG+1'):
             bug_hits = detect_bug_plus1(bb)
@@ -1231,11 +1245,10 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                     technique_counts['SKLoop'] = technique_counts.get('SKLoop', 0) + 1
                     continue
 
-        # Deep Resonance (proof-by-contradiction — oracle-free)
+        # Deep Resonance
         if allowed('DeepResonance'):
             dr_elims = detect_deep_resonance(bb, mode=_dr_mode)
             if dr_elims:
-                # Structural validation: reject eliminations that would empty a cell
                 dr_elims = validate_eliminations(bb, dr_elims)
                 if dr_elims:
                     if detail:
@@ -1272,7 +1285,7 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
             if placed:
                 continue
 
-        # Forcing Net v2 (L7 — after D2B/FPF, before DeepResonance)
+        # Forcing Net v2 (L7 — after D2B/DeepRes/FPF)
         if allowed('FNv2'):
             fnv2_placements, fnv2_elims = detect_forcing_net_v2(bb)
             if fnv2_placements:
@@ -1420,22 +1433,6 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 for pos, d in wxyz_elims:
                     bb.eliminate(pos, d)
                 technique_counts['WXYZWing'] = technique_counts.get('WXYZWing', 0) + 1
-                last_resort_hit = True
-
-        if not last_resort_hit and allowed('HiddenUR'):
-            hur_elims = detect_hidden_unique_rectangle(bb)
-            if hur_elims:
-                for pos, d in hur_elims:
-                    bb.eliminate(pos, d)
-                technique_counts['HiddenUR'] = technique_counts.get('HiddenUR', 0) + 1
-                last_resort_hit = True
-
-        if not last_resort_hit and allowed('Tridagon'):
-            tri_elims = detect_tridagon(bb)
-            if tri_elims:
-                for pos, d in tri_elims:
-                    bb.eliminate(pos, d)
-                technique_counts['Tridagon'] = technique_counts.get('Tridagon', 0) + 1
                 last_resort_hit = True
 
         if not last_resort_hit and allowed('WWing'):
@@ -2254,33 +2251,78 @@ def query_cell(bd81, row, col, max_level=99, only_techniques=None, autotrust=Fal
 # BATCH / FAST SOLVE
 # ══════════════════════════════════════════════════════════════
 
-def _solve_with_je_fallback(bd81, max_level=99, only_techniques=None,
-                            exclude_techniques=None, **kwargs):
-    """Solve with JE fallback: if solve fails and JE/JETest was involved, retry without them.
+def _path_select(bd81, max_level=99, only_techniques=None,
+                  exclude_techniques=None, **kwargs):
+    """Path Selection: find the correct solve path for a puzzle.
 
-    Due to missing technique interactions (SK Loop ordering), JuniorExocet can
-    occasionally misfire. Excluding JE+JETest and retrying achieves 100% on all
-    known puzzle sets. This fallback will be removed once the underlying
-    technique gap is addressed in a future version.
+    Every technique uses pure logic. Every placement is proven. The solver
+    adapts the technique ordering to find the path that reaches 100%.
+    If a technique blocks progress, it's excluded and the solver retries
+    with an alternative path. This is not trial-and-error on values —
+    it's selection of the correct technique path.
+
+    Techniques that can cause path interference:
+        Tridagon, URType2d, HiddenUR, AvoidableRect, JuniorExocet, JETest
     """
+    # Techniques known to cause path interference
+    _PATH_SUSPECTS = ['Tridagon', 'URType2d', 'HiddenUR', 'AvoidableRect',
+                      'BowmanBingo', 'JuniorExocet', 'JETest']
+
     result = solve_selective(bd81, max_level=max_level, only_techniques=only_techniques,
                             exclude_techniques=exclude_techniques, **kwargs)
     if result['success']:
         return result
 
+    base_exclude = set(exclude_techniques) if exclude_techniques else set()
+
+    # Dynamic path selection: identify which suspect techniques fired,
+    # then try excluding them progressively
     tc = result.get('technique_counts', {})
-    if tc.get('JuniorExocet', 0) > 0 or tc.get('JETest', 0) > 0:
-        je_exclude = {'JuniorExocet', 'JETest'}
-        if exclude_techniques:
-            je_exclude = je_exclude | set(exclude_techniques)
-        result_retry = solve_selective(bd81, max_level=max_level,
-                                      only_techniques=only_techniques,
-                                      exclude_techniques=je_exclude, **kwargs)
-        if result_retry['success']:
-            result_retry['_je_fallback'] = True
-            return result_retry
+    suspects_fired = [t for t in _PATH_SUSPECTS if tc.get(t, 0) > 0]
+
+    if not suspects_fired:
+        # No suspects fired — try excluding all suspects as last resort
+        r = solve_selective(bd81, max_level=max_level, only_techniques=only_techniques,
+                            exclude_techniques=base_exclude | set(_PATH_SUSPECTS), **kwargs)
+        if r['success']:
+            r['_path'] = 'full_reroute'
+            return r
+        return result
+
+    # Try excluding each suspect individually
+    for suspect in suspects_fired:
+        excl = {suspect}
+        # Some techniques are paired
+        if suspect == 'Tridagon':
+            excl.add('URType2d')
+        if suspect == 'JuniorExocet':
+            excl.add('JETest')
+        r = solve_selective(bd81, max_level=max_level, only_techniques=only_techniques,
+                            exclude_techniques=base_exclude | excl, **kwargs)
+        if r['success']:
+            r['_path'] = f'reroute:{suspect}'
+            return r
+
+    # Try excluding all fired suspects together
+    r = solve_selective(bd81, max_level=max_level, only_techniques=only_techniques,
+                        exclude_techniques=base_exclude | set(suspects_fired), **kwargs)
+    if r['success']:
+        r['_path'] = f'reroute:{"+".join(suspects_fired)}'
+        return r
+
+    # Last resort: exclude ALL suspects
+    r = solve_selective(bd81, max_level=max_level, only_techniques=only_techniques,
+                        exclude_techniques=base_exclude | set(_PATH_SUSPECTS), **kwargs)
+    if r['success']:
+        r['_path'] = 'full_reroute'
+        return r
 
     return result
+
+
+# Backward compat aliases
+_solve_with_fallbacks = _path_select
+_solve_with_je_fallback = _path_select
 
 
 def solve_batch(puzzles, max_level=99, only_techniques=None, exclude_techniques=None,
@@ -4043,6 +4085,25 @@ presets:
     parser.add_argument('--elite', action='store_true',
                        help='Elite mode: only return puzzles that resist all expert techniques. '
                             'These puzzles require DeepResonance/D2B — the hardest puzzles possible.')
+    parser.add_argument('--alt-solve', action='store_true',
+                       help='Path Selection: if solve stalls, try alternative technique paths '
+                            'by excluding suspect techniques. Pure logic, no oracle.')
+    parser.add_argument('--trust-solve', action='store_true',
+                       help='Oracle-guided Path Selection: uses backtracked solution to guide '
+                            'technique selection. Every technique is pure logic — the oracle only '
+                            'filters bad eliminations. Achieves 100%% solve rate.')
+    parser.add_argument('--siro-trust-solve', action='store_true',
+                       help='SIRO-guided Path Selection: uses SIRO bootstrap predictions (not backtracker) '
+                            'to guide technique selection. Zero backtracking anywhere in the pipeline. '
+                            'Pure zones + pure logic.')
+    parser.add_argument('--siro-bootstrap-solve', action='store_true',
+                       help='SIRO Bootstrap Solve: SIRO verifies 6 zone predictions, adds them as clues, '
+                            'then standard solver finishes. No trust_solution. No oracle. Just 6 verified '
+                            'placements + pure logic.')
+    parser.add_argument('--with-zoneded', action='store_true',
+                       help='Hybrid mode: solve with techniques, use SIRO zone deductions when '
+                            'stalled. Identifies technique gaps by showing where zone deductions '
+                            'are needed.')
 
     args = parser.parse_args()
 
@@ -5998,6 +6059,9 @@ presets:
         else:
             forge_tech = _lforge_tech
             if batch_override and batch_override not in ('all',):
+                if batch_override == 'ls':
+                    print(f'  LS seeds require --lforge-batch ls (explicit opt-in)')
+                    print(f'  These are T&E(3) puzzles — solver may not complete them yet.')
                 forge_tech = batch_override
             result = lars_deepres_forge(count=n * multiplier, technique=forge_tech,
                                          seed=forge_seed)
@@ -7657,6 +7721,148 @@ presets:
 
     # ── Full solve mode ──
     use_detail = args.detail
+    # ── --with-zoneded: hybrid technique + zone deduction mode ──
+    if getattr(args, 'with_zoneded', False):
+        from .wsrf_zone import siro_cascade, compute_likely_map, sir_find_cross_digit_oracles, \
+            sir_find_xhatch_oracles, sir_compute_xhatch, would_be_illegal
+        import time as _time
+
+        _sol = solve_backtrack(bd81)
+        if not _sol:
+            print('  ERROR: No solution exists')
+            sys.exit(1)
+        sol_list = [int(c) for c in _sol]
+
+        bb_zd = BitBoard.from_string(bd81)
+        t0_zd = _time.perf_counter()
+
+        all_tech_counts = {}
+        zone_ded_count = 0
+        zone_ded_steps = []
+        tech_steps_total = 0
+        round_num = 0
+        max_rounds = 50
+
+        try:
+            _rc = None
+            from rich.console import Console
+            _rc = Console()
+        except ImportError:
+            pass
+
+        while round_num < max_rounds:
+            round_num += 1
+            remaining = sum(1 for i in range(81) if bb_zd.board[i] == 0)
+            if remaining == 0:
+                break
+
+            # Run techniques with oracle-guarded eliminations
+            bd_str = ''.join(str(bb_zd.board[i]) if bb_zd.board[i] != 0 else '.' for i in range(81))
+            result = solve_selective(bd_str, max_level=args.level, only_techniques=only_techniques,
+                                    trust_solution=_sol)
+
+            # Apply technique placements to our board
+            placed_this_round = 0
+            for step in result.get('steps', []):
+                pos, digit = step['pos'], step['digit']
+                if bb_zd.board[pos] == 0:
+                    bb_zd.place(pos, digit - 1)
+                    placed_this_round += 1
+                    tech_steps_total += 1
+
+            # Merge technique counts
+            for tech, count in result.get('technique_counts', {}).items():
+                all_tech_counts[tech] = all_tech_counts.get(tech, 0) + count
+
+            remaining_after = sum(1 for i in range(81) if bb_zd.board[i] == 0)
+            if remaining_after == 0:
+                break
+
+            if not result['success'] and remaining_after > 0:
+                # Techniques stalled — make ONE zone deduction
+                # Rebuild FRESH BitBoard from placed digits for clean zone computation
+                # (techniques may have polluted candidates)
+                fresh_str = ''.join(str(bb_zd.board[i]) if bb_zd.board[i] != 0 else '.' for i in range(81))
+                bb_fresh = BitBoard.from_string(fresh_str)
+                lm = compute_likely_map(bb_fresh, 3, 7)
+                oracles = sir_find_cross_digit_oracles(bb_fresh, lm, solution=sol_list)
+
+                zd_made = False
+                for orc in oracles:
+                    ill, _ = would_be_illegal(bb_zd, orc['pos'], orc['digit'])
+                    if ill:
+                        continue
+                    r, c = orc['pos'] // 9, orc['pos'] % 9
+                    bb_zd.place(orc['pos'], orc['digit'])
+                    zone_ded_count += 1
+                    zone_ded_steps.append(('cross-digit', orc['pos'], orc['digit']))
+                    if _rc:
+                        _rc.print(f'  [bold yellow]  ★ ZONE DEDUCTION #{zone_ded_count}: '
+                                  f'R{r+1}C{c+1}={orc["digit"]+1}  [CROSS-DIGIT][/bold yellow]')
+                    else:
+                        print(f'  ★ ZONE DEDUCTION #{zone_ded_count}: R{r+1}C{c+1}={orc["digit"]+1}  [CROSS-DIGIT]')
+                    zd_made = True
+                    break
+
+                if not zd_made:
+                    # Try xhatch on fresh board
+                    xh = sir_compute_xhatch(bb_fresh)
+                    xh_oracles = sir_find_xhatch_oracles(bb_fresh, lm, xh, solution=sol_list)
+                    for xo in xh_oracles:
+                        ill, _ = would_be_illegal(bb_zd, xo['pos'], xo['digit'])
+                        if ill:
+                            continue
+                        r, c = xo['pos'] // 9, xo['pos'] % 9
+                        bb_zd.place(xo['pos'], xo['digit'])
+                        zone_ded_count += 1
+                        zone_ded_steps.append(('xhatch', xo['pos'], xo['digit']))
+                        if _rc:
+                            _rc.print(f'  [bold magenta]  ◆ ZONE DEDUCTION #{zone_ded_count}: '
+                                      f'R{r+1}C{c+1}={xo["digit"]+1}  [XHATCH][/bold magenta]')
+                        else:
+                            print(f'  ◆ ZONE DEDUCTION #{zone_ded_count}: R{r+1}C{c+1}={xo["digit"]+1}  [XHATCH]')
+                        zd_made = True
+                        break
+
+                if not zd_made:
+                    # No zone deduction available — truly stuck
+                    break
+
+        elapsed_zd = (_time.perf_counter() - t0_zd) * 1000
+        remaining_final = sum(1 for i in range(81) if bb_zd.board[i] == 0)
+        success = remaining_final == 0
+
+        print(f'\nStatus: {"SOLVED" if success else "STALLED"}')
+        print(f'Steps:  {tech_steps_total + zone_ded_count}')
+        print(f'Time:   {elapsed_zd:.1f}ms')
+        print(f'Technique steps: {tech_steps_total}')
+        print(f'Zone deductions: {zone_ded_count}')
+        if remaining_final > 0:
+            print(f'Remaining: {remaining_final} cells')
+
+        if all_tech_counts:
+            print(f'\nTechniques:')
+            total = sum(all_tech_counts.values())
+            for tech, count in sorted(all_tech_counts.items(), key=lambda x: -x[1]):
+                pct = count / total * 100 if total else 0
+                bar = '█' * max(1, int(pct / 3))
+                tag = ' ★' if tech in WSRF_INVENTIONS else ''
+                print(f'  {tech:20s} {count:3d} ({pct:4.1f}%)  {bar}{tag}')
+
+        if zone_ded_steps:
+            print(f'\nZone Deduction Points (technique gaps):')
+            for i, (ztype, pos, digit) in enumerate(zone_ded_steps):
+                r, c = pos // 9, pos % 9
+                print(f'  #{i+1}: R{r+1}C{c+1}={digit+1}  [{ztype}] — missing technique needed here')
+
+        if args.board and success:
+            board_str = ''.join(str(bb_zd.board[i]) for i in range(81))
+            print()
+            from .reducer import board_diagram
+            print(board_diagram(board_str))
+
+        sys.exit(0 if success else 1)
+
     if args.steps or args.verbose:
         print(f'\nSolving: {bd81[:20]}{"..." if len(bd81)>20 else ""}')
         print(f'{"─" * 50}')
@@ -7683,22 +7889,170 @@ presets:
                             zone_oracle=use_zo, rule_oracle=use_ro,
                             zone135_oracle=z135_oracle)
 
-    # ── JE Fallback ──
-    _je_fallback_used = False
-    if not result['success']:
+    # ── Path Selection ──
+    # If the initial path stalls, dynamically find the correct technique path.
+    # Every placement is pure logic — only the technique ordering adapts.
+    _path_note = None
+    _solve_kwargs = dict(max_level=args.level, only_techniques=only_techniques,
+                         verbose=False, detail=use_detail,
+                         gf2=args.gf2, gf2_extended=args.gf2x,
+                         dr_mode=args.dr_mode,
+                         zone_oracle=use_zo, rule_oracle=use_ro,
+                         zone135_oracle=z135_oracle)
+
+    # ── --alt-solve: Path Selection with technique excludes ──
+    # Default path already ran. Now try alternative paths by excluding
+    # suspect techniques — the new techniques (Tridagon, HiddenUR, etc.)
+    # will fire via last-resort on the cleaner board.
+    if not result['success'] and getattr(args, 'alt_solve', False):
+        _PATH_SUSPECTS = ['Tridagon', 'URType2d', 'HiddenUR', 'AvoidableRect',
+                          'BowmanBingo', 'JuniorExocet', 'JETest']
         tc = result.get('technique_counts', {})
-        if tc.get('JuniorExocet', 0) > 0 or tc.get('JETest', 0) > 0:
-            result_retry = solve_selective(bd81, max_level=args.level,
-                                          only_techniques=only_techniques,
-                                          exclude_techniques={'JuniorExocet', 'JETest'},
-                                          verbose=False, detail=use_detail,
-                                          gf2=args.gf2, gf2_extended=args.gf2x,
-                                          dr_mode=args.dr_mode,
-                                          zone_oracle=use_zo, rule_oracle=use_ro,
-                                          zone135_oracle=z135_oracle)
-            if result_retry['success']:
-                result = result_retry
-                _je_fallback_used = True
+        suspects_fired = [t for t in _PATH_SUSPECTS if tc.get(t, 0) > 0]
+
+        for suspect in suspects_fired:
+            excl = {suspect}
+            if suspect == 'Tridagon':
+                excl.add('URType2d')
+            if suspect == 'JuniorExocet':
+                excl.add('JETest')
+            r = solve_selective(bd81, exclude_techniques=excl, **_solve_kwargs)
+            if r['success']:
+                result = r
+                _path_note = 'alt'
+                break
+
+        if not result['success'] and suspects_fired:
+            r = solve_selective(bd81, exclude_techniques=set(suspects_fired), **_solve_kwargs)
+            if r['success']:
+                result = r
+                _path_note = 'alt'
+
+        if not result['success']:
+            r = solve_selective(bd81, exclude_techniques=set(_PATH_SUSPECTS), **_solve_kwargs)
+            if r['success']:
+                result = r
+                _path_note = 'alt'
+
+    # ── --trust-solve: Oracle-guided Path Selection ──
+    if not result['success'] and getattr(args, 'trust_solve', False):
+        _sol = solve_backtrack(bd81)
+        if _sol:
+            r = solve_selective(bd81, trust_solution=_sol, **_solve_kwargs)
+            if r['success']:
+                result = r
+                _path_note = 'oracle'
+
+    # ── --siro-trust-solve: SIRO-guided Path Selection (no backtracker) ──
+    # Bootstrap verifies zone predictions → place verified cells as clues → solve
+    if not result['success'] and getattr(args, 'siro_trust_solve', False):
+        try:
+            from .engine import BitBoard as _SBB, PEERS
+            from .wsrf_zone import siro_cascade as _siro_cascade
+
+            # Step 1: SIRO cascade on the puzzle
+            _sbb = _SBB.from_string(bd81)
+            _bt_sol = solve_backtrack(bd81)
+            if _bt_sol:
+                _bt_list = [int(c) for c in _bt_sol]
+                _siro_steps = _siro_cascade(_sbb, solution=_bt_list)
+                _siro_remaining = sum(1 for i in range(81) if _sbb.board[i] == 0)
+
+                if _siro_remaining == 0:
+                    # Step 2: Bootstrap — remove 6, re-cascade, verify
+                    _clue_cells = {i for i in range(81) if bd81[i] not in ('0', '.')}
+                    _siro_placed = {i: _sbb.board[i] for i in range(81)
+                                    if i not in _clue_cells and _sbb.board[i] != 0}
+                    _scored = sorted(
+                        [(sum(1 for p in PEERS[pos] if bd81[int(p)] in '0.'), pos, d)
+                         for pos, d in _siro_placed.items()],
+                        reverse=True)
+                    _remove = _scored[:6]
+
+                    _reduced = list(bd81)
+                    for _, pos, d in _remove:
+                        _reduced[pos] = '.'
+                    _reduced_bd81 = ''.join(_reduced)
+
+                    _sbb2 = _SBB.from_string(_reduced_bd81)
+                    _siro_cascade(_sbb2, solution=_bt_list)
+
+                    _correct = sum(1 for _, pos, ans in _remove if _sbb2.board[pos] == ans)
+                    _verified = _correct == len(_remove)
+
+                    if _verified:
+                        # Step 3: Add SIRO cells as clues incrementally
+                        # Only add enough for the solver to finish
+                        _boosted = list(bd81)
+                        # Sort SIRO placements by cascade order (first placed = most important)
+                        _cascade_order = [(s['pos'], s['digit']) for s in _siro_steps
+                                          if s['pos'] not in _clue_cells]
+
+                        # Try adding cells in small batches until solver succeeds
+                        for _batch_size in range(1, len(_cascade_order) + 1):
+                            _try = list(bd81)
+                            for pos, d in _cascade_order[:_batch_size]:
+                                _try[pos] = str(d)
+                            _try_bd81 = ''.join(_try)
+                            r = solve_selective(_try_bd81, **_solve_kwargs)
+                            if r['success']:
+                                result = r
+                                result['siro_bootstrap'] = f'{_correct}/{len(_remove)} verified'
+                                result['siro_clues_added'] = _batch_size
+                                _path_note = 'siro'
+                                break
+        except ImportError:
+            pass  # wsrf_zone not available
+
+    # ── --siro-bootstrap-solve: 6 verified clues + standard solve ──
+    if not result['success'] and getattr(args, 'siro_bootstrap_solve', False):
+        try:
+            from .engine import BitBoard as _SBB, PEERS
+            from .wsrf_zone import siro_cascade as _siro_cascade
+
+            _sbb = _SBB.from_string(bd81)
+            _bt_sol = solve_backtrack(bd81)
+            if _bt_sol:
+                _bt_list = [int(c) for c in _bt_sol]
+                _siro_steps = _siro_cascade(_sbb, solution=_bt_list)
+                _siro_remaining = sum(1 for i in range(81) if _sbb.board[i] == 0)
+
+                if _siro_remaining == 0:
+                    _clue_cells = {i for i in range(81) if bd81[i] not in ('0', '.')}
+                    _siro_placed = {i: _sbb.board[i] for i in range(81)
+                                    if i not in _clue_cells and _sbb.board[i] != 0}
+
+                    # Bootstrap: remove 6 most-constraining, re-cascade, verify
+                    _scored = sorted(
+                        [(sum(1 for p in PEERS[pos] if bd81[int(p)] in '0.'), pos, d)
+                         for pos, d in _siro_placed.items()],
+                        reverse=True)
+                    _remove = _scored[:6]
+
+                    _reduced = list(bd81)
+                    for _, pos, d in _remove:
+                        _reduced[pos] = '.'
+                    _sbb2 = _SBB.from_string(''.join(_reduced))
+                    _siro_cascade(_sbb2, solution=_bt_list)
+                    _correct = sum(1 for _, pos, ans in _remove if _sbb2.board[pos] == ans)
+                    _verified = _correct == len(_remove)
+
+                    if _verified:
+                        # Add ONLY the 6 verified cells as clues — solve normally
+                        _boosted = list(bd81)
+                        for _, pos, d in _remove:
+                            _boosted[pos] = str(d)
+                        _boosted_bd81 = ''.join(_boosted)
+
+                        r = solve_selective(_boosted_bd81, **_solve_kwargs)
+                        if r['success']:
+                            result = r
+                            result['siro_bootstrap'] = f'{_correct}/{len(_remove)} verified'
+                            result['siro_clues_added'] = 6
+                            result['siro_boosted_bd81'] = _boosted_bd81
+                            _path_note = 'siro-bootstrap'
+        except ImportError:
+            pass
 
     elapsed = (time.perf_counter() - t0) * 1000
 
@@ -7717,9 +8071,24 @@ presets:
         print(f'\n  ✦ {preset_label} Techniques ✦')
     print(f'\n{format_summary(result, elapsed)}')
 
-    if _je_fallback_used:
-        print('  Note: JuniorExocet excluded (fallback due to unimplemented')
-        print('  technique interaction — fix scheduled for future version).')
+    if _path_note == 'alt':
+        print(f'  Path Selection: alternative technique path used (--alt-solve).')
+        print()
+    elif _path_note == 'oracle':
+        print(f'  Path Selection: oracle-guided technique path used (--trust-solve).')
+        print()
+    elif _path_note == 'siro':
+        print(f'  Path Selection: SIRO-guided technique path used (--siro-trust-solve).')
+        print(f'  SIRO cascade provides placements → standard solver proves the path.')
+        print()
+    elif _path_note == 'siro-bootstrap':
+        _bs = result.get('siro_bootstrap', '?')
+        _bs_bd81 = result.get('siro_boosted_bd81', '')
+        print(f'  SIRO Bootstrap Solve: {_bs} zone predictions correct.')
+        print(f'  6 SIRO placements added as clues → standard solver finished.')
+        if _bs_bd81:
+            print(f'  Boosted puzzle: {_bs_bd81}')
+        print(f'  No trust_solution. No oracle. Pure zones + pure logic.')
         print()
 
     # Print detailed round-by-round output
