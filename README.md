@@ -26,6 +26,12 @@ larsdoku <puzzle> # Normal Solkver!
 larsdoku <puzzle> --siro-trust-solve #  # ( SIRO Guided Solver, zones + logic )  
 larsdoku <puzzle> --siro-bootstrap-solve # ( Noraml Solver, but with Candidate Statistics so a boosted with statisics solver)
 
+or even better use!
+
+https://larsdoku.netlify.app/larsdoku_deploy_hypersiro !! It's a very awesome research tool for Soduku. know the breakdown of the
+
+missing techniques to help you further research into sudoku!
+
 ```
 
  ## The Anthem                                                                                                                                                     
