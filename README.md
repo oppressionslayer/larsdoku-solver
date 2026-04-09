@@ -31,7 +31,7 @@ Larsdoku solves the hardest Sudoku puzzles ever created using only logical deduc
 
 > **Note:** There is a rare bug where JuniorExocet can cause a stall on a very very very small number of puzzles  If you encounter a STALL, try running with `--exclude JuniorExocet` as a workaround. A fix is in progress.
 
-## LarsForge: --auto-reduce Over a UniDecillion reduction to unsolvable seeds from the Lars Seed Variant Database
+## LarsForge: --auto-reduce Over a UniDecillion reduction to unsolvable database seeds from the Lars Database Seed Variant Database
 
 ## LarsForge: 60 Quadrillion Indestructible Puzzles
 
