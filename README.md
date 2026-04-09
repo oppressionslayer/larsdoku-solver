@@ -41,6 +41,104 @@ LarsForge generates **60 quadrillion unique 17-clue puzzles** from the complete 
 
 We are building toward forging all puzzles from an **18-clue minimum base** — one clue above the mathematical floor. At 17 clues, 90% of puzzles solve with basic techniques alone. At 18 clues, the extra clue opens the door to harder, more interesting puzzles while still guaranteeing dimensional uniqueness. When a 24-clue puzzle is built on the forge, removing any clue above the 18-clue base never leads to multiple solutions. Boards that break when reduced to their minimum base are, in our view, backtracker-unreliable — verified at one snapshot, but fragile under interaction. We prefer puzzles with structural integrity all the way down.
 
+# Solving "Unsolvable" Puzzles — mith T&E(3) Collection 
+
+## Puzzle 1: mith seed (34 clues)
+```
+...4.6.89....891.2.8.21.64.2.4...8.18.1.4296........243.762....5...9......8......
+```
+
+```
+$ larsdoku ...4.6.89....891.2.8.21.64.2.4...8.18.1.4296........243.762....5...9......8......
+Status: STALLED (needs LS technique — in development)
+StatusL In Development, can you beat me to the solution ;-)
+
+larsdoku ...4.6.89....891.2.8.21.64.2.4...8.18.1.4296........243.762....5...9......8......  --siro-bootstrap-solve
+
+Status: SOLVED
+Steps:  43
+Time:   2311.0ms
+Verify: All techniques are Sudoku Expert Approved ✓
+
+  Board validated: every row, column, and box contains
+  digits 1-9 exactly once per international Sudoku rules.
+  No backtracking or trial-and-error was used at any point.
+  Every placement was derived by deterministic logic alone.
+
+Techniques:
+  crossHatch              22 ( 51.2%)  L1  █████████████████
+  lastRemaining           12 ( 27.9%)  L1  █████████
+  nakedSingle              5 ( 11.6%)  L1  ███
+  fullHouse                4 (  9.3%)  L1  ███
+  SIRO Bootstrap Solve: 6/6 verified zone predictions correct.
+  6 SIRO placements added as clues → standard solver finished.
+  Boosted puzzle: 020406089050089102080210640204000801801042960000000024307620000500090000048000293
+  No trust_solution. No oracle. Pure zones + pure logic.
+
+
+```
+
+
+## Puzzle 2: mith seed (29 clues)
+```
+.2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132.
+```
+
+```
+$ larsdoku .2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132.
+Status: STALLED (needs LS technique — in development)
+```larsdoku .2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132. --siro-bootstrap-solve
+
+Status: SOLVED
+Steps:  45
+Time:   7070.8ms
+Verify: All techniques are Sudoku Expert Approved ✓
+
+  Board validated: every row, column, and box contains
+  digits 1-9 exactly once per international Sudoku rules.
+  No backtracking or trial-and-error was used at any point.
+  Every placement was derived by deterministic logic alone.
+
+Techniques:
+  crossHatch              24 ( 53.3%)  L1  █████████████████
+  lastRemaining           10 ( 22.2%)  L1  ███████
+  nakedSingle              7 ( 15.6%)  L1  █████
+  fullHouse                4 (  8.9%)  L1  ██
+  SIRO Bootstrap Solve: 6/6 verified zone predictions correct.
+  6 SIRO placements added as clues → standard solver finished.
+  Boosted puzzle: 020000700007109000860007000241000093030904170798000402000092041002340907000701320
+  No trust_solution. No oracle. Pure zones + pure logic.
+
+
+```
+
+## Puzzle 3: SOLVED — Tridagon puzzle (no Tridagon needed!)
+```
+.234.6......18..3...93.7.........1.33.5.1.89...1.3..52......3.8.3.5..92.9..8.3.15
+```
+
+```
+$ larsdoku .234.6......18..3...93.7.........1.33.5.1.89...1.3..52......3.8.3.5..92.9..8.3.15
+Status: SOLVED
+Steps:  49
+Time:   2299.1ms
+WSRF:   FPC, FPCE, FPF
+
+Techniques:
+  nakedSingle             20 ( 32.8%)  L1
+  crossHatch              18 ( 29.5%)  L1
+  ALS_XZ                   7 ( 11.5%)  L5
+  lastRemaining            6 (  9.8%)  L1
+  FPC                      2 (  3.3%)  L5 ★
+  FPF                      2 (  3.3%)  L7 ★
+  WXYZWing                 2 (  3.3%)  L5
+  SimpleColoring           2 (  3.3%)  L4
+  ALS_XYWing               1 (  1.6%)  L5
+  FPCE                     1 (  1.6%)  L5 ★
+```
+
+No Tridagon. No HiddenUR. No backtracking. Pure logic.
+
 ```bash
 larsdoku --reduce-solve ..345...945...9.3...93..4.52..59.34.39.2.4.5..45...9.25.2.4..9..3.9.25..91.7.582. 2018381088
 ======================================================================
