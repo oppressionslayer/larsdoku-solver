@@ -10,7 +10,7 @@ pip install larsdoku==3.4.2
 # Run this for JIT speedups 10x-100x faster!
 larsdoku --warmup
 
-# The website below is a Research tool. it can solve but it is not a traditional solver, it's built for a research. please remember this and have fun using it for your research and solving!
+# The website below is a Research tool. it can solve but it is not a traditional solver, it's built for a research. please remember this and have fun using it for your research and solving! Solve your favorite mith puzzle here!: 
 
 https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 ```
