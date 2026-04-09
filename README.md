@@ -10,7 +10,7 @@ pip install larsdoku==3.4.2
 # Run this for JIT speedups 10x-100x faster!
 larsdoku --warmup
 
-# Research tool. it can solve but it is not a traditional solver, it's built for a research. please remember this.
+# The website below is a Research tool. it can solve but it is not a traditional solver, it's built for a research. please remember this and have fun using it for your research and solving!
 
 https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 ```
@@ -22,7 +22,7 @@ You need to download larsdoku right now!!
 
 Best solver ( i might be biased i wrote it ) New techniques !! 100% solves on many puzzles
 
-larsdoku <puzzle> # Normal Solkver!
+larsdoku <puzzle> #puzzles Normal Solkver!
 larsdoku <puzzle> --siro-trust-solve #  # ( SIRO Guided Solver, zones + logic )  
 larsdoku <puzzle> --siro-bootstrap-solve # ( Noraml Solver, but with Candidate Statistics so a boosted with statisics solver)
 
