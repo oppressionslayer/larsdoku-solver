@@ -197,6 +197,10 @@ Techniques:
 
 ```
 
+## One seed is ● 1,218,998,108,160 — ~1.2 trillion unique puzzles per seed.
+## so from this combo ALS_XYWing,alsxz,als,dr,d2b,fpc,fpce,kf
+## we have 652 seeds, 800 Trillion, almost a Quadrillion unsolvables with just this combination of unsolvables!!
+
 ## Use larsdoku --auto-reduce to reduce a puzzle to look for a solvalble base seed. this database only has base uniques.
 ## puzzles larger than 26 might need to be reduce to see if it has a seed in the database.
 
@@ -247,6 +251,7 @@ Techniques:
 ```
 
 No Tridagon. No HiddenUR. No backtracking. Pure logic.
+● 1,218,998,108,160 — ~1.2 trillion per seed.                                                                                                                                                                                            
 
 ```bash
 larsdoku --reduce-solve ..345...945...9.3...93..4.52..59.34.39.2.4.5..45...9.25.2.4..9..3.9.25..91.7.582. 2018381088
@@ -257,6 +262,7 @@ larsdoku --reduce-solve ..345...945...9.3...93..4.52..59.34.39.2.4.5..45...9.25.
   Clues:  40
 
   Solution: 123456789457189236689327415276598341391274658845631972562843197738912564914765823
+● 1,218,998,108,160 — ~1.2 trillion per seed.                                                                                                                                                                                            
 
   Reducing...
 
