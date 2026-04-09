@@ -5,7 +5,7 @@
 ```
 # Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
 
-pip install larsdoku==3.4.0
+pip install larsdoku==3.4.2
 
 # Run this for JIT speedups 10x-100x faster!
 larsdoku --warmup 
