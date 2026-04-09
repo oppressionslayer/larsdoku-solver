@@ -10,6 +10,7 @@ pip install larsdoku==3.4.2
 # Run this for JIT speedups 10x-100x faster!
 larsdoku --warmup
 
+# Research tool. it can solve but it is not a traditional solver, it's built for a research. please remember this.
 https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 ```
 
