@@ -59,9 +59,7 @@ We are building toward forging all puzzles from an **18-clue minimum base** — 
 ## Puzzle 1: mith seed (34 clues)
 ```
 ...4.6.89....891.2.8.21.64.2.4...8.18.1.4296........243.762....5...9......8......
-```
 
-```
 $ larsdoku ...4.6.89....891.2.8.21.64.2.4...8.18.1.4296........243.762....5...9......8......
 Status: STALLED (needs LS technique — in development)
 StatusL In Development, can you beat me to the solution ;-)
@@ -118,9 +116,7 @@ Techniques:
 ## Puzzle 2: mith seed (29 clues)
 ```
 .2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132.
-```
 
-```
 $ larsdoku .2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132.
 Status: STALLED (needs LS technique — in development)
 ```larsdoku .2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132. --siro-bootstrap-solve
