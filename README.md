@@ -226,6 +226,24 @@ larsdoku --lforge ALS_XYWing,alsxz,als,dr,d2b,fpc,fpce,kf --lforge-exact --lforg
 
 
   # 15 puzzles (exact, --lforge-no-confirm)
+
+larsdoku 030100470074003006600400300049030000020000000300001940450080009700009650000500000
+
+Status: SOLVED
+Steps:  53
+Time:   191.1ms
+WSRF:   FPCE
+
+Techniques:
+  crossHatch              22 ( 39.3%)  L1  █████████████
+  lastRemaining           15 ( 26.8%)  L1  ████████
+  nakedSingle             11 ( 19.6%)  L1  ██████
+  fullHouse                3 (  5.4%)  L1  █
+  FPCE                     2 (  3.6%)  L5  █ ★
+  DeepResonance            1 (  1.8%)  L7  █
+  ALS_XZ                   1 (  1.8%)  L5  █
+  KrakenFish               1 (  1.8%)  L6  █
+
 ```
 
 No Tridagon. No HiddenUR. No backtracking. Pure logic.
