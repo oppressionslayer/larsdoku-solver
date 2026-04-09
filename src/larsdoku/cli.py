@@ -7305,25 +7305,17 @@ presets:
             sys.exit(0)
 
         cands = [d + 1 for d in range(9) if bb.cands[pos] & BIT[d]]
-        n_clues = sum(1 for i in range(81) if bb.board[i] != 0)
-
-        print(f'\n  ╔══════════════════════════════════════╗')
-        print(f'  ║  Cell Inspector: R{row+1}C{col+1}               ║')
-        print(f'  ╚══════════════════════════════════════╝')
-        print(f'  Candidates: {cands} ({len(cands)})')
+        sol = solve_backtrack(bd81)
+        actual = int(sol[pos]) if sol else None
+        br, bc = (row // 3) * 3, (col // 3) * 3
+        box_idx = (row // 3) * 3 + col // 3
 
         # Unit stats
         row_e = sum(1 for j in range(9) if bb.board[row*9+j] == 0)
         col_e = sum(1 for i in range(9) if bb.board[i*9+col] == 0)
-        br, bc = (row // 3) * 3, (col // 3) * 3
         box_e = sum(1 for i in range(br, br+3) for j in range(bc, bc+3) if bb.board[i*9+j] == 0)
-        print(f'  Row {row+1}: {row_e} empty | Col {col+1}: {col_e} empty | Box: {box_e} empty')
 
         # Rival analysis per candidate
-        print(f'\n  ── Rival Analysis ──')
-        print(f'  {"d":>3s}  {"Row":>4s}  {"Col":>4s}  {"Box":>4s}  {"Total":>5s}  {"Zone":>6s}')
-        print(f'  {"─"*30}')
-
         rival_data = []
         for d in cands:
             dbit = BIT[d - 1]
@@ -7336,104 +7328,255 @@ presets:
             col_ratio = cr / max(1, col_e - 1)
             box_ratio = bx / max(1, box_e - 1)
             min_ratio = min(row_ratio, col_ratio, box_ratio)
-            zone = 'likely' if min_ratio <= 1.0 else 'unlikely'
-            rival_data.append((d, rr, cr, bx, total, min_ratio, zone))
-            print(f'  {d:3d}  {rr:4d}  {cr:4d}  {bx:4d}  {total:5d}  {zone:>6s}')
+            # Band/stack analysis
+            band_idx = row // 3
+            stack_idx = col // 3
+            band_rivals = sum(1 for bi in range(band_idx*3, band_idx*3+3)
+                              for bj in range(9) if bb.board[bi*9+bj] == 0
+                              and bi*9+bj != pos and (bb.cands[bi*9+bj] & dbit))
+            stack_rivals = sum(1 for si in range(9)
+                               for sj in range(stack_idx*3, stack_idx*3+3)
+                               if bb.board[si*9+sj] == 0 and si*9+sj != pos
+                               and (bb.cands[si*9+sj] & dbit))
+            band_total = sum(1 for bi in range(band_idx*3, band_idx*3+3)
+                             for bj in range(9) if bb.board[bi*9+bj] == 0 and bi*9+bj != pos)
+            stack_total = sum(1 for si in range(9)
+                              for sj in range(stack_idx*3, stack_idx*3+3)
+                              if bb.board[si*9+sj] == 0 and si*9+sj != pos)
+            band_ratio = band_rivals / max(1, band_total)
+            stack_ratio = stack_rivals / max(1, stack_total)
+            # Placed count
+            placed = sum(1 for i in range(81) if bb.board[i] == d)
+            # Harmonic
+            min_x_d = min_ratio * d
+            nearest_05 = round(min_x_d * 20) / 20
+            harmonic_dist = abs(min_x_d - nearest_05)
+            band_x_d = band_ratio * d
+            band_nearest = round(band_x_d * 20) / 20
+            band_dist = abs(band_x_d - band_nearest)
+            stack_x_d = stack_ratio * d
+            stack_nearest = round(stack_x_d * 20) / 20
+            stack_dist = abs(stack_x_d - stack_nearest)
+            # Score
+            score = rr * row_ratio + cr * col_ratio + bx * box_ratio
+            closeness = abs(d - score)
 
-        # SIRO prediction
-        rival_data.sort(key=lambda x: x[4])
-        siro_pred = rival_data[0][0]
-        siro_rivals = rival_data[0][4]
-        gap = rival_data[1][4] - rival_data[0][4] if len(rival_data) > 1 else 0
+            rival_data.append({
+                'd': d, 'rr': rr, 'cr': cr, 'bx': bx, 'total': total,
+                'row_ratio': row_ratio, 'col_ratio': col_ratio, 'box_ratio': box_ratio,
+                'min_ratio': min_ratio, 'band_ratio': band_ratio, 'stack_ratio': stack_ratio,
+                'band_rivals': band_rivals, 'stack_rivals': stack_rivals,
+                'placed': placed, 'score': score, 'closeness': closeness,
+                'harmonic_dist': harmonic_dist, 'band_dist': band_dist, 'stack_dist': stack_dist,
+                'min_x_d': min_x_d, 'band_x_d': band_x_d, 'stack_x_d': stack_x_d,
+                'nearest_05': nearest_05, 'band_nearest': band_nearest, 'stack_nearest': stack_nearest,
+            })
+
+        # Sort by total rivals (SIRO prediction = fewest rivals)
+        rival_data.sort(key=lambda x: x['total'])
+        siro_pred = rival_data[0]['d']
+        siro_rivals = rival_data[0]['total']
+        gap = rival_data[1]['total'] - rival_data[0]['total'] if len(rival_data) > 1 else 0
 
         # Scout detection
-        siro_dbit = BIT[siro_pred - 1]
+        from .engine import PEERS as _PEERS
         is_scout = False
-        scout_cell = ''
-        for j in range(9):
-            if j == col: continue
-            peer = row * 9 + j
-            if bb.board[peer] != 0: continue
-            pcands = [dd + 1 for dd in range(9) if bb.cands[peer] & BIT[dd]]
-            if len(pcands) < 2: continue
-            best_pd, best_ps = -1, 999
-            for dd in pcands:
-                ps = sum(1 for jj in range(9) if jj != j and bb.board[row*9+jj] == 0 and (bb.cands[row*9+jj] & BIT[dd-1]))
-                ps += sum(1 for ii in range(9) if ii != row and bb.board[ii*9+j] == 0 and (bb.cands[ii*9+j] & BIT[dd-1]))
-                pbr, pbc = (row // 3) * 3, (j // 3) * 3
-                ps += sum(1 for ii in range(pbr, pbr+3) for jj in range(pbc, pbc+3)
-                         if (ii != row or jj != j) and bb.board[ii*9+jj] == 0 and (bb.cands[ii*9+jj] & BIT[dd-1]))
-                if ps < best_ps: best_ps, best_pd = ps, dd
-            if best_pd == siro_pred:
+        scout_cells = []
+        siro_dbit = BIT[siro_pred - 1]
+        for p2 in _PEERS[pos]:
+            if bb.board[p2] != 0: continue
+            if not (bb.cands[p2] & siro_dbit): continue
+            p2_cands = [dd+1 for dd in range(9) if bb.cands[p2] & BIT[dd]]
+            if len(p2_cands) < 2: continue
+            best_d, best_s = -1, 999
+            for dd in p2_cands:
+                s = sum(1 for pp in _PEERS[p2] if bb.board[pp] == 0 and (bb.cands[pp] & BIT[dd-1]))
+                if s < best_s: best_s, best_d = s, dd
+            if best_d == siro_pred:
                 is_scout = True
-                scout_cell = f'R{row+1}C{j+1}'
-                break
+                scout_cells.append(f'R{p2//9+1}C{p2%9+1}')
 
-        # Technique prediction
-        if len(cands) <= 2:
-            tech_pred = 'ForcingChain'
-        elif siro_rivals < 6:
-            tech_pred = 'FPC'
-        elif siro_rivals < 7:
-            tech_pred = 'D2B'
-        elif siro_rivals >= 8:
-            tech_pred = 'FPCE'
-        else:
-            tech_pred = 'FPF'
+        # Technique prediction (feature-based like HTML)
+        conj_units = 0
+        for ui in range(27):
+            unit_cells = []
+            if ui < 9:
+                unit_cells = [ui*9+j for j in range(9)]
+            elif ui < 18:
+                unit_cells = [i*9+(ui-9) for i in range(9)]
+            else:
+                ubi = ui - 18
+                ubr, ubc = (ubi//3)*3, (ubi%3)*3
+                unit_cells = [ubr*9+ubc+dr*9+dc for dr in range(3) for dc in range(3)]
+            count = sum(1 for c in unit_cells if bb.board[c] == 0 and (bb.cands[c] & siro_dbit))
+            if count == 2: conj_units += 1
 
-        print(f'\n  ── SIRO Prediction ──')
-        print(f'  Predicted digit: {siro_pred} (rivals={siro_rivals}, gap={gap})')
-        if is_scout:
-            print(f'  ⚠ SCOUT: {siro_pred} is also rank-1 in {scout_cell}')
-            if len(rival_data) > 1:
-                print(f'  Swap suggestion: {rival_data[1][0]} (rivals={rival_data[1][4]})')
+        spreads = [r['total'] for r in rival_data]
+        digit_min_spread = max(spreads) - min(spreads) if len(spreads) > 1 else 0
+        avg_cross = sum(r['total'] for r in rival_data) / max(1, len(rival_data))
+        sum_ratio = sum(r['min_ratio'] for r in rival_data)
+        ratio_spread = max(r['min_ratio'] for r in rival_data) - min(r['min_ratio'] for r in rival_data) if rival_data else 0
+        board_progress = sum(1 for i in range(81) if bb.board[i] != 0) / 81
 
-        print(f'\n  ── Technique Prediction ──')
-        print(f'  Predicted: {tech_pred}')
-        print(f'  Confidence: {"HIGH" if gap >= 4 else "MED" if gap >= 2 else "LOW"}')
+        if digit_min_spread <= 1: tech_pred = 'FPCE'
+        elif conj_units > 0 and digit_min_spread <= 2: tech_pred = 'GF2'
+        elif digit_min_spread >= 3: tech_pred = 'FPF'
+        elif avg_cross >= 12: tech_pred = 'ForcingChain'
+        elif sum_ratio / max(1, len(rival_data)) >= 0.15: tech_pred = 'ForcingChain'
+        else: tech_pred = 'FPC'
+        tech_conf = 'HIGH' if digit_min_spread >= 3 else 'MED' if gap >= 2 else 'LOW'
 
-        # Cascade depth analysis
+        # Cascade depth
         L1_SET = {'crossHatch', 'nakedSingle', 'fullHouse', 'lastRemaining'}
-        L2_SET = {'Zone135', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
-        CASCADE_SET_INS = L1_SET | L2_SET
+        cell_depth = None; cell_technique = None; total_bn = 0
         try:
             casc_result = solve_selective(bd81, detail=True)
             bn_count = 0
-            cell_depth = None
-            cell_technique = None
             for step in casc_result.get('steps', []):
-                tech_s = step.get('technique', '')
-                if tech_s not in CASCADE_SET_INS:
-                    bn_count += 1
+                if step.get('technique', '') not in L1_SET: bn_count += 1
                 if step.get('pos') == pos:
-                    cell_depth = bn_count
-                    cell_technique = tech_s
-                    break
+                    cell_depth = bn_count; cell_technique = step.get('technique', ''); break
+            total_bn = sum(1 for s in casc_result.get('steps', []) if s.get('technique', '') not in L1_SET)
+        except Exception: pass
 
-            print(f'\n  ── Cascade Depth ──')
-            if cell_depth is not None:
-                if cell_depth == 0:
-                    print(f'  This cell cascades from basic techniques (depth=0)')
+        # ── RICH OUTPUT ──
+        try:
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
+            from rich.text import Text
+            from rich.columns import Columns
+            rc = Console()
+
+            # Header
+            rc.print(Panel(f'[bold white]Cell Inspector: R{row+1}C{col+1}[/bold white]\n'
+                           f'Candidates: [cyan]{", ".join(str(c) for c in cands)}[/cyan] ({len(cands)})\n'
+                           f'Row {row+1}: {row_e} empty | Col {col+1}: {col_e} empty | Box {box_idx+1}: {box_e} empty',
+                           title='[bold yellow]🔍 INSPECTOR[/bold yellow]', border_style='yellow'))
+
+            # Rival Table
+            rt = Table(title='[bold]Rival Analysis[/bold]', show_header=True, header_style='bold cyan')
+            rt.add_column('d', justify='center', style='bold')
+            rt.add_column('Row', justify='right')
+            rt.add_column('Col', justify='right')
+            rt.add_column('Box', justify='right')
+            rt.add_column('Total', justify='right', style='bold')
+            rt.add_column('Band', justify='right')
+            rt.add_column('Stack', justify='right')
+            rt.add_column('Min Ratio', justify='right')
+            rt.add_column('Placed', justify='right')
+            for r in rival_data:
+                is_answer = r['d'] == actual
+                is_pred = r['d'] == siro_pred
+                d_style = 'bold green' if is_answer else ('bold yellow' if is_pred else '')
+                mark = ' ★' if is_answer else (' ←' if is_pred else '')
+                rt.add_row(
+                    f'{r["d"]}{mark}', str(r['rr']), str(r['cr']), str(r['bx']),
+                    str(r['total']), str(r['band_rivals']), str(r['stack_rivals']),
+                    f'{r["min_ratio"]:.3f}', f'{r["placed"]}/9',
+                    style=d_style)
+            rc.print(rt)
+
+            # Dynamic Zones (SIR Analysis)
+            rc.print(Panel('[bold]Dynamic Zones — SIR Analysis[/bold]', border_style='magenta'))
+            for rank, r in enumerate(rival_data):
+                d = r['d']
+                is_answer = d == actual
+                is_pred = d == siro_pred
+                is_scouting = is_pred and is_scout
+
+                if rank == 0 and not is_scouting:
+                    zone_label = '🟢 BEST PICK — likely #1'
+                    color = 'bold green'
+                elif rank == 0 and is_scouting:
+                    zone_label = f'🟡 Scout — rank-1 here AND in {", ".join(scout_cells[:3])} — scouting'
+                    color = 'bold yellow'
+                elif rank == 1:
+                    zone_label = '🟡 Contender — likely #2'
+                    color = 'yellow'
                 else:
-                    print(f'  Depth: {cell_depth} (needs {cell_depth} bottleneck move{"s" if cell_depth > 1 else ""} first)')
-                if cell_technique:
-                    cat = 'cascade' if cell_technique in CASCADE_SET_INS else 'bottleneck ★'
-                    print(f'  Actual technique: {cell_technique} ({cat})')
+                    zone_label = f'⚪ Fringe — likely #{rank+1}'
+                    color = 'dim'
 
-            total_bn = sum(1 for s in casc_result.get('steps', [])
-                          if s.get('technique', '') not in CASCADE_SET_INS)
-            print(f'  Puzzle bottleneck depth: {total_bn}')
-        except Exception:
-            pass
+                # Harmonic analysis
+                h_mark = '★ PERFECT' if r['harmonic_dist'] < 0.005 else ('✦ CLOSE' if r['harmonic_dist'] < 0.02 else '')
+                b_mark = '★ PERFECT' if r['band_dist'] < 0.005 else ('✦ CLOSE' if r['band_dist'] < 0.02 else '')
+                s_mark = '★ PERFECT' if r['stack_dist'] < 0.005 else ('✦ CLOSE' if r['stack_dist'] < 0.02 else '')
 
-        # Get actual answer if we can solve
-        sol = solve_backtrack(bd81)
-        if sol:
-            actual = int(sol[pos])
-            siro_correct = siro_pred == actual
-            print(f'\n  ── Oracle ──')
-            print(f'  Answer: {actual}')
-            print(f'  SIRO: {"✓ CORRECT" if siro_correct else "✗ WRONG"}')
+                oracle_mark = ' ✓ ANSWER' if is_answer else ''
+
+                rc.print(f'  [{color}]{d} {zone_label}{oracle_mark}[/{color}]')
+                rc.print(f'    ROW {r["rr"]}/{max(1,row_e-1)} = {r["row_ratio"]:.3f}  |  '
+                         f'COL {r["cr"]}/{max(1,col_e-1)} = {r["col_ratio"]:.3f}  |  '
+                         f'BOX {r["bx"]}/{max(1,box_e-1)} = {r["box_ratio"]:.3f}')
+                rc.print(f'    BAND {r["band_rivals"]}: ratio={r["band_ratio"]:.3f}  |  '
+                         f'STACK {r["stack_rivals"]}: ratio={r["stack_ratio"]:.3f}  |  '
+                         f'Placed {r["placed"]}/9')
+                rc.print(f'    min_ratio={r["min_ratio"]:.3f}  score={r["score"]:.2f}  '
+                         f'|d-score|={r["closeness"]:.2f}')
+                rc.print(f'    harmonic: min×d={r["min_x_d"]:.3f} → .05={r["nearest_05"]:.3f} dist={r["harmonic_dist"]:.4f} {h_mark}')
+                rc.print(f'    band:    band×d={r["band_x_d"]:.3f} → .05={r["band_nearest"]:.3f} dist={r["band_dist"]:.4f} {b_mark}')
+                rc.print(f'    stack:  stack×d={r["stack_x_d"]:.3f} → .05={r["stack_nearest"]:.3f} dist={r["stack_dist"]:.4f} {s_mark}')
+                rc.print()
+
+            # Technique Predictor
+            tree_rule = (f'spread=1→FPCE | conj={conj_units}→GF2 | spread≥3→FPF | '
+                         f'cross≥12→FC | ratio≥.15→FC | default→FPC')
+            tp = Table(title=f'[bold]Technique Predictor: {tech_pred} ({tech_conf})[/bold]',
+                       show_header=True, header_style='bold')
+            tp.add_column('Feature', style='cyan')
+            tp.add_column('Value', justify='right')
+            tp.add_row('conjugate_units', str(conj_units))
+            tp.add_row('digit_min_spread', str(digit_min_spread))
+            tp.add_row('avg_cross', f'{avg_cross:.2f}')
+            tp.add_row('sum_ratio', f'{sum_ratio:.2f}')
+            tp.add_row('ratio_spread', f'{ratio_spread:.2f}')
+            tp.add_row('board_progress', f'{board_progress:.2f}')
+            rc.print(tp)
+            rc.print(f'  [dim]Tree: {tree_rule}[/dim]')
+
+            # Cascade Depth
+            rc.print()
+            if cell_depth is not None:
+                cat = 'cascade' if cell_technique in L1_SET else 'bottleneck ★'
+                rc.print(Panel(f'[bold]Cascade Depth: {cell_depth}[/bold]\n'
+                               f'Actual technique: [cyan]{cell_technique}[/cyan] ({cat})\n'
+                               f'Puzzle bottleneck depth: {total_bn}',
+                               title='[bold]⛓ Cascade[/bold]', border_style='blue'))
+            else:
+                rc.print(Panel(f'Puzzle bottleneck depth: {total_bn}',
+                               title='[bold]⛓ Cascade[/bold]', border_style='blue'))
+
+            # Oracle
+            if actual:
+                siro_correct = siro_pred == actual
+                oracle_style = 'bold green' if siro_correct else 'bold red'
+                oracle_mark = '✓ CORRECT' if siro_correct else '✗ WRONG'
+                rc.print(Panel(f'Answer: [bold]{actual}[/bold]\n'
+                               f'SIRO Prediction: [bold]{siro_pred}[/bold]\n'
+                               f'[{oracle_style}]{oracle_mark}[/{oracle_style}]',
+                               title='[bold]🎯 Oracle[/bold]', border_style='green' if siro_correct else 'red'))
+
+        except ImportError:
+            # Fallback: plain text (current behavior)
+            print(f'\n  ╔══════════════════════════════════════╗')
+            print(f'  ║  Cell Inspector: R{row+1}C{col+1}               ║')
+            print(f'  ╚══════════════════════════════════════╝')
+            print(f'  Candidates: {cands} ({len(cands)})')
+            print(f'  Row {row+1}: {row_e} empty | Col {col+1}: {col_e} empty | Box: {box_e} empty')
+            print(f'\n  ── Rival Analysis ──')
+            print(f'  {"d":>3s}  {"Row":>4s}  {"Col":>4s}  {"Box":>4s}  {"Total":>5s}  {"MinR":>6s}')
+            print(f'  {"─"*35}')
+            for r in rival_data:
+                mark = ' ★' if r['d'] == actual else (' ←' if r['d'] == siro_pred else '')
+                print(f'  {r["d"]:3d}{mark:2s} {r["rr"]:4d}  {r["cr"]:4d}  {r["bx"]:4d}  {r["total"]:5d}  {r["min_ratio"]:.3f}')
+            print(f'\n  SIRO Prediction: {siro_pred} (rivals={siro_rivals}, gap={gap})')
+            if is_scout: print(f'  ⚠ SCOUT in {", ".join(scout_cells[:3])}')
+            print(f'  Technique: {tech_pred} ({tech_conf})')
+            if cell_depth is not None:
+                print(f'  Cascade depth: {cell_depth}, technique: {cell_technique}')
+            if actual:
+                print(f'  Oracle: {actual} {"✓" if siro_pred == actual else "✗"}')
 
         sys.exit(0)
 
