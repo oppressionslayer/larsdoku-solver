@@ -19,7 +19,7 @@ You need to download larsdoku right now!!
 Best solver ( i might be biased i wrote it ) New techniques !! 100% solves on many puzzles
 
 larsdoku <puzzle> # Normal Solkver!
-larsdoku <puzzle> --trust-solve # ( T&E Solver )
+larsdoku <puzzle> --siro-trust-solve # ( T&E Solver )
 larsdoku <puzzle> --siro-bootstrap-solve # ( Noraml Solver, but with Candidate Statistics so a boosted with statisics solver)
 
 ```
@@ -88,6 +88,29 @@ Techniques:
   Boosted puzzle: 020406089050089102080210640204000801801042960000000024307620000500090000048000293
   No trust_solution. No oracle. Pure zones + pure logic.
 
+larsdoku .2....7....71.9...86...7..........93.3.9.417.......4.2....92.41..234.9.7...7.132. --siro-trust-solve
+
+Status: SOLVED
+Steps:  50
+Time:   6844.2ms
+WSRF:   FPC, FPF
+
+Techniques:
+  crossHatch              22 ( 34.4%)  L1  ███████████
+  lastRemaining           13 ( 20.3%)  L1  ██████
+  nakedSingle             10 ( 15.6%)  L1  █████
+  ALS_XZ                   9 ( 14.1%)  L5  ████
+  KrakenFish               2 (  3.1%)  L6  █
+  FPC                      2 (  3.1%)  L5  █ ★
+  fullHouse                2 (  3.1%)  L1  █
+  AlignedPairExcl          1 (  1.6%)  L5  █
+  FPF                      1 (  1.6%)  L7  █ ★
+  SimpleColoring           1 (  1.6%)  L4  █
+  ALS_XYWing               1 (  1.6%)  L5  █
+  Path Selection: SIRO-guided technique path used (--siro-trust-solve).
+  SIRO cascade provides placements → standard solver proves the path.
+
+
 
 ```
 
@@ -121,6 +144,26 @@ Techniques:
   6 SIRO placements added as clues → standard solver finished.
   Boosted puzzle: 020000700007109000860007000241000093030904170798000402000092041002340907000701320
   No trust_solution. No oracle. Pure zones + pure logic.
+
+larsdoku ...4.6.89....891.2.8.21.64.2.4...8.18.1.4296........243.762....5...9......8...... --siro-trust-solve
+
+Status: SOLVED
+Steps:  48
+Time:   2269.6ms
+WSRF:   D2B, FPC, FPCE
+
+Techniques:
+  crossHatch              26 ( 49.1%)  L1  ████████████████
+  nakedSingle             16 ( 30.2%)  L1  ██████████
+  ALS_XZ                   3 (  5.7%)  L5  █
+  D2B                      2 (  3.8%)  L6  █ ★
+  lastRemaining            2 (  3.8%)  L1  █
+  AlignedPairExcl          1 (  1.9%)  L5  █
+  ALS_XYWing               1 (  1.9%)  L5  █
+  FPC                      1 (  1.9%)  L5  █ ★
+  FPCE                     1 (  1.9%)  L5  █ ★
+  Path Selection: SIRO-guided technique path used (--siro-trust-solve).
+  SIRO cascade provides placements → standard solver proves the path.
 
 
 ```
