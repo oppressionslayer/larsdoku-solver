@@ -19,7 +19,7 @@ You need to download larsdoku right now!!
 Best solver ( i might be biased i wrote it ) New techniques !! 100% solves on many puzzles
 
 larsdoku <puzzle> # Normal Solkver!
-larsdoku <puzzle> --siro-trust-solve # ( T&E Solver )
+larsdoku <puzzle> --siro-trust-solve #  # ( SIRO Guided Solver, zones + logic )  
 larsdoku <puzzle> --siro-bootstrap-solve # ( Noraml Solver, but with Candidate Statistics so a boosted with statisics solver)
 
 ```
