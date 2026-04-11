@@ -2,7 +2,7 @@
 
 ```
 
-https://larsdoku.netlify.app/
+https://larsdoku.netlify.app/https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 
 https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 
@@ -454,7 +454,7 @@ on-ramp for the rest of the codebase.
 
 If you want to dive in right now:
 
-1. Install larsdoku 3.4.7
+1. Install larsdoku 3.4.8
 2. Run `larsdoku '<any hard puzzle>' --with-zoneded --level 7 --verbose`
 3. When you see a `Zone Deduction Points` line, that is a missing
    technique. Pick a zone slot you find interesting, gather 20-50
