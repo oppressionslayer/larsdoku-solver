@@ -1,8 +1,16 @@
 # Hunting New Sudoku Techniques with larsdoku + AI
 
+```
+
+https://larsdoku.netlify.app/
+
+https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
+
+```
+
 A research guide for joining the party.
 
-larsdoku 3.4.7 is a pure-logic sudoku solver with 44 pattern detectors. It is
+larsdoku 3.4.8 is a pure-logic sudoku solver with 44 pattern detectors. It is
 also a research instrument: when you give it a hard puzzle and it stalls, the
 stall is a **fingerprint of a technique nobody has named yet**. This guide
 shows you how to install it, run it in research mode, and use any AI assistant
