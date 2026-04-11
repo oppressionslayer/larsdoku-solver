@@ -694,7 +694,7 @@ Techniques:
 
 ```
 
-## Puzzle 3: SOLVED — Tridagon puzzle (no Tridagon needed!)
+## Puzzle 3: SOLVED 
 ```
 .234.6......18..3...93.7.........1.33.5.1.89...1.3..52......3.8.3.5..92.9..8.3.15
 ```
@@ -818,7 +818,6 @@ Techniques:
 
 ```
 
-No Tridagon. No HiddenUR. No backtracking. Pure logic.
 ● 1,218,998,108,160 — ~1.2 trillion per seed.                                                                                                                                                                                            
 
 ```bash
