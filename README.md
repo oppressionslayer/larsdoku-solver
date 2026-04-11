@@ -7,7 +7,7 @@ https://larsdoku.netlify.app/
 
 https://larsdoku.netlify.app/larsdoku_deploy_hypersiro
 
-Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githubusercontent.com/oppressionslayer/wsrf-sudoku-solved-series/refs/heads/main/puzzles5_forum_hardest_1905_11%2B.txt
+Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githubusercontent.com/oppressionslayer/wsrf-sudoku-solved-series/refs/heads/main/puzzles5_forum_hardest_1905_11plus.txt
 
 ```
 
