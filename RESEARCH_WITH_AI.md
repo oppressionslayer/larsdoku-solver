@@ -59,7 +59,7 @@ Verify:
 
 ```bash
 larsdoku --version
-# larsdoku 3.4.7
+# larsdoku 3.4.8
 ```
 
 ---
