@@ -37,7 +37,7 @@ from .engine import (
     detect_fpc_bitwise, detect_fpce_bitwise,
     detect_forcing_chain_bitwise, detect_forcing_net, detect_forcing_net_v2,
     detect_rectangle_elimination, detect_xy_chain, detect_dpi,
-    detect_wxyz_wing, detect_xyz_wing, detect_3d_medusa,
+    detect_wxyz_wing, detect_lzwing, detect_xyz_wing, detect_3d_medusa,
     detect_hidden_unique_rectangle, detect_grouped_x_cycle,
     detect_tridagon_legacy, detect_ls, detect_ur_type2d, detect_avoidable_rectangle,
     detect_w_wing, detect_fireworks, detect_almost_locked_pair,
@@ -69,7 +69,7 @@ TECHNIQUE_LEVELS = {
     'DeathBlossom': 5,
     'FPC': 5, 'FPCE': 5,
     'ForcingChain': 5, 'ForcingNet': 5, 'XYChain': 5, 'RectElim': 5, 'FNv2': 7,
-    'XYZWing': 4, 'WXYZWing': 5, '3DMedusa': 5, 'HiddenUR': 5, 'GroupedXCycle': 4,
+    'XYZWing': 4, 'WXYZWing': 5, 'LZWing': 5, '3DMedusa': 5, 'HiddenUR': 5, 'GroupedXCycle': 4,
     'Tridagon': 6, 'LS': 5, 'WWing': 4, 'Fireworks': 5, 'AlmostLockedPair': 4,
     'ChuteRemotePair': 4,
     'BUG+1': 6, 'URType2': 6, 'URType2d': 6, 'AvoidableRect': 6, 'URType4': 6,
@@ -117,7 +117,18 @@ TECHNIQUE_ALIASES = {
 # WSRF inventions (excluded from expert-approved preset)
 WSRF_INVENTIONS = {'FPC', 'FPCE', 'D2B', 'FPF', 'GF2_Lanczos', 'GF2_Extended', 'GF2_Probe'}
 
-# Experimental techniques — research detectors not ready for production
+# Experimental techniques — research detectors not ready for production.
+# Default: not allowed by solve_selective; opt-in via `only_techniques`.
+#
+# Note: WXYZWing was briefly moved here on 2026-04-10 during the soundness
+# audit because its residual Z >= 3 heuristic is not logically forced.
+# It was moved back after a full mith 158K re-benchmark showed LZWing
+# alone cannot solve the early (hardest) section of mith — WXYZWing's
+# lucky-correct eliminations contribute ~50 percentage points on that
+# region. LZWing remains the sound primary detector dispatched before
+# ALS_XZ (cli.py ~813), and WXYZWing fires only as a last-resort fallback
+# at cli.py ~1458. See WXYZ_CASE_STUDY.md for the six worked examples and
+# SOUNDNESS_AUDIT.md for the full audit trade-off discussion.
 EXPERIMENTAL_TECHNIQUES = {'JETest', 'DPI'}
 
 # Sudoku Expert Approved — standard L1-L6 techniques only (no WSRF inventions)
@@ -796,6 +807,22 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['XCycle'] = technique_counts.get('XCycle', 0) + 1
                 continue
 
+        # LZWing (sound Z=2 case of WXYZ-Wing — run early before ALS_XZ
+        # eats the patterns)
+        if allowed('LZWing'):
+            lz_elims = detect_lzwing(bb)
+            if lz_elims:
+                if detail:
+                    elim_events.append({
+                        'round': round_num, 'technique': 'LZWing',
+                        'eliminations': list(lz_elims),
+                        'detail': f'LZWing: {len(lz_elims)} eliminations',
+                    })
+                for pos, d in lz_elims:
+                    bb.eliminate(pos, d)
+                technique_counts['LZWing'] = technique_counts.get('LZWing', 0) + 1
+                continue
+
         # ALS-XZ
         if allowed('ALS_XZ'):
             als_elims = detect_als_xz_bitwise(bb)
@@ -1427,6 +1454,12 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['3DMedusa'] = technique_counts.get('3DMedusa', 0) + 1
                 last_resort_hit = True
 
+        # WXYZWing — last-resort heuristic fallback. LZWing (dispatched at
+        # cli.py ~813, before ALS_XZ) is the primary sound detector in this
+        # family. WXYZWing fires here only when LZWing and all other L5
+        # techniques have stalled. Its Z>=3 residual heuristic is not
+        # strictly sound (see WXYZ_CASE_STUDY.md) but contributes
+        # significantly to mith 158K solve rate in the early hard region.
         if not last_resort_hit and allowed('WXYZWing'):
             wxyz_elims = detect_wxyz_wing(bb)
             if wxyz_elims:
@@ -7864,10 +7897,33 @@ presets:
 
     # ── Full solve mode ──
     use_detail = args.detail
-    # ── --with-zoneded: hybrid technique + zone deduction mode ──
+    # ── --with-zoneded: hybrid technique + one-shot zone deduction loop ──
+    #
+    # Flow:
+    #   1. Run the normal technique chain
+    #   2. If stalled, apply ONE zone deduction (cross-digit → xhatch → direct
+    #      rank-1) using zone math from wsrf_zone (skip-oracle validated against
+    #      the backtracker solution — this is "siro with backtracking")
+    #   3. Loop back to (1) — let techniques cascade off the new placement
+    #   4. Stop when neither side can move forward
+    #
+    # IMPORTANT: zone deductions only fire at stall points. We do not call
+    # siro_cascade because it solves the whole puzzle by itself (cross-digit +
+    # xhatch + naked single + hidden single + L2 in one pass). The research
+    # signal we want is "where did techniques get stuck?" — each zone deduction
+    # marks a cell where the standard technique chain ran out and a zone-rank
+    # prediction unstuck it. The zone phase is the only place we use the
+    # backtracker solution; the technique phase runs the normal solver to
+    # avoid the trust_solution wrapper overhead on L5+ techniques.
     if getattr(args, 'with_zoneded', False):
-        from .wsrf_zone import siro_cascade, compute_likely_map, sir_find_cross_digit_oracles, \
-            sir_find_xhatch_oracles, sir_compute_xhatch, would_be_illegal
+        from .wsrf_zone import (
+            compute_likely_map,
+            sir_find_cross_digit_oracles,
+            sir_find_xhatch_oracles,
+            sir_compute_xhatch,
+            would_be_illegal,
+            would_be_illegal_deep,
+        )
         import time as _time
 
         _sol = solve_backtrack(bd81)
@@ -7880,11 +7936,10 @@ presets:
         t0_zd = _time.perf_counter()
 
         all_tech_counts = {}
-        zone_ded_count = 0
-        zone_ded_steps = []
+        zone_ded_steps = []   # list of (subtype, pos, digit, round) — research signal
         tech_steps_total = 0
-        round_num = 0
-        max_rounds = 50
+        outer_round = 0
+        max_outer_rounds = 200  # generous; we break on no-progress anyway
 
         try:
             _rc = None
@@ -7893,83 +7948,173 @@ presets:
         except ImportError:
             pass
 
-        while round_num < max_rounds:
-            round_num += 1
+        # WSRF zone position: which slot inside the 3x3 box does this cell occupy?
+        # Each box's 9 cells map to TL/TC/TR/ML/MC/MR/BL/BC/BR. There are 9
+        # zones, each containing one cell from each of the 9 boxes (a "zone
+        # position" is a positional role within a box).
+        _ZD_ZONE_NAMES = (
+            ('TL', 'TC', 'TR'),
+            ('ML', 'MC', 'MR'),
+            ('BL', 'BC', 'BR'),
+        )
+
+        def _zone_for_pos(pos):
+            r, c = pos // 9, pos % 9
+            return _ZD_ZONE_NAMES[r % 3][c % 3]
+
+        def _log_zone_ded(subtype, pos, digit, idx, rnd):
+            r, c = pos // 9, pos % 9
+            zone = _zone_for_pos(pos)
+            if subtype == 'cross-digit':
+                tag = 'CROSS-DIGIT'
+                colour = 'bold yellow'
+                glyph = '★'
+            elif subtype == 'xhatch':
+                tag = 'XHATCH'
+                colour = 'bold magenta'
+                glyph = '◆'
+            else:
+                tag = subtype.upper()
+                colour = 'bold cyan'
+                glyph = '◇'
+            msg = (f"{glyph} ZONE DEDUCTION #{idx} (round {rnd}): "
+                   f"R{r+1}C{c+1}={digit}  zone={zone}  [{tag}]")
+            if _rc:
+                _rc.print(f'  [{colour}]  {msg}[/{colour}]')
+            else:
+                print(f'  {msg}')
+
+        def _apply_one_zone_deduction(rnd):
+            """Find ONE valid zone-oracle placement and apply it to bb_zd.
+            Tries cross-digit → xhatch → direct rank-1, in that order.
+            Returns the (subtype, pos, digit) tuple if a placement was made,
+            or None if no zone oracle could fire on the current board state."""
+            lm = compute_likely_map(bb_zd)
+
+            # 1. Cross-digit oracles (highest priority — historically 100%)
+            cd_oracles = sir_find_cross_digit_oracles(bb_zd, lm, solution=sol_list)
+            for orc in cd_oracles:
+                ill, _ = would_be_illegal(bb_zd, orc['pos'], orc['digit'])
+                if ill:
+                    continue
+                bb_zd.place(orc['pos'], orc['digit'])
+                return ('cross-digit', orc['pos'], orc['digit'])
+
+            # 2. XHatch oracles (rank-1 demoted by cross-hatch promotion)
+            xh = sir_compute_xhatch(bb_zd)
+            xh_oracles = sir_find_xhatch_oracles(bb_zd, lm, xh, solution=sol_list)
+            for xo in xh_oracles:
+                ill, _ = would_be_illegal_deep(bb_zd, xo['pos'], xo['digit'])
+                if ill:
+                    continue
+                bb_zd.place(xo['pos'], xo['digit'])
+                return ('xhatch', xo['pos'], xo['digit'])
+
+            # 3. Direct rank-1 fallback — pick the most-confident zone rank-1
+            # cell whose placement is legal (mirrors siro_cascade Phase 3).
+            r1_cells = []
+            for pos in range(81):
+                if bb_zd.board[pos] != 0:
+                    continue
+                ranked = lm.get(pos)
+                if not ranked:
+                    continue
+                items = [x for x in ranked if bb_zd.cands[pos] & BIT[x['d'] - 1]]
+                if not items:
+                    continue
+                items.sort(key=lambda x: abs(x['d'] - x['score']))
+                rank1d = items[0]['d']
+                if not (bb_zd.cands[pos] & BIT[rank1d - 1]):
+                    continue
+                closeness = abs(rank1d - items[0]['score'])
+                cand_size = bin(bb_zd.cands[pos]).count('1')
+                r1_cells.append((cand_size, closeness, pos, rank1d))
+            r1_cells.sort()
+            for _cs, _cl, pos, digit in r1_cells:
+                ill, _ = would_be_illegal(bb_zd, pos, digit)
+                if ill:
+                    continue
+                bb_zd.place(pos, digit)
+                return ('direct-rank1', pos, digit)
+
+            return None
+
+        # Need BIT for the direct rank-1 fallback above
+        from .engine import BIT
+
+        _zd_debug = getattr(args, 'verbose', False) or getattr(args, 'steps', False)
+
+        # Main loop: techniques cascade fully → if stalled, ONE zone deduction → repeat
+        # solve_selective already loops internally until no technique can fire,
+        # so each call exhausts the technique chain on the current state. We
+        # only re-call it AFTER a zone deduction places a new digit (which
+        # opens up new technique opportunities).
+        while outer_round < max_outer_rounds:
+            outer_round += 1
             remaining = sum(1 for i in range(81) if bb_zd.board[i] == 0)
+            if _zd_debug:
+                print(f'  [zd-loop] round {outer_round}: remaining={remaining}')
             if remaining == 0:
                 break
 
-            # Run techniques with oracle-guarded eliminations
-            bd_str = ''.join(str(bb_zd.board[i]) if bb_zd.board[i] != 0 else '.' for i in range(81))
-            result = solve_selective(bd_str, max_level=args.level, only_techniques=only_techniques,
-                                    trust_solution=_sol)
+            # Phase A: run the full technique chain. trust_solution is
+            # intentionally NOT used here — its GuardedBB wrapper makes
+            # L5+ techniques 10-100x slower via __getattr__ overhead.
+            # Validation happens at the zone phase (skip-oracle) and at
+            # the final state check (does bb_zd match the solution).
+            bd_str = ''.join(str(bb_zd.board[i]) if bb_zd.board[i] != 0 else '.'
+                             for i in range(81))
+            result = solve_selective(
+                bd_str, max_level=args.level, only_techniques=only_techniques)
 
-            # Apply technique placements to our board
+            # Apply technique placements to bb_zd. step['digit'] is 1-9.
+            # Stop at the first wrong placement — that's where unsound
+            # eliminations corrupted the candidate set. The zone phase will
+            # then attempt to make progress from the last-known-good state.
             placed_this_round = 0
+            corrupted = False
             for step in result.get('steps', []):
                 pos, digit = step['pos'], step['digit']
-                if bb_zd.board[pos] == 0:
-                    bb_zd.place(pos, digit - 1)
-                    placed_this_round += 1
-                    tech_steps_total += 1
+                if bb_zd.board[pos] != 0:
+                    continue
+                if sol_list[pos] != digit:
+                    if _zd_debug:
+                        r2, c2 = pos // 9, pos % 9
+                        print(f'  [zd-loop]   wrong placement R{r2+1}C{c2+1}={digit} '
+                              f'(truth={sol_list[pos]}) — abort technique cascade')
+                    corrupted = True
+                    break
+                bb_zd.place(pos, digit)
+                tech_steps_total += 1
+                placed_this_round += 1
 
-            # Merge technique counts
             for tech, count in result.get('technique_counts', {}).items():
                 all_tech_counts[tech] = all_tech_counts.get(tech, 0) + count
 
             remaining_after = sum(1 for i in range(81) if bb_zd.board[i] == 0)
+            if _zd_debug:
+                print(f'  [zd-loop]   placed {placed_this_round}, '
+                      f'result.steps={len(result.get("steps",[]))}, '
+                      f'result.success={result.get("success")}, '
+                      f'remaining_after={remaining_after}')
             if remaining_after == 0:
                 break
 
-            if not result['success'] and remaining_after > 0:
-                # Techniques stalled — make ONE zone deduction
-                # Rebuild FRESH BitBoard from placed digits for clean zone computation
-                # (techniques may have polluted candidates)
-                fresh_str = ''.join(str(bb_zd.board[i]) if bb_zd.board[i] != 0 else '.' for i in range(81))
-                bb_fresh = BitBoard.from_string(fresh_str)
-                lm = compute_likely_map(bb_fresh, 3, 7)
-                oracles = sir_find_cross_digit_oracles(bb_fresh, lm, solution=sol_list)
+            # solve_selective returned but the puzzle isn't solved — that
+            # means it ran out of techniques on this state. Try ONE zone
+            # deduction and then loop back to let the technique chain
+            # cascade off the new placement.
+            zd = _apply_one_zone_deduction(outer_round)
+            if zd is None:
+                # Neither techniques nor zone math can move forward
+                if _zd_debug:
+                    print(f'  [zd-loop]   no zone deduction available — break')
+                break
+            subtype, zpos, zdigit = zd
+            zone_ded_steps.append((subtype, zpos, zdigit, outer_round))
+            _log_zone_ded(subtype, zpos, zdigit, len(zone_ded_steps), outer_round)
 
-                zd_made = False
-                for orc in oracles:
-                    ill, _ = would_be_illegal(bb_zd, orc['pos'], orc['digit'])
-                    if ill:
-                        continue
-                    r, c = orc['pos'] // 9, orc['pos'] % 9
-                    bb_zd.place(orc['pos'], orc['digit'])
-                    zone_ded_count += 1
-                    zone_ded_steps.append(('cross-digit', orc['pos'], orc['digit']))
-                    if _rc:
-                        _rc.print(f'  [bold yellow]  ★ ZONE DEDUCTION #{zone_ded_count}: '
-                                  f'R{r+1}C{c+1}={orc["digit"]+1}  [CROSS-DIGIT][/bold yellow]')
-                    else:
-                        print(f'  ★ ZONE DEDUCTION #{zone_ded_count}: R{r+1}C{c+1}={orc["digit"]+1}  [CROSS-DIGIT]')
-                    zd_made = True
-                    break
-
-                if not zd_made:
-                    # Try xhatch on fresh board
-                    xh = sir_compute_xhatch(bb_fresh)
-                    xh_oracles = sir_find_xhatch_oracles(bb_fresh, lm, xh, solution=sol_list)
-                    for xo in xh_oracles:
-                        ill, _ = would_be_illegal(bb_zd, xo['pos'], xo['digit'])
-                        if ill:
-                            continue
-                        r, c = xo['pos'] // 9, xo['pos'] % 9
-                        bb_zd.place(xo['pos'], xo['digit'])
-                        zone_ded_count += 1
-                        zone_ded_steps.append(('xhatch', xo['pos'], xo['digit']))
-                        if _rc:
-                            _rc.print(f'  [bold magenta]  ◆ ZONE DEDUCTION #{zone_ded_count}: '
-                                      f'R{r+1}C{c+1}={xo["digit"]+1}  [XHATCH][/bold magenta]')
-                        else:
-                            print(f'  ◆ ZONE DEDUCTION #{zone_ded_count}: R{r+1}C{c+1}={xo["digit"]+1}  [XHATCH]')
-                        zd_made = True
-                        break
-
-                if not zd_made:
-                    # No zone deduction available — truly stuck
-                    break
+        zone_ded_count = len(zone_ded_steps)
 
         elapsed_zd = (_time.perf_counter() - t0_zd) * 1000
         remaining_final = sum(1 for i in range(81) if bb_zd.board[i] == 0)
@@ -7980,6 +8125,9 @@ presets:
         print(f'Time:   {elapsed_zd:.1f}ms')
         print(f'Technique steps: {tech_steps_total}')
         print(f'Zone deductions: {zone_ded_count}')
+        if zone_ded_steps:
+            zones_used = ','.join(_zone_for_pos(p) for _, p, _, _ in zone_ded_steps)
+            print(f'|Zones: {zones_used}|')
         if remaining_final > 0:
             print(f'Remaining: {remaining_final} cells')
 
@@ -7993,10 +8141,12 @@ presets:
                 print(f'  {tech:20s} {count:3d} ({pct:4.1f}%)  {bar}{tag}')
 
         if zone_ded_steps:
-            print(f'\nZone Deduction Points (technique gaps):')
-            for i, (ztype, pos, digit) in enumerate(zone_ded_steps):
+            print(f'\nZone Deduction Points (technique gaps — research signal):')
+            for i, (subtype, pos, digit, rnd) in enumerate(zone_ded_steps):
                 r, c = pos // 9, pos % 9
-                print(f'  #{i+1}: R{r+1}C{c+1}={digit+1}  [{ztype}] — missing technique needed here')
+                zone = _zone_for_pos(pos)
+                print(f'  #{i+1}: R{r+1}C{c+1}={digit}  zone={zone}  [{subtype}]  '
+                      f'(stall round {rnd}) — missing technique here')
 
         if args.board and success:
             board_str = ''.join(str(bb_zd.board[i]) for i in range(81))

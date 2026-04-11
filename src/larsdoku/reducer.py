@@ -77,12 +77,14 @@ def _seed_technique(seed_bd81):
         techs.append("DeepResonance")
     if seed_bd81 in seeds_data.get("d2b", []):
         techs.append("D2B")
+    if seed_bd81 in seeds_data.get("ls", []):
+        techs.append("LS")
     return techs or ["Unknown"]
 
 
 def _seed_index(seed_bd81):
     seeds_data = LARS_SEEDS.get("seeds", {})
-    for tech in ("deepres", "d2b"):
+    for tech in ("deepres", "d2b", "ls"):
         pool = seeds_data.get(tech, [])
         if seed_bd81 in pool:
             return pool.index(seed_bd81)
@@ -404,7 +406,7 @@ def cmd_auto_reduce(puzzle):
     print()
     print(f"  Total time: {elapsed:.1f}s")
     print(f"  Strategies: {len(orderings)} orderings + exhaustive")
-    print(f"  Lars DB:    10,698 signatures | 438,564 seeds | 1.1 quintillion puzzles")
+    print(f"  Lars DB:    10,698 signatures | 463,759 seeds (438K + 25K LS) | 565 quadrillion puzzles")
     print(f"              {len(LARS_SEEDS_HASHES)} core + {len(LARS_SEEDS_L1_HASHES)} variant hashes")
     print("=" * 70)
 
@@ -488,13 +490,16 @@ def _seed_lookup_by_bd81(bd81):
     seeds_data = LARS_SEEDS.get("seeds", {})
     is_deepres = norm in seeds_data.get("deepres", [])
     is_d2b = norm in seeds_data.get("d2b", [])
-    is_seed = is_deepres or is_d2b
+    is_ls = norm in seeds_data.get("ls", [])
+    is_seed = is_deepres or is_d2b or is_ls
     if is_seed:
         techs = []
         if is_deepres:
             techs.append("DeepResonance")
         if is_d2b:
             techs.append("D2B")
+        if is_ls:
+            techs.append("LS")
         idx = _seed_index(norm)
         print(f"  >>> EXACT SEED MATCH <<<")
         print(f"  This bd81 IS a registered seed.")

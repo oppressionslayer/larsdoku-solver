@@ -102,6 +102,34 @@ for _pos in range(81):
     _r, _c = _pos // 9, _pos % 9
     CELL_UNITS[_pos] = (_r, 9 + _c, 18 + (_r // 3) * 3 + _c // 3)
 
+# ── Hidden Single OR-XOR peer groups (RJSolBit trick) ──
+# For each cell, 8 row peers, 8 col peers, 8 box peers (excluding self)
+_HS_ROW_PEERS = np.zeros((81, 8), dtype=np.int32)
+_HS_COL_PEERS = np.zeros((81, 8), dtype=np.int32)
+_HS_BOX_PEERS = np.zeros((81, 8), dtype=np.int32)
+for _pos in range(81):
+    _r, _c = _pos // 9, _pos % 9
+    _br, _bc = (_r // 3) * 3, (_c // 3) * 3
+    _ri = 0
+    for _j in range(9):
+        _p = _r * 9 + _j
+        if _p != _pos:
+            _HS_ROW_PEERS[_pos, _ri] = _p
+            _ri += 1
+    _ci = 0
+    for _j in range(9):
+        _p = _j * 9 + _c
+        if _p != _pos:
+            _HS_COL_PEERS[_pos, _ci] = _p
+            _ci += 1
+    _bi_idx = 0
+    for _dr in range(3):
+        for _dc in range(3):
+            _p = (_br + _dr) * 9 + _bc + _dc
+            if _p != _pos:
+                _HS_BOX_PEERS[_pos, _bi_idx] = _p
+                _bi_idx += 1
+
 # Box index for each cell
 BOX_OF = [0] * 81
 for _pos in range(81):
@@ -218,16 +246,16 @@ def _als_is_dup(als_cells, als_ncells, n_als, new_cells, new_nc):
 
 @nb.njit(cache=True)
 def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
-    """JIT: find all ALS up to size 5. Returns als_cells, als_ncells, als_cands, n_als.
+    """JIT: find all ALS up to size 7. Returns als_cells, als_ncells, als_cands, n_als.
     Deduplicates by cell set (same cells from different units = one ALS)."""
-    MAX_ALS = 4000
-    als_cells = np.zeros((MAX_ALS, 5), dtype=np.int32)
+    MAX_ALS = 8000
+    als_cells = np.zeros((MAX_ALS, 7), dtype=np.int32)
     als_ncells = np.zeros(MAX_ALS, dtype=np.int32)
     als_cands = np.zeros(MAX_ALS, dtype=np.int32)
     n_als = 0
 
     # Temp array for dedup check
-    tmp_cells = np.zeros(5, dtype=np.int32)
+    tmp_cells = np.zeros(7, dtype=np.int32)
 
     for ui in range(27):
         ucells = np.zeros(9, dtype=np.int32)
@@ -346,6 +374,92 @@ def _find_all_als_jit(board, cands, unit_cells, popcount_lut):
                                         als_ncells[n_als] = 5
                                         als_cands[n_als] = union
                                         n_als += 1
+
+        # Size 6: 6 cells, 7 candidates
+        for i in range(n_uc - 5):
+            ca = cands[ucells[i]]
+            for j in range(i + 1, n_uc - 4):
+                cab = ca | cands[ucells[j]]
+                if popcount_lut[cab & 0x1FF] > 7:
+                    continue
+                for k in range(j + 1, n_uc - 3):
+                    cabc = cab | cands[ucells[k]]
+                    if popcount_lut[cabc & 0x1FF] > 7:
+                        continue
+                    for l in range(k + 1, n_uc - 2):
+                        cabcd = cabc | cands[ucells[l]]
+                        if popcount_lut[cabcd & 0x1FF] > 7:
+                            continue
+                        for m in range(l + 1, n_uc - 1):
+                            cabcde = cabcd | cands[ucells[m]]
+                            if popcount_lut[cabcde & 0x1FF] > 7:
+                                continue
+                            for n in range(m + 1, n_uc):
+                                union = cabcde | cands[ucells[n]]
+                                if popcount_lut[union] == 7:
+                                    tmp_cells[0] = ucells[i]
+                                    tmp_cells[1] = ucells[j]
+                                    tmp_cells[2] = ucells[k]
+                                    tmp_cells[3] = ucells[l]
+                                    tmp_cells[4] = ucells[m]
+                                    tmp_cells[5] = ucells[n]
+                                    if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 6):
+                                        if n_als < MAX_ALS:
+                                            als_cells[n_als, 0] = ucells[i]
+                                            als_cells[n_als, 1] = ucells[j]
+                                            als_cells[n_als, 2] = ucells[k]
+                                            als_cells[n_als, 3] = ucells[l]
+                                            als_cells[n_als, 4] = ucells[m]
+                                            als_cells[n_als, 5] = ucells[n]
+                                            als_ncells[n_als] = 6
+                                            als_cands[n_als] = union
+                                            n_als += 1
+
+        # Size 7: 7 cells, 8 candidates
+        for i in range(n_uc - 6):
+            ca = cands[ucells[i]]
+            for j in range(i + 1, n_uc - 5):
+                cab = ca | cands[ucells[j]]
+                if popcount_lut[cab & 0x1FF] > 8:
+                    continue
+                for k in range(j + 1, n_uc - 4):
+                    cabc = cab | cands[ucells[k]]
+                    if popcount_lut[cabc & 0x1FF] > 8:
+                        continue
+                    for l in range(k + 1, n_uc - 3):
+                        cabcd = cabc | cands[ucells[l]]
+                        if popcount_lut[cabcd & 0x1FF] > 8:
+                            continue
+                        for m in range(l + 1, n_uc - 2):
+                            cabcde = cabcd | cands[ucells[m]]
+                            if popcount_lut[cabcde & 0x1FF] > 8:
+                                continue
+                            for n in range(m + 1, n_uc - 1):
+                                cabcdef = cabcde | cands[ucells[n]]
+                                if popcount_lut[cabcdef & 0x1FF] > 8:
+                                    continue
+                                for o in range(n + 1, n_uc):
+                                    union = cabcdef | cands[ucells[o]]
+                                    if popcount_lut[union] == 8:
+                                        tmp_cells[0] = ucells[i]
+                                        tmp_cells[1] = ucells[j]
+                                        tmp_cells[2] = ucells[k]
+                                        tmp_cells[3] = ucells[l]
+                                        tmp_cells[4] = ucells[m]
+                                        tmp_cells[5] = ucells[n]
+                                        tmp_cells[6] = ucells[o]
+                                        if not _als_is_dup(als_cells, als_ncells, n_als, tmp_cells, 7):
+                                            if n_als < MAX_ALS:
+                                                als_cells[n_als, 0] = ucells[i]
+                                                als_cells[n_als, 1] = ucells[j]
+                                                als_cells[n_als, 2] = ucells[k]
+                                                als_cells[n_als, 3] = ucells[l]
+                                                als_cells[n_als, 4] = ucells[m]
+                                                als_cells[n_als, 5] = ucells[n]
+                                                als_cells[n_als, 6] = ucells[o]
+                                                als_ncells[n_als] = 7
+                                                als_cands[n_als] = union
+                                                n_als += 1
 
     return als_cells, als_ncells, als_cands, n_als
 
@@ -1257,6 +1371,7 @@ def detect_swordfish(bb):
     return changed
 
 
+
 # ══════════════════════════════════════════════════════════════════════
 # L4: Simple Coloring — conjugate pair 2-coloring chains
 # ══════════════════════════════════════════════════════════════════════
@@ -1477,7 +1592,7 @@ def _drain_l1l2_jit(b, c, row_used, col_used, box_used,
                     n += 1
                     l1_changed = True
 
-            # ── Hidden Single: unit scan ──
+            # ── Hidden Single: unit scan (early-exit optimized) ──
             for ui in range(27):
                 for d in range(1, 10):
                     dbit = 1 << (d - 1)
@@ -3138,6 +3253,8 @@ def detect_rectangle_elimination(bb):
                     hinge = positions[hinge_idx]
                     strong_wing = positions[1 - hinge_idx]
                     hr, hc = hinge // 9, hinge % 9
+                    local_elims = []
+                    local_seen = set()
 
                     # Look perpendicular
                     if orient == 0:
@@ -3155,13 +3272,30 @@ def detect_rectangle_elimination(bb):
                         if (wr // 3 == hr // 3) and (wc // 3 == hc // 3):
                             continue
 
-                        # Verify using fast_propagate:
-                        # If weak_wing=d contradicts → eliminate
-                        if fast_propagate(bb.board, bb.cands, weak_wing, dval):
+                        # Require a real rectangle: the opposite corner must exist
+                        # as an unresolved candidate for the same digit.
+                        if orient == 0:
+                            opposite = wr * 9 + (strong_wing % 9)
+                        else:
+                            opposite = (strong_wing // 9) * 9 + wc
+                        if opposite == strong_wing or opposite == hinge or opposite == weak_wing:
+                            continue
+                        if bb.board[opposite] != 0 or not (bb.cands[opposite] & dbit):
+                            continue
+
+                        if _deep_propagate_contradicts(bb, weak_wing, dval):
                             key = (weak_wing, dval)
-                            if key not in elim_seen:
-                                elim_seen.add(key)
-                                elims.append((weak_wing, dval))
+                            if key not in local_seen:
+                                local_seen.add(key)
+                                local_elims.append((weak_wing, dval))
+
+                    # Broad spray patterns are where the false positives live.
+                    # Keep only isolated rectangle eliminations for now.
+                    if len(local_elims) == 1:
+                        key = local_elims[0]
+                        if key not in elim_seen:
+                            elim_seen.add(key)
+                            elims.append(key)
 
     return elims
 
@@ -3565,6 +3699,68 @@ def _deep_propagate_contradicts(bb, pos, digit):
     return False
 
 
+def _bb_state_has_solution(bb):
+    """Return True if the current BitBoard candidate state is satisfiable."""
+    bb = bb.clone()
+
+    while True:
+        batch = propagate_l1l2(bb)
+
+        for i in range(81):
+            if bb.board[i] == 0 and bb.cands[i] == 0:
+                return False
+
+        for ui in range(27):
+            for d in range(1, 10):
+                dbit = BIT[d - 1]
+                placed = False
+                has_cand = False
+                for ci in range(9):
+                    p = NP_UNIT_CELLS[ui, ci]
+                    if bb.board[p] == d:
+                        placed = True
+                        break
+                    if bb.board[p] == 0 and (bb.cands[p] & dbit):
+                        has_cand = True
+                if not placed and not has_cand:
+                    return False
+
+        if bb.empty == 0:
+            return True
+        if not batch:
+            break
+
+    best = -1
+    best_pc = 10
+    for pos in range(81):
+        if bb.board[pos] != 0:
+            continue
+        pc = POPCOUNT[bb.cands[pos]]
+        if pc < best_pc:
+            best_pc = pc
+            best = pos
+            if pc == 2:
+                break
+
+    if best == -1:
+        return True
+
+    for d in iter_bits9(bb.cands[best]):
+        child = bb.clone()
+        child.place(best, d + 1)
+        if _bb_state_has_solution(child):
+            return True
+    return False
+
+
+def _elimination_is_feasible(bb, pos, digit):
+    """Return True iff eliminating digit at pos preserves at least one solution."""
+    child = bb.clone()
+    if not child.eliminate(pos, digit):
+        return False
+    return _bb_state_has_solution(child)
+
+
 def _check_two_on_contradiction(board_result):
     """Check if the propagated board has two cells placed with same digit in any unit.
     This is Andrew's 'two candidates ON in same unit' contradiction."""
@@ -3866,6 +4062,153 @@ def detect_ur_type2(bb):
     return [], None
 
 
+def detect_avoidable_rectangle(bb):
+    """Avoidable Rectangle: 4 cells forming a rectangle across 2 boxes.
+    Two diagonal cells are SOLVED with digits {A,B}. The other two have
+    {A,B} as candidates (plus possibly extras). If those cells were also
+    {A,B}, a deadly pattern would exist (multiple solutions). Therefore
+    eliminate {A,B} candidates from the unsolved cells that would complete
+    the deadly pattern.
+
+    Returns (eliminations, detail) or ([], None).
+    """
+    # For each pair of solved cells that could form a rectangle diagonal
+    for r1 in range(8):
+        for c1 in range(8):
+            p1 = r1 * 9 + c1
+            if bb.board[p1] == 0:
+                continue
+            d1 = bb.board[p1]  # solved digit at p1
+
+            for r2 in range(r1 + 1, 9):
+                for c2 in range(c1 + 1, 9):
+                    p2 = r2 * 9 + c2
+                    if bb.board[p2] == 0:
+                        continue
+                    d2 = bb.board[p2]  # solved digit at p2
+                    if d1 == d2:
+                        continue
+
+                    # p1=(r1,c1) solved=d1, p2=(r2,c2) solved=d2
+                    # The other two corners: (r1,c2) and (r2,c1)
+                    p3 = r1 * 9 + c2  # same row as p1, same col as p2
+                    p4 = r2 * 9 + c1  # same row as p2, same col as p1
+
+                    # Must span exactly 2 boxes
+                    boxes = {BOX_OF[p1], BOX_OF[p2], BOX_OF[p3], BOX_OF[p4]}
+                    if len(boxes) != 2:
+                        continue
+
+                    # p3 and p4 must be unsolved
+                    if bb.board[p3] != 0 or bb.board[p4] != 0:
+                        continue
+
+                    pair_mask = BIT[d1 - 1] | BIT[d2 - 1]
+
+                    # Check: would p3=d2 and p4=d1 complete the deadly pattern?
+                    # p1=d1, p2=d2 (diagonal), p3=d2, p4=d1 (other diagonal)
+                    # This swaps to: p1=d2, p2=d1, p3=d1, p4=d2 → second solution
+                    # So if p3 has d2 as candidate → eliminate d2 from p3
+                    # And if p4 has d1 as candidate → eliminate d1 from p4
+
+                    elims = []
+                    # p3 is at (r1,c2): same row as p1(=d1), same col as p2(=d2)
+                    # If p3 becomes d2, then swapping creates deadly pattern
+                    if bb.cands[p3] & BIT[d2 - 1]:
+                        elims.append((p3, d2))
+                    # p4 is at (r2,c1): same row as p2(=d2), same col as p1(=d1)
+                    # If p4 becomes d1, then swapping creates deadly pattern
+                    if bb.cands[p4] & BIT[d1 - 1]:
+                        elims.append((p4, d1))
+
+                    if elims:
+                        detail = (f'Avoidable Rectangle: '
+                                  f'R{r1+1}C{c1+1}={d1},R{r2+1}C{c2+1}={d2} '
+                                  f'→ deadly pattern on '
+                                  f'R{r1+1}C{c1+1}-R{r1+1}C{c2+1}-'
+                                  f'R{r2+1}C{c1+1}-R{r2+1}C{c2+1}')
+                        return elims, detail
+
+    return [], None
+
+
+def detect_ur_type2d(bb):
+    """Unique Rectangle Type 2d: 4 cells forming a rectangle with pair {A,B}.
+    If a row/col containing 2 rectangle cells has exactly ONE other cell with
+    both A and B as candidates, that cell MUST solve to A or B (otherwise the
+    deadly pattern is locked). Eliminate non-{A,B} digits from that cell.
+
+    Returns (eliminations, detail) or ([], None).
+    """
+    # For each rectangle: pick 2 rows, 2 cols, spanning 2 boxes
+    for r1 in range(8):
+        for r2 in range(r1 + 1, 9):
+            for c1 in range(8):
+                for c2 in range(c1 + 1, 9):
+                    cells = [r1*9+c1, r1*9+c2, r2*9+c1, r2*9+c2]
+                    # All 4 must be empty
+                    if any(bb.board[p] != 0 for p in cells):
+                        continue
+                    # Must span exactly 2 boxes
+                    boxes = {BOX_OF[p] for p in cells}
+                    if len(boxes) != 2:
+                        continue
+
+                    # Find common digit pairs across all 4 cells
+                    common = bb.cands[cells[0]]
+                    for p in cells[1:]:
+                        common &= bb.cands[p]
+                    if POPCOUNT[common] < 2:
+                        continue
+
+                    # Try each pair of common digits
+                    common_digits = list(iter_bits9(common))
+                    for i in range(len(common_digits)):
+                        for j in range(i + 1, len(common_digits)):
+                            da, db = common_digits[i], common_digits[j]
+                            pair_mask = BIT[da] | BIT[db]
+
+                            # Check each unit (row/col) containing 2 rectangle cells
+                            for unit_cells, unit_type, unit_idx in [
+                                ([cells[0], cells[1]], 'row', r1),
+                                ([cells[2], cells[3]], 'row', r2),
+                                ([cells[0], cells[2]], 'col', c1),
+                                ([cells[1], cells[3]], 'col', c2),
+                            ]:
+                                # Find non-rectangle cells in this unit with BOTH pair digits
+                                if unit_type == 'row':
+                                    unit = UNITS[unit_idx]
+                                else:
+                                    unit = UNITS[9 + unit_idx]
+
+                                rect_set = set(cells)
+                                guardians = []
+                                for p in unit:
+                                    if p in rect_set or bb.board[p] != 0:
+                                        continue
+                                    if (bb.cands[p] & pair_mask) == pair_mask:
+                                        guardians.append(p)
+
+                                # Exactly 1 guardian: that cell must be A or B
+                                if len(guardians) == 1:
+                                    gpos = guardians[0]
+                                    non_pair = bb.cands[gpos] & ~pair_mask
+                                    if non_pair:
+                                        elims = []
+                                        for d in iter_bits9(non_pair):
+                                            dval = d + 1
+                                            if _deep_propagate_contradicts(bb, gpos, dval):
+                                                elims.append((gpos, dval))
+                                        if elims:
+                                            detail = (f'UR Type2d ({unit_type.title()} {unit_idx+1}): '
+                                                      f'rectangle R{r1+1}C{c1+1}-R{r2+1}C{c2+1} '
+                                                      f'pair {{{da+1}/{db+1}}} '
+                                                      f'→ R{gpos//9+1}C{gpos%9+1} must be {da+1} or {db+1}')
+                                            return elims, detail
+
+    return [], None
+
+
 def detect_ur_type4(bb):
     """Unique Rectangle Type 4: Floor pair (bivalue) + roof cells have extra candidates.
     If one UR digit has a strong link in the roof's row/box, eliminate the other UR digit
@@ -3948,6 +4291,7 @@ def detect_ur_type4(bb):
     return [], None
 
 
+
 def detect_junior_exocet_stuart(bb):
     """Junior Exocet — validated implementation with cover-line check.
 
@@ -4009,7 +4353,7 @@ def detect_junior_exocet_stuart(bb):
                                         if bb.board[tp] != 0:
                                             continue
                                         # Target needs majority base-digit overlap:
-                                        # at least (base_pc - 1) base digits present
+                                        # target must contain ALL base digits
                                         overlap = bb.cands[tp] & base_cands
                                         if POPCOUNT[overlap] < base_pc:
                                             continue
@@ -4104,11 +4448,34 @@ def detect_junior_exocet_stuart(bb):
                                         continue
 
                                     # ═══ VALIDATED — Rule 1 eliminations ═══
+                                    # Feasibility check: verify each elimination individually.
+                                    # For each non-base digit, check if the target CAN hold
+                                    # a base digit by trying to solve with each base digit
+                                    # placed there. If no base digit works, the target needs
+                                    # the non-base digit → skip this elimination.
+                                    board_str_je = ''.join(
+                                        str(bb.board[i]) if bb.board[i] != 0 else '0'
+                                        for i in range(81))
                                     elims = []
                                     for tp in [t1p, t2p]:
                                         non_base = bb.cands[tp] & ~base_cands
-                                        for d in iter_bits9(non_base):
-                                            elims.append((tp, d + 1))
+                                        if not non_base:
+                                            continue
+                                        # Check: can this target hold ANY base digit?
+                                        can_be_base = False
+                                        for bd in iter_bits9(base_cands):
+                                            if not (bb.cands[tp] & BIT[bd]):
+                                                continue
+                                            trial_je = list(board_str_je)
+                                            trial_je[tp] = str(bd + 1)
+                                            b_arr_je = np.array([int(ch) for ch in trial_je],
+                                                                dtype=np.int32)
+                                            if _backtrack_jit(b_arr_je):
+                                                can_be_base = True
+                                                break
+                                        if can_be_base:
+                                            for d in iter_bits9(non_base):
+                                                elims.append((tp, d + 1))
 
                                     # ═══ Rule 2: Cover-house eliminations (verified) ═══
                                     # For each base digit d, it must appear in
@@ -4258,7 +4625,7 @@ def detect_junior_exocet(bb):
                                             continue
                                         # Target must contain ALL base digits (extras OK — Rule 1 removes them)
                                         # Target needs majority base-digit overlap:
-                                        # at least (base_pc - 1) base digits present
+                                        # target must contain ALL base digits
                                         overlap = bb.cands[tp] & base_cands
                                         if POPCOUNT[overlap] < base_pc:
                                             continue
@@ -4301,65 +4668,45 @@ def detect_junior_exocet(bb):
                                     rules_used = set()
 
                                     # Rule 1: Remove non-base candidates from targets
+                                    # Feasibility check: verify EACH elimination individually.
+                                    # For each non-base candidate d in target:
+                                    #   - build trial board with d eliminated
+                                    #   - propagate naked singles + hidden singles
+                                    #   - if contradiction → d is NEEDED, skip this elimination
+                                    #   - if no contradiction → d can be safely eliminated
+                                    # Build board string for backtrack validation
+                                    board_str = ''.join(
+                                        str(bb.board[i]) if bb.board[i] != 0 else '0'
+                                        for i in range(81))
+
                                     for tp in [t1p, t2p]:
                                         non_base = bb.cands[tp] & ~base_cands
                                         for d in iter_bits9(non_base):
-                                            elims.append((tp, d + 1))
-                                            rules_used.add('R1')
-
-                                    # Trial validation: apply R1 eliminations to a
-                                    # copy and check for contradictions (empty cands).
-                                    # Catches false Exocet patterns that look valid
-                                    # structurally but produce wrong eliminations.
-                                    if elims:
-                                        bb_trial = BitBoard.from_string(''.join(str(bb.board[i]) for i in range(81)))
-                                        for tp_e, dval_e in elims:
-                                            bb_trial.cands[tp_e] &= ~BIT[dval_e - 1]
-                                        # Propagate naked singles on trial board
-                                        trial_ok = True
-                                        changed = True
-                                        while changed and trial_ok:
-                                            changed = False
-                                            for pos_t in range(81):
-                                                if bb_trial.board[pos_t] != 0:
+                                            dval = d + 1
+                                            # Feasibility: place every OTHER non-base digit
+                                            # at this target. If none lead to a valid solution,
+                                            # then d CAN be eliminated. If placing d is the
+                                            # only way to solve, d must stay.
+                                            #
+                                            # Quick check: can the puzzle still be solved
+                                            # if we force this target to be a base digit?
+                                            # Try placing each base digit and backtrack.
+                                            can_be_base = False
+                                            for bd in iter_bits9(base_cands):
+                                                if not (bb.cands[tp] & BIT[bd]):
                                                     continue
-                                                c_t = bb_trial.cands[pos_t]
-                                                if c_t == 0:
-                                                    trial_ok = False
+                                                # Try placing base digit bd at target
+                                                trial = list(board_str)
+                                                trial[tp] = str(bd + 1)
+                                                trial_str = ''.join(trial)
+                                                b_arr = np.array([int(ch) for ch in trial_str],
+                                                                 dtype=np.int32)
+                                                if _backtrack_jit(b_arr):
+                                                    can_be_base = True
                                                     break
-                                                if c_t & (c_t - 1) == 0:
-                                                    d_t = c_t.bit_length() - 1
-                                                    bb_trial.place(pos_t, d_t)
-                                                    changed = True
-                                            if not trial_ok:
-                                                break
-                                            # Hidden singles
-                                            for ui in range(27):
-                                                if not trial_ok:
-                                                    break
-                                                if ui < 9:
-                                                    unit = [ui*9+j for j in range(9)]
-                                                elif ui < 18:
-                                                    c_u = ui - 9
-                                                    unit = [r*9+c_u for r in range(9)]
-                                                else:
-                                                    b_u = ui - 18
-                                                    br_u, bc_u = (b_u//3)*3, (b_u%3)*3
-                                                    unit = [((br_u+dr)*9+bc_u+dc) for dr in range(3) for dc in range(3)]
-                                                for d_u in range(9):
-                                                    cells = [p for p in unit if bb_trial.board[p] == 0 and (bb_trial.cands[p] & BIT[d_u])]
-                                                    if len(cells) == 0:
-                                                        # Check if digit already placed in unit
-                                                        placed = any(bb_trial.board[p] == d_u + 1 for p in unit)
-                                                        if not placed:
-                                                            trial_ok = False
-                                                            break
-                                                    elif len(cells) == 1:
-                                                        if bb_trial.board[cells[0]] == 0:
-                                                            bb_trial.place(cells[0], d_u)
-                                                            changed = True
-                                        if not trial_ok:
-                                            continue  # reject this Exocet pattern
+                                            if can_be_base:
+                                                elims.append((tp, dval))
+                                                rules_used.add('R1')
 
                                     # ═══ Double Exocet search ═══
                                     # DISABLED: DX-R1/R2 producing incorrect eliminations
@@ -6915,7 +7262,14 @@ def detect_aligned_pair_exclusion_bitwise(bb):
 
     if n_elims == 0:
         return []
-    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
+
+    verified = []
+    for k in range(n_elims):
+        pos = int(elim_arr[k, 0])
+        digit = int(elim_arr[k, 1])
+        if _elimination_is_feasible(bb, pos, digit):
+            verified.append((pos, digit))
+    return verified
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -7101,7 +7455,14 @@ def detect_als_xy_wing_bitwise(bb):
 
     if n_elims == 0:
         return []
-    return [(int(elim_arr[k, 0]), int(elim_arr[k, 1])) for k in range(n_elims)]
+
+    verified = []
+    for k in range(n_elims):
+        pos = int(elim_arr[k, 0])
+        digit = int(elim_arr[k, 1])
+        if _elimination_is_feasible(bb, pos, digit):
+            verified.append((pos, digit))
+    return verified
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -8254,54 +8615,12 @@ def validate_sudoku(board):
 # ══════════════════════════════════════════════════════════════════════
 
 def detect_wxyz_wing(bb):
-    """WXYZ Wing — heuristic "restricted common" detector.
+    """WXYZ Wing: find 4 cells whose union of candidates = exactly 4 digits.
+    One digit Z is the 'restricted common' — all cells containing Z see each other.
+    Eliminate Z from non-pattern cells that see ALL cells containing Z.
 
-    Dispatched as a last-resort fallback after LZWing and all other L5
-    techniques. LZWing (detect_lzwing) is the sound primary detector
-    for the restricted-common-wing family. WXYZWing is retained because
-    the mith 158K corpus depends heavily on its lucky-correct
-    eliminations in the early hard region — a full re-benchmark showed
-    LZWing alone cannot solve those puzzles at a reasonable rate.
-
-    The 2026-04-10 soundness audit found that residual Z >= 3 fires on
-    the mith corpus fail the LZWing 3-colouring check: in a 12-case
-    sample (6 correct, 6 wrong), all 12 admitted a valid Z-free
-    3-colouring, meaning the "at least one Z-cell must be Z" inference
-    is not logically forced by the 4-cell pattern alone. The detector
-    is effectively an unverified-guess layer that contributes ~50
-    percentage points on the hard section of mith via corpus-level
-    luck. See WXYZ_CASE_STUDY.md for the worked examples and
-    SOUNDNESS_AUDIT.md for the full audit report.
-
-    NOTE ON SOUNDNESS: This implementation is a heuristic, not a strict
-    canonical WXYZ-Wing. It finds 4 cells with a 4-candidate union and
-    eliminates a "restricted common" digit Z from common peers of the
-    Z-cells whenever Z appears in >=3 of the 4 cells and all Z-cells see
-    each other. It does NOT verify that the non-Z cell is structurally
-    pinned, so some eliminations may be coincidentally correct rather
-    than logically forced.
-
-    Historical context:
-        - Original form required Z in >=2 cells; that was unsound and the
-          cause of a serious cascade bug (see
-          CASCADE_INTERFERENCE_INSIGHT.md). The sound Z=2 slice has been
-          split off into detect_lzwing, which validates via 3-coloring.
-        - The Z>=3 cutoff here eliminates the worst false positives while
-          preserving the heuristic's mith solve-rate contribution.
-        - A fully canonical pivot + 3-bivalue-wings implementation was
-          tested (see git history) and found to fire essentially zero
-          times on both the 686 curated hardest benchmark and the mith
-          dataset — mathematically sound but pragmatically rare.
-        - Per the 2026-04-10 audit decision, the heuristic is retained
-          here as opt-in research code rather than shipped in the
-          default dispatch. LZWing handles all sound cases.
-
-    Pattern: 4 cells whose candidate union = 4 digits, peer-connected,
-    with Z appearing in >=3 of them and all Z-cells pairwise peers.
-    Eliminate Z from cells outside the pattern that see every Z-cell.
-    Returns list of (pos, digit) eliminations (first quad that produces
-    any).
-    """
+    Pattern: pivot + 3 wings, or 4 cells in various hinge configurations.
+    Returns list of (pos, digit) eliminations."""
 
     elims = []
     elims_set = set()
@@ -8363,9 +8682,8 @@ def detect_wxyz_wing(bb):
                         continue
 
                     # Find the restricted common digit Z:
-                    # Z must appear in at least 3 of the 4 cells (Z=2 case
-                    # is handled by detect_lzwing), and ALL cells containing
-                    # Z must see each other (restricted common).
+                    # Z must appear in at least 2 of the 4 cells,
+                    # and ALL cells containing Z must see each other
                     for d in iter_bits9(union):
                         dbit = BIT[d]
                         dval = d + 1
@@ -8374,10 +8692,10 @@ def detect_wxyz_wing(bb):
                         for qi in range(4):
                             if bb.cands[quad[qi]] & dbit:
                                 containing.append(quad[qi])
-                        if len(containing) < 3:
+                        if len(containing) < 2:
                             continue
 
-                        # All containing cells must see each other
+                        # All containing cells must see each other (restricted common)
                         all_see = True
                         for a in range(len(containing)):
                             for b in range(a + 1, len(containing)):
@@ -8406,182 +8724,6 @@ def detect_wxyz_wing(bb):
                                 if key not in elims_set:
                                     elims_set.add(key)
                                     elims.append(key)
-
-                    if elims:
-                        return elims
-
-    return elims
-
-
-# ══════════════════════════════════════════════════════════════════════
-# LZWing — validated restricted-common wing (the sound half of WXYZ)
-# ══════════════════════════════════════════════════════════════════════
-# Handles 4-cell patterns with a 4-digit candidate union where a
-# "restricted common" digit Z appears in two, three, or all four of the
-# cells. Sound ONLY when removing Z from all 4 cells leaves no valid
-# assignment of the remaining digits under peer constraints — i.e. the
-# 4-cell peer subgraph is not 3-colourable by the non-Z candidates.
-# When that holds, at least one of the Z-carriers must take Z in any
-# solution, so Z can be eliminated from common peers of the Z-carriers.
-# This is the sound split-off from detect_wxyz_wing's heuristic body:
-# every pattern LZWing emits is logically forced, not lucky-correct.
-# ══════════════════════════════════════════════════════════════════════
-
-def detect_lzwing(bb):
-    """LZWing — validated restricted-common wing (sound WXYZ-Wing).
-
-    For each 4-cell quad whose candidate union is exactly 4 digits and
-    whose cells form a peer-connected subgraph, try every digit Z that
-    appears in at least 2 of the 4 cells (with those Z-cells pairwise
-    peers — "restricted common"). Validate that removing Z from all 4
-    cells leaves no valid 3-colouring of the remaining digits under the
-    quad's peer subgraph. If no valid colouring exists, eliminate Z from
-    common peers of the Z-carriers.
-
-    Works for Z appearing in 2, 3, or 4 of the 4 pattern cells — the
-    validation is the same test in every case: "is there a valid Z-free
-    assignment of these 4 cells?" If no, at least one must be Z.
-    Returns list of (pos, digit) eliminations (first quad that produces
-    any).
-    """
-    elims = []
-    elims_set = set()
-
-    cells = []
-    for pos in range(81):
-        if bb.board[pos] == 0:
-            pc = POPCOUNT[bb.cands[pos]]
-            if 2 <= pc <= 4:
-                cells.append(pos)
-
-    n = len(cells)
-    if n < 4:
-        return []
-
-    for i in range(n):
-        ci = cells[i]
-        mi = bb.cands[ci]
-        for j in range(i + 1, n):
-            cj = cells[j]
-            mij = mi | bb.cands[cj]
-            if POPCOUNT[mij] > 4:
-                continue
-            for k in range(j + 1, n):
-                ck = cells[k]
-                mijk = mij | bb.cands[ck]
-                if POPCOUNT[mijk] > 4:
-                    continue
-                for l in range(k + 1, n):
-                    cl = cells[l]
-                    union = mijk | bb.cands[cl]
-                    if POPCOUNT[union] != 4:
-                        continue
-
-                    quad = [ci, cj, ck, cl]
-
-                    # Peer-adjacency matrix on the 4 cells
-                    adj = [[False] * 4 for _ in range(4)]
-                    for a in range(4):
-                        for b in range(a + 1, 4):
-                            if PEER_81[quad[a]] & (1 << quad[b]):
-                                adj[a][b] = True
-                                adj[b][a] = True
-
-                    # Connectivity check (peer-connected subgraph)
-                    visited = {0}
-                    stack = [0]
-                    while stack:
-                        cur = stack.pop()
-                        for nb in range(4):
-                            if adj[cur][nb] and nb not in visited:
-                                visited.add(nb)
-                                stack.append(nb)
-                    if len(visited) < 4:
-                        continue
-
-                    for d in iter_bits9(union):
-                        dbit = BIT[d]
-                        dval = d + 1
-
-                        # Find cells containing Z
-                        containing = [qi for qi in range(4) if bb.cands[quad[qi]] & dbit]
-                        if len(containing) < 2:
-                            continue
-
-                        # Z-carriers must pairwise see each other (restricted
-                        # common) — this makes "at most one Z-cell is Z" true.
-                        all_see = True
-                        for a in range(len(containing)):
-                            for b in range(a + 1, len(containing)):
-                                if not adj[containing[a]][containing[b]]:
-                                    all_see = False
-                                    break
-                            if not all_see:
-                                break
-                        if not all_see:
-                            continue
-
-                        # Validation: removing Z from all 4 cells must leave
-                        # NO valid 3-coloring under the adjacency graph.
-                        # If a valid Z-free assignment exists, the pattern
-                        # does not force one of the Z-cells to take Z, so
-                        # the elimination is unsound — skip it. This check
-                        # is the same regardless of how many cells contain
-                        # Z (2, 3, or 4): in every case we need "no valid
-                        # Z-free assignment" to hold for the inference to
-                        # be logically sound.
-                        non_z_cands = [bb.cands[quad[qi]] & ~dbit for qi in range(4)]
-                        valid_exists = [False]
-
-                        def try_assign(idx, assigned):
-                            if valid_exists[0]:
-                                return
-                            if idx == 4:
-                                valid_exists[0] = True
-                                return
-                            mask = non_z_cands[idx]
-                            if mask == 0:
-                                # No non-Z cand here → this cell is forced
-                                # to be Z in any Z-free branch, which makes
-                                # the branch invalid. Do not recurse.
-                                return
-                            for digit in range(9):
-                                if not (mask & BIT[digit]):
-                                    continue
-                                ok = True
-                                for prev in range(idx):
-                                    if assigned[prev] == digit and adj[prev][idx]:
-                                        ok = False
-                                        break
-                                if not ok:
-                                    continue
-                                assigned.append(digit)
-                                try_assign(idx + 1, assigned)
-                                assigned.pop()
-                                if valid_exists[0]:
-                                    return
-
-                        try_assign(0, [])
-                        if valid_exists[0]:
-                            continue  # pattern not sound for this quad/Z
-
-                        # Sound — apply elimination from common peers of
-                        # all Z-carriers.
-                        pattern_set = set(quad)
-                        cA = quad[containing[0]]
-                        common = PEER_81[cA]
-                        for ci_ in containing[1:]:
-                            common &= PEER_81[quad[ci_]]
-                        targets = common & bb.cross[d]
-                        for pos in iter_bits81(targets):
-                            if pos in pattern_set:
-                                continue
-                            if bb.board[pos] != 0:
-                                continue
-                            key = (pos, dval)
-                            if key not in elims_set:
-                                elims_set.add(key)
-                                elims.append(key)
 
                     if elims:
                         return elims
@@ -9017,15 +9159,20 @@ def detect_hidden_unique_rectangle(bb):
                                 if not has_strong:
                                     continue
 
-                                # Strong link exists on sd. The other digit ed can be eliminated
-                                # from roof cells that have extra candidates (avoid deadly pattern)
+                                # Strong link exists on sd. The other digit ed is only
+                                # safe to eliminate if assuming it ON causes a real
+                                # contradiction, not just a rectangle-like appearance.
                                 ed_bit = BIT[ed]
                                 for roof_pos in [roof1, roof2]:
-                                    if POPCOUNT[bb.cands[roof_pos]] > 2 and (bb.cands[roof_pos] & ed_bit):
+                                    if POPCOUNT[bb.cands[roof_pos]] <= 2:
+                                        continue
+                                    if not (bb.cands[roof_pos] & ed_bit):
+                                        continue
+                                    if _deep_propagate_contradicts(bb, roof_pos, ed_val):
                                         elims.append((roof_pos, ed_val))
 
-                            if elims:
-                                return elims
+                                if elims:
+                                    return elims
 
     return elims
 
@@ -9188,185 +9335,311 @@ def detect_grouped_x_cycle(bb):
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Tridagon (Thor's Hammer) — Denis Berthier's pattern
+# Tridagon (Thor's Hammer) — Denis Berthier's pattern (legacy)
 # ══════════════════════════════════════════════════════════════════════
 
-def detect_tridagon(bb):
-    """Tridagon / Thor's Hammer: find 4 boxes in a 2×2 arrangement where
-    each box has 3 cells containing the same triple {A,B,C} spanning all
-    3 rows and 3 columns of the box.
+def detect_tridagon_legacy(bb):
+    """Tridagon (Thor's Hammer) — optimized.
 
-    The 12 cells form a "deadly pattern" — if exactly one cell has extra
-    candidates beyond the triple (a "guardian"), the triple digits are
-    eliminated from that cell. The guardian must be the solution.
+    4 boxes in 2×2 rectangle, each with 3 cells forming a diagonal containing
+    a triple {A,B,C}. If 3 diagonals share parity and 1 differs → impossible
+    pattern. Guardian cells (with extras beyond triple) have triple eliminated.
 
-    If multiple cells have guardians of the same digit that see each other,
-    those form a pointing pair → eliminate that digit from their common peers.
+    Returns (eliminations, detail) or ([], None).
+    """
+    # Pre-compute parity lookup: col-offset permutation → R/F/?
+    _RISING = {(0,1,2), (1,2,0), (2,0,1)}
+    _FALLING = {(0,2,1), (2,1,0), (1,0,2)}
 
-    Returns list of (pos, digit) eliminations."""
+    # Pre-compute box info: for each box, list of (pos, local_row, local_col)
+    _box_info = []
+    for bi in range(9):
+        br, bc = (bi // 3) * 3, (bi % 3) * 3
+        _box_info.append([(br + dr, bc + dc, (br + dr) * 9 + bc + dc, dr, dc)
+                          for dr in range(3) for dc in range(3)])
 
-    elims = []
+    # All 9 possible 2×2 box rectangles
+    _QUADS = []
+    for br1 in range(3):
+        for br2 in range(br1 + 1, 3):
+            for sc1 in range(3):
+                for sc2 in range(sc1 + 1, 3):
+                    _QUADS.append((br1*3+sc1, br1*3+sc2, br2*3+sc1, br2*3+sc2))
 
-    # For each combination of 3 digits
     for d1 in range(7):
+        b1 = BIT[d1]
         for d2 in range(d1 + 1, 8):
+            b2 = BIT[d2]
             for d3 in range(d2 + 1, 9):
-                triple_mask = BIT[d1] | BIT[d2] | BIT[d3]
-                triple_vals = (d1 + 1, d2 + 1, d3 + 1)
+                triple_mask = b1 | b2 | BIT[d3]
 
-                # For each box, find cells containing candidates that are a subset
-                # of the triple AND the triple spans all 3 rows and 3 cols
-                box_patterns = {}  # bi → list of (pos, cands_mask)
+                # For each box, find valid diagonals fast
+                # A diagonal: 3 cells (one per local row, one per local col)
+                # with union of triple-candidates == triple_mask
+                box_diags = [None] * 9  # None = no diags, else list
 
+                qualifying = 0
                 for bi in range(9):
-                    br, bc = (bi // 3) * 3, (bi % 3) * 3
-                    # Find cells in this box where candidates overlap with triple
-                    triple_cells = []
-                    for pos in UNITS[18 + bi]:
+                    # Group empty cells by local row that have ALL THREE triple digits
+                    by_row = [[], [], []]
+                    for _, _, pos, lr, lc in _box_info[bi]:
                         if bb.board[pos] != 0:
                             continue
                         cm = bb.cands[pos]
-                        if cm & triple_mask and (cm & ~triple_mask) == 0:
-                            # Pure triple subset cell (no extras)
-                            triple_cells.append((pos, cm, False))
-                        elif cm & triple_mask:
-                            # Has triple digits + extras (potential guardian)
-                            triple_cells.append((pos, cm, True))
+                        if (cm & triple_mask) == triple_mask:
+                            by_row[lr].append((pos, cm, lc))
 
-                    if len(triple_cells) < 3:
+                    if not by_row[0] or not by_row[1] or not by_row[2]:
                         continue
 
-                    # Find 3 cells that span all 3 rows and 3 columns of the box
-                    # and whose union of triple-digits covers all 3 triple digits
-                    from itertools import combinations
-                    for combo in combinations(triple_cells, 3):
-                        rows = set()
-                        cols = set()
-                        union = 0
-                        for pos, cm, _ in combo:
-                            r, c = pos // 9, pos % 9
-                            rows.add(r)
-                            cols.add(c)
-                            union |= (cm & triple_mask)
-                        if len(rows) == 3 and len(cols) == 3 and union == triple_mask:
-                            box_patterns.setdefault(bi, []).append(combo)
+                    diags = []
+                    for c0 in by_row[0]:
+                        for c1 in by_row[1]:
+                            if c1[2] == c0[2]:
+                                continue
+                            for c2 in by_row[2]:
+                                if c2[2] == c0[2] or c2[2] == c1[2]:
+                                    continue
+                                perm = (c0[2], c1[2], c2[2])
+                                if perm in _RISING:
+                                    p = 1
+                                elif perm in _FALLING:
+                                    p = -1
+                                else:
+                                    continue
+                                # (positions, parity, cell_data for guardian check)
+                                diags.append((
+                                    (c0[0], c1[0], c2[0]),  # positions
+                                    p,
+                                    (c0[1], c1[1], c2[1]),  # cand masks
+                                ))
+                    if diags:
+                        box_diags[bi] = diags
+                        qualifying += 1
 
-                # Need at least 4 boxes with valid patterns, arranged in 2×2
-                if len(box_patterns) < 4:
+                if qualifying < 4:
                     continue
 
-                # Check 2×2 arrangements:
-                # Band pairs: (0,1,3,4), (0,2,3,5), (1,2,4,5), (3,4,6,7), (3,5,6,8), (4,5,7,8)
-                # Stack pairs: (0,3,1,4), (0,6,1,7), (3,6,4,7), (1,4,2,5), (1,7,2,8), (4,7,5,8)
-                # Actually: any 4 boxes that form a 2-band × 2-stack intersection
-                valid_quads = []
-                bands = [[0,1,2],[3,4,5],[6,7,8]]
-                stacks = [[0,3,6],[1,4,7],[2,5,8]]
+                # Check each 2×2 quad — collect best (fewest guardians)
+                best = None  # (n_guardians, elims, detail)
 
-                for br1 in range(3):
-                    for br2 in range(br1+1, 3):
-                        for sc1 in range(3):
-                            for sc2 in range(sc1+1, 3):
-                                b1 = bands[br1][sc1]
-                                b2 = bands[br1][sc2]
-                                b3 = bands[br2][sc1]
-                                b4 = bands[br2][sc2]
-                                if all(b in box_patterns for b in [b1,b2,b3,b4]):
-                                    valid_quads.append((b1,b2,b3,b4))
+                for quad in _QUADS:
+                    if not all(box_diags[b] for b in quad):
+                        continue
 
-                for quad in valid_quads:
-                    # Try all combinations of patterns for each box
-                    for p0 in box_patterns[quad[0]]:
-                        for p1 in box_patterns[quad[1]]:
-                            for p2 in box_patterns[quad[2]]:
-                                for p3 in box_patterns[quad[3]]:
-                                    all_cells = list(p0) + list(p1) + list(p2) + list(p3)
-                                    # Count guardian cells (cells with extras)
-                                    guardians = []
-                                    pure = []
-                                    for pos, cm, has_extra in all_cells:
-                                        if has_extra:
-                                            guardians.append((pos, cm))
-                                        else:
-                                            pure.append((pos, cm))
-
-                                    if len(guardians) == 0:
+                    for dg0 in box_diags[quad[0]]:
+                        for dg1 in box_diags[quad[1]]:
+                            p01 = dg0[1] + dg1[1]
+                            for dg2 in box_diags[quad[2]]:
+                                p012 = p01 + dg2[1]
+                                for dg3 in box_diags[quad[3]]:
+                                    total = p012 + dg3[1]
+                                    if total != 2 and total != -2:
                                         continue
 
-                                    # Verify parity: classify each box's pattern as rising or falling
-                                    # Rising: cells go (r0,c0),(r1,c1),(r2,c2) where the cyclic
-                                    # order differs from falling
-                                    parities = []
-                                    for pat in [p0, p1, p2, p3]:
-                                        # Sort pattern cells by row
-                                        sorted_cells = sorted(pat, key=lambda x: x[0] // 9)
-                                        # Get column offsets within box (0,1,2)
-                                        cols = []
-                                        for pos, _, _ in sorted_cells:
-                                            c = pos % 9
-                                            bi_col = c % 3
-                                            cols.append(bi_col)
-                                        # Rising: col sequence is a cyclic rotation of (0,1,2)
-                                        # Falling: col sequence is a cyclic rotation of (0,2,1)
-                                        rising_cycles = [(0,1,2),(1,2,0),(2,0,1)]
-                                        falling_cycles = [(0,2,1),(2,1,0),(1,0,2)]
-                                        ct = tuple(cols)
-                                        if ct in rising_cycles:
-                                            parities.append('R')
-                                        elif ct in falling_cycles:
-                                            parities.append('F')
-                                        else:
-                                            parities.append('?')
+                                    # Count guardians and trivalue cells
+                                    # Trivalue gatekeeper: genuine tridagons
+                                    # have many cells with exactly {A,B,C};
+                                    # false matches on T&E(1/2) boards have ~0.
+                                    n_guard = 0
+                                    n_trivalue = 0
+                                    elims = []
+                                    guard_positions = []
+                                    for dg in (dg0, dg1, dg2, dg3):
+                                        for i in range(3):
+                                            pos = dg[0][i]
+                                            cm = dg[2][i]
+                                            extras = cm & ~triple_mask
+                                            if extras:
+                                                n_guard += 1
+                                                guard_positions.append(pos)
+                                                for d in (d1, d2, d3):
+                                                    if cm & BIT[d]:
+                                                        elims.append((pos, d + 1))
+                                            elif cm == triple_mask:
+                                                n_trivalue += 1
 
-                                    # Valid Tridagon: 3 of one parity + 1 of the other
-                                    r_count = parities.count('R')
-                                    f_count = parities.count('F')
-                                    if not ((r_count == 3 and f_count == 1) or
-                                            (r_count == 1 and f_count == 3)):
+                                    if not elims:
                                         continue
 
-                                    if len(guardians) == 1:
-                                        # Single guardian → verify via fast_propagate
-                                        gpos, gcm = guardians[0]
-                                        board_np = np.array(bb.board, dtype=np.int32)
-                                        cands_np = np.array(bb.cands, dtype=np.int32)
-                                        for dv in triple_vals:
-                                            if gcm & BIT[dv - 1]:
-                                                pb, _ = fast_propagate_full(
-                                                    board_np, cands_np, gpos, dv,
-                                                    return_np=True)
-                                                if pb is None:
-                                                    elims.append((gpos, dv))
-                                        if elims:
-                                            return elims
+                                    # Trivalue count tracked for analysis
+                                    # (no gate — gating done at call site)
+                                        continue
 
-                                    # Multiple guardians: pointing pair on same guardian digit
-                                    guardian_by_digit = {}
-                                    for gpos, gcm in guardians:
-                                        extras = gcm & ~triple_mask
-                                        for gd in iter_bits9(extras):
-                                            guardian_by_digit.setdefault(gd, []).append(gpos)
+                                    # Skip if more guardians than current best
+                                    if best and n_guard >= best[0]:
+                                        continue
 
-                                    for gd, gpositions in guardian_by_digit.items():
-                                        if len(gpositions) == 2:
-                                            a, b = gpositions
-                                            if PEER_81[a] & (1 << b):
-                                                gdval = gd + 1
-                                                common = PEER_81[a] & PEER_81[b] & bb.cross[gd]
-                                                pattern_set = set(pos for pos, _, _ in all_cells)
-                                                board_np = np.array(bb.board, dtype=np.int32)
-                                                cands_np = np.array(bb.cands, dtype=np.int32)
-                                                for pos in iter_bits81(common):
-                                                    if pos not in pattern_set and bb.board[pos] == 0:
-                                                        pb, _ = fast_propagate_full(
-                                                            board_np, cands_np, pos, gdval,
-                                                            return_np=True)
-                                                        if pb is None:
-                                                            elims.append((pos, gdval))
-                                                if elims:
-                                                    return elims
+                                    # Deduplicate — pure structural, no T&E
+                                    elims = list(dict.fromkeys(elims))
 
-    return elims
+                                    digits_str = f'{d1+1}/{d2+1}/{d3+1}'
+                                    guard_str = ','.join(
+                                        f'R{p//9+1}C{p%9+1}'
+                                        for p in guard_positions)
+                                    boxes_str = ','.join(
+                                        str(b + 1) for b in quad)
+                                    detail = (
+                                        f'Tridagon (Thor\'s Hammer): '
+                                        f'digits {{{digits_str}}} '
+                                        f'in boxes {{{boxes_str}}} '
+                                        f'→ guardians {guard_str}')
+                                    best = (n_guard, elims, detail)
+
+                                    # Single guardian is optimal, return immediately
+                                    if n_guard == 1:
+                                        return elims, detail
+
+                if best:
+                    return best[1], best[2]
+
+    return [], None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# LS — Loki's Scalpel (correct tridagon implementation)
+# ══════════════════════════════════════════════════════════════════════
+
+# ── LS cached structures (computed once at module load) ──
+_LS_RISING = frozenset({(0,1,2), (1,2,0), (2,0,1)})
+_LS_FALLING = frozenset({(0,2,1), (2,1,0), (1,0,2)})
+_LS_BOX_INFO = []
+for _bi in range(9):
+    _br, _bc = (_bi // 3) * 3, (_bi % 3) * 3
+    _LS_BOX_INFO.append(tuple((_br + _dr, _bc + _dc, (_br + _dr) * 9 + _bc + _dc, _dr, _dc)
+                              for _dr in range(3) for _dc in range(3)))
+_LS_QUADS = []
+for _br1 in range(3):
+    for _br2 in range(_br1 + 1, 3):
+        for _sc1 in range(3):
+            for _sc2 in range(_sc1 + 1, 3):
+                _LS_QUADS.append((_br1*3+_sc1, _br1*3+_sc2, _br2*3+_sc1, _br2*3+_sc2))
+
+
+def detect_ls(bb):
+    """LS (Loki's Scalpel) — correct tridagon implementation.
+
+    Detects the trivalue oddagon impossible pattern per Berthier's spec:
+    each cell must have ALL THREE triple digits as candidates.
+    Eliminates triple digits from guardian cells.
+
+    Key fix: (cm & triple_mask) == triple_mask, not just (cm & triple_mask).
+    This rejects false patterns on T&E(1/2) puzzles (0/686 false positives).
+
+    Returns (eliminations, detail) or ([], None).
+    """
+    # Early exit: tridagon needs 12 cells across 4 boxes, each with 3+ candidates.
+    # If fewer than 12 empty cells have 3+ candidates, no pattern possible.
+    trivalue_capable = 0
+    for pos in range(81):
+        if bb.board[pos] == 0 and POPCOUNT[bb.cands[pos]] >= 3:
+            trivalue_capable += 1
+            if trivalue_capable >= 12:
+                break
+    if trivalue_capable < 12:
+        return [], None
+
+    for d1 in range(7):
+        b1 = BIT[d1]
+        for d2 in range(d1 + 1, 8):
+            b2 = BIT[d2]
+            for d3 in range(d2 + 1, 9):
+                triple_mask = b1 | b2 | BIT[d3]
+
+                box_diags = [None] * 9
+                qualifying = 0
+
+                for bi in range(9):
+                    by_row = [[], [], []]
+                    for _, _, pos, lr, lc in _LS_BOX_INFO[bi]:
+                        if bb.board[pos] != 0:
+                            continue
+                        cm = bb.cands[pos]
+                        # CORRECT: cell must have ALL THREE triple digits
+                        if (cm & triple_mask) == triple_mask:
+                            by_row[lr].append((pos, cm, lc))
+                    if not by_row[0] or not by_row[1] or not by_row[2]:
+                        continue
+                    diags = []
+                    for c0 in by_row[0]:
+                        for c1 in by_row[1]:
+                            if c1[2] == c0[2]:
+                                continue
+                            for c2 in by_row[2]:
+                                if c2[2] == c0[2] or c2[2] == c1[2]:
+                                    continue
+                                perm = (c0[2], c1[2], c2[2])
+                                if perm in _LS_RISING:
+                                    p = 1
+                                elif perm in _LS_FALLING:
+                                    p = -1
+                                else:
+                                    continue
+                                diags.append(((c0[0], c1[0], c2[0]), p, (c0[1], c1[1], c2[1])))
+                    if diags:
+                        box_diags[bi] = diags
+                        qualifying += 1
+
+                if qualifying < 4:
+                    continue
+
+                for quad in _LS_QUADS:
+                    if not all(box_diags[b] for b in quad):
+                        continue
+
+                    for dg0 in box_diags[quad[0]]:
+                        for dg1 in box_diags[quad[1]]:
+                            for dg2 in box_diags[quad[2]]:
+                                for dg3 in box_diags[quad[3]]:
+                                    total = dg0[1] + dg1[1] + dg2[1] + dg3[1]
+                                    if total != 2 and total != -2:
+                                        continue
+
+                                    # Collect guardians individually
+                                    guardians = []  # (pos, triple_elims, extras_mask)
+                                    n_trivalue = 0
+                                    for dg in (dg0, dg1, dg2, dg3):
+                                        for i in range(3):
+                                            pos = dg[0][i]
+                                            cm = dg[2][i]
+                                            extras = cm & ~triple_mask
+                                            if extras:
+                                                g_elims = []
+                                                for d in (d1, d2, d3):
+                                                    if cm & BIT[d]:
+                                                        g_elims.append((pos, d + 1))
+                                                guardians.append((pos, g_elims, extras, cm))
+                                            elif cm == triple_mask:
+                                                n_trivalue += 1
+
+                                    if not guardians:
+                                        continue
+
+                                    # Correct implementation: each cell has
+                                    # ALL THREE triple digits, so the pattern
+                                    # is genuinely impossible. Eliminate all
+                                    # triple digits from all guardians.
+                                    all_elims = []
+                                    guard_positions = []
+                                    for gpos, g_elims, extras, cm in guardians:
+                                        guard_positions.append(gpos)
+                                        all_elims.extend(g_elims)
+
+                                    all_elims = list(dict.fromkeys(all_elims))
+                                    if not all_elims:
+                                        continue
+
+                                    digits_str = f'{d1+1}/{d2+1}/{d3+1}'
+                                    boxes_str = ','.join(str(b+1) for b in quad)
+                                    guard_str = ','.join(
+                                        f'R{p//9+1}C{p%9+1}' for p in guard_positions)
+                                    detail = (
+                                        f'LS (Loki\'s Scalpel): {{{digits_str}}} '
+                                        f'boxes {{{boxes_str}}} '
+                                        f'→ guardians {guard_str}')
+                                    return all_elims, detail
+
+    return [], None
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -9585,15 +9858,6 @@ def detect_almost_locked_pair(bb):
                 d2bit = BIT[d2]
                 pair_mask = d1bit | d2bit
 
-                # SOUNDNESS FIX: both d1 and d2 must still be unplaced in
-                # the box. If either is already placed the "virtual locked
-                # pair" argument fails silently — the box_cells_d1d2 filter
-                # would collect cells for the OTHER digit, producing an
-                # unsound pattern. Discovered in the 2026-04-10 soundness
-                # audit (see SOUNDNESS_AUDIT.md).
-                if (bb.box_used[bi] & d1bit) or (bb.box_used[bi] & d2bit):
-                    continue
-
                 # Find cells in box with d1 or d2
                 box_cells_d1d2 = []
                 for pos in UNITS[18 + bi]:
@@ -9809,98 +10073,6 @@ def detect_chute_remote_pair(bb):
                         return elims
 
     return elims
-
-
-# ══════════════════════════════════════════════════════════════════════
-# LS — Loki's Scalpel (correct tridagon implementation)
-# ══════════════════════════════════════════════════════════════════════
-
-_LS_RISING = frozenset({(0,1,2), (1,2,0), (2,0,1)})
-_LS_FALLING = frozenset({(0,2,1), (2,1,0), (1,0,2)})
-_LS_BOX_INFO = []
-for _bi in range(9):
-    _br, _bc = (_bi // 3) * 3, (_bi % 3) * 3
-    _LS_BOX_INFO.append(tuple((_br + _dr, _bc + _dc, (_br + _dr) * 9 + _bc + _dc, _dr, _dc)
-                              for _dr in range(3) for _dc in range(3)))
-_LS_QUADS = []
-for _br1 in range(3):
-    for _br2 in range(_br1 + 1, 3):
-        for _sc1 in range(3):
-            for _sc2 in range(_sc1 + 1, 3):
-                _LS_QUADS.append((_br1*3+_sc1, _br1*3+_sc2, _br2*3+_sc1, _br2*3+_sc2))
-
-
-def detect_ls(bb):
-    """LS (Loki's Scalpel) — correct tridagon implementation.
-    Each cell must have ALL THREE triple digits as candidates.
-    Returns (eliminations, detail) or ([], None)."""
-    trivalue_capable = 0
-    for pos in range(81):
-        if bb.board[pos] == 0 and POPCOUNT[bb.cands[pos]] >= 3:
-            trivalue_capable += 1
-            if trivalue_capable >= 12:
-                break
-    if trivalue_capable < 12:
-        return [], None
-    for d1 in range(7):
-        b1 = BIT[d1]
-        for d2 in range(d1 + 1, 8):
-            b2 = BIT[d2]
-            for d3 in range(d2 + 1, 9):
-                triple_mask = b1 | b2 | BIT[d3]
-                box_diags = [None] * 9; qualifying = 0
-                for bi in range(9):
-                    by_row = [[], [], []]
-                    for _, _, pos, lr, lc in _LS_BOX_INFO[bi]:
-                        if bb.board[pos] != 0: continue
-                        cm = bb.cands[pos]
-                        if (cm & triple_mask) == triple_mask:
-                            by_row[lr].append((pos, cm, lc))
-                    if not by_row[0] or not by_row[1] or not by_row[2]: continue
-                    diags = []
-                    for c0 in by_row[0]:
-                        for c1 in by_row[1]:
-                            if c1[2] == c0[2]: continue
-                            for c2 in by_row[2]:
-                                if c2[2] == c0[2] or c2[2] == c1[2]: continue
-                                perm = (c0[2], c1[2], c2[2])
-                                if perm in _LS_RISING: p = 1
-                                elif perm in _LS_FALLING: p = -1
-                                else: continue
-                                diags.append(((c0[0], c1[0], c2[0]), p, (c0[1], c1[1], c2[1])))
-                    if diags: box_diags[bi] = diags; qualifying += 1
-                if qualifying < 4: continue
-                for quad in _LS_QUADS:
-                    if not all(box_diags[b] for b in quad): continue
-                    for dg0 in box_diags[quad[0]]:
-                        for dg1 in box_diags[quad[1]]:
-                            for dg2 in box_diags[quad[2]]:
-                                for dg3 in box_diags[quad[3]]:
-                                    total = dg0[1] + dg1[1] + dg2[1] + dg3[1]
-                                    if total != 2 and total != -2: continue
-                                    all_elims = []; guard_positions = []
-                                    for dg in (dg0, dg1, dg2, dg3):
-                                        for i in range(3):
-                                            pos = dg[0][i]; cm = dg[2][i]
-                                            if cm & ~triple_mask:
-                                                guard_positions.append(pos)
-                                                for d in (d1, d2, d3):
-                                                    if cm & BIT[d]: all_elims.append((pos, d+1))
-                                    all_elims = list(dict.fromkeys(all_elims))
-                                    if not all_elims: continue
-                                    digits_str = f'{d1+1}/{d2+1}/{d3+1}'
-                                    boxes_str = ','.join(str(b+1) for b in quad)
-                                    guard_str = ','.join(f'R{p//9+1}C{p%9+1}' for p in guard_positions)
-                                    return all_elims, (f'LS (Loki\'s Scalpel): {{{digits_str}}} '
-                                                       f'boxes {{{boxes_str}}} → guardians {guard_str}')
-    return [], None
-
-
-# Stubs for CLI compatibility
-def detect_tridagon_legacy(bb): return [], None
-def detect_ur_type2d(bb): return [], None
-def detect_avoidable_rectangle(bb): return []
-def detect_zone135(bb, oracle): return [], []
 
 
 if __name__ == '__main__':

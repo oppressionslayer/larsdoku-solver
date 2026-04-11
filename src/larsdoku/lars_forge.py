@@ -1959,8 +1959,8 @@ def lars_technique_list():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# LARS SEEDS — DeepRes/D2B Provenance Registry
-# 384K seeds, 469 quadrillion forgeable puzzles
+# LARS SEEDS — DeepRes/D2B/LS Provenance Registry
+# 463K seeds (438K + 25K LS), 565 quadrillion forgeable puzzles
 # ══════════════════════════════════════════════════════════════════════
 
 # Load Lars Seeds from split files (part1 + part2)
@@ -2023,6 +2023,20 @@ def _load_lars_seeds():
                 except Exception:
                     pass
                 break
+
+    # LS seeds (Loki's Scalpel — mith T&E(3))
+    _ls_path = _os.path.join(_pkg_dir, 'ls_seeds.json.gz')
+    if _os.path.exists(_ls_path):
+        try:
+            import gzip as _gzip
+            with _gzip.open(_ls_path, 'rt') as _f:
+                _ls_data = _json.load(_f)
+            _ls_seeds = _ls_data.get('seeds', [])
+            LARS_SEEDS['seeds']['ls'] = [s['puzzle'] for s in _ls_seeds]
+            for s in _ls_seeds:
+                LARS_SEEDS_HASHES[s['hash']] = s['puzzle']
+        except Exception:
+            pass
 
 _load_lars_seeds()
 
@@ -2174,12 +2188,19 @@ def lars_seeds_stats():
     meta = LARS_SEEDS.get('meta', {})
     seeds_data = LARS_SEEDS.get('seeds', {})
 
+    ls_count = len(seeds_data.get('ls', []))
+    dr_count = len(seeds_data.get('deepres', []))
+    d2b_count = len(seeds_data.get('d2b', []))
+    total = dr_count + d2b_count + ls_count
+
     return {
         'loaded': True,
         'meta': meta,
-        'deepres_count': len(seeds_data.get('deepres', [])),
-        'd2b_count': len(seeds_data.get('d2b', [])),
-        'total_seeds': len(seeds_data.get('deepres', [])) + len(seeds_data.get('d2b', [])),
+        'deepres_count': dr_count,
+        'd2b_count': d2b_count,
+        'ls_count': ls_count,
+        'total_seeds': total,
+        'total_puzzles': f'{total * 1218998108160:.2e} (~500 quadrillion)',
         'mask_hashes': len(LARS_SEEDS_HASHES) + len(LARS_SEEDS_L1_HASHES),
         'core_hashes': len(LARS_SEEDS_HASHES),
         'variant_hashes': len(LARS_SEEDS_L1_HASHES),
