@@ -217,15 +217,15 @@ A non-uniform distribution is a finding. From a recent 559-puzzle slice of
 the mith corpus:
 
 ```
-  TR    67  28.3%
-  TC    64  27.0%
-  ML    37  15.6%
-  MC    22   9.3%
-  BR    13   5.5%
-  MR    12   5.1%
-  BL    10   4.2%
-  TL     8   3.4%
-  BC     4   1.7%
+    TR   450  24.4%
+    TC   389  21.1%
+    TL   356  19.3%
+    MR   198  10.7%
+    MC   152   8.3%
+    ML   112   6.1%
+    BC    91   4.9%
+    BR    48   2.6%
+    BL    47   2.6%    
 ```
 
 The top row (TL+TC+TR) holds 58.7% of the deductions. That is not random.
