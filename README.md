@@ -9,6 +9,9 @@ https://larsdoku.netlify.app/larsdoku_deploy_hypersiro/
 
 Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githubusercontent.com/oppressionslayer/wsrf-sudoku-solved-series/refs/heads/main/puzzles5_forum_hardest_1905_11plus.txt
 
+# Example solve file: https://github.com/oppressionslayer/wsrf-sudoku-solved-series/blob/main/bench_h11_last_2500_3_4_7.txt
+
+
 ```
 
 A research guide for joining the party.
