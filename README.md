@@ -24,6 +24,10 @@ Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githu
 
 https://github.com/oppressionslayer/wsrf-sudoku-solved-series/
 
+Results in theee files at wsrf-sudoku-solved-series/ :!  
+bench_h11_full_48765_3_4_8.zip
+bench_h11_full_48765_3_4_8.txt
+
 ```
 
 A research guide for joining the party.
