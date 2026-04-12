@@ -11,6 +11,14 @@ Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githu
 
 # Example solve file: https://github.com/oppressionslayer/wsrf-sudoku-solved-series/blob/main/bench_h11_last_2500_3_4_7.txt
 
+# The worlds hardest unsolvables!!!!!!!!!!!!!!!!!!!!!!!!
+
+  Total:    48,765 puzzles                                                                                                                                                                                 
+  Solved:   48,690  (99.846%)                                                                                                                                                                              
+  Stalled:      75  (0.154%)                                                                                                                                                                               
+  Failed:        0  (0.000%)
+
+# Use Larsdoku to find the last remaining technique or techniques!
 
 ```
 
