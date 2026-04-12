@@ -20,6 +20,10 @@ Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githu
 
 # Use Larsdoku to find the last remaining technique or techniques!
 
+# Go to https://github.com/oppressionslayer/wsrf-sudoku-solved-series/ for information on solved techniques and data files!
+
+https://github.com/oppressionslayer/wsrf-sudoku-solved-series/
+
 ```
 
 A research guide for joining the party.
