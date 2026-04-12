@@ -1,7 +1,7 @@
 # Hunting New Sudoku Techniques with larsdoku + AI
 
 ```
-# 99.91% on the 48k hardest !
+# 99.846% on the 48k hardest !
 
 https://larsdoku.netlify.app/
 
