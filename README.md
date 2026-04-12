@@ -27,6 +27,8 @@ https://github.com/oppressionslayer/wsrf-sudoku-solved-series/
 Results in theee files at wsrf-sudoku-solved-series/ :!  
 bench_h11_full_48765_3_4_8.zip
 bench_h11_full_48765_3_4_8.txt
+bench_h11_full_48765_stalls_3_4_8.txt # 75 stalls in the 48k.
+
 
 ```
 
