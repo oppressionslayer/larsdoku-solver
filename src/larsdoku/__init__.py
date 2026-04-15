@@ -9,13 +9,18 @@ Quick usage:
     print(result['n_steps'])     # number of steps
     print(result['technique_counts'])  # technique frequency
 """
-__version__ = "3.4.8"
+__version__ = "3.6.0"
 
 
 def _lars_warmup():
-    """Background JIT warmup — compiles all Numba functions on first import.
-    If cache exists, this is nearly instant. If not, runs in background
-    so the user's code isn't blocked."""
+    """Synchronous JIT warmup — compiles all Numba functions on first import.
+
+    Must be synchronous: Numba's JIT compiler is not thread-safe, so running
+    warmup in a background thread while user code calls the same functions
+    from the main thread can race and segfault. If the Numba disk cache is
+    warm this is nearly instant; on a cold cache the first import pays the
+    compilation cost once, then subsequent imports are fast.
+    """
     try:
         from larsdoku.cli import solve_selective
         # Simple puzzle triggers L1-L5 JIT paths
@@ -24,15 +29,7 @@ def _lars_warmup():
         pass  # silently ignore warmup failures
 
 
-def _lars_background_warmup():
-    """Spawn warmup in a background thread so import returns immediately."""
-    import threading
-    t = threading.Thread(target=_lars_warmup, daemon=True)
-    t.start()
-
-
-# Auto-warmup on import — compiles JIT in background
-_lars_background_warmup()
+_lars_warmup()
 
 
 def solve(puzzle, max_level=99, no_oracle=False, detail=False, gf2_extended=False):

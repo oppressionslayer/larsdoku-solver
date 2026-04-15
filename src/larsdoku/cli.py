@@ -8039,9 +8039,6 @@ presets:
 
             return None
 
-        # Need BIT for the direct rank-1 fallback above
-        from .engine import BIT
-
         _zd_debug = getattr(args, 'verbose', False) or getattr(args, 'steps', False)
 
         # Main loop: techniques cascade fully → if stalled, ONE zone deduction → repeat
