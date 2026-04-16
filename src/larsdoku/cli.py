@@ -45,7 +45,7 @@ from .engine import (
     detect_d2b_bitwise, detect_fpf_bitwise,
     detect_xwing, detect_swordfish, detect_simple_coloring,
     detect_bug_plus1, detect_ur_type2, detect_ur_type4,
-    detect_junior_exocet, detect_junior_exocet_stuart,
+    detect_junior_exocet, detect_junior_exocet_stuart, detect_junior_exocet_stuart_v2,
     detect_template, detect_bowman_bingo,
     detect_gf2_lanczos, detect_gf2_extended, fast_propagate, iter_bits9,
     detect_x_cycle_bitwise, detect_als_xz_bitwise,
@@ -1124,9 +1124,9 @@ def solve_selective(bd81, max_level=99, only_techniques=None, exclude_techniques
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet — validated version (strict cover-line ≤2)
+        # Junior Exocet — v2 with fast_propagate-gated elims (2026-04-15)
         if allowed('JuniorExocet'):
-            je_elims, je_detail = detect_junior_exocet_stuart(bb)
+            je_elims, je_detail = detect_junior_exocet_stuart_v2(bb)
             if je_elims:
                 if detail:
                     elim_events.append({
@@ -1953,9 +1953,9 @@ def solve_siro_guided(bd81, max_level=99, no_oracle=False, verbose=False, detail
                 technique_counts['URType4'] = technique_counts.get('URType4', 0) + 1
                 continue
 
-        # Junior Exocet — validated version
+        # Junior Exocet — v2 with trial-propagation gate (2026-04-15)
         if allowed('JuniorExocet'):
-            je_elims, _ = detect_junior_exocet_stuart(bb)
+            je_elims, _ = detect_junior_exocet_stuart_v2(bb)
             if je_elims:
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
@@ -2587,7 +2587,7 @@ def solve_fast(bd81, sigboost=None):
                 continue
 
         if need('JuniorExocet'):
-            je_elims, _ = detect_junior_exocet_stuart(bb)
+            je_elims, _ = detect_junior_exocet_stuart_v2(bb)
             if je_elims:
                 for pos, d in je_elims:
                     bb.eliminate(pos, d)
