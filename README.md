@@ -538,7 +538,7 @@ missing techniques to help you further research into sudoku!
 
  ## The Anthem                                                                                                                                                     
                                                             
-  [Just Another Tuesday (Dark Rock Epic Anthem)](https://suno.com/s/iXu40bwUXWs02n2o)                                                                
+  [Just Another Tuesday (Dark Rock Epic Anthem)](https://suno.com/s/usI0HWjGrshlMRmd)                                                                
    
   *"Solved the whole damn game like it's just another Tuesday"*    
   
