@@ -1,7 +1,8 @@
 # Hunting New Sudoku Techniques with larsdoku + AI and/or with Your own Brain!
 
 ```
-# 99.846% on the 48k hardest (we just achieved 100% we are redesigining solves to not contradict each other now as seen in mith puzzles -- update to come soon ! )
+# 99.846% on the 48k hardest (we just achieved 100% we are redesigining solves to not contradict each other now as seen
+in  mith  puzzles -- update to come soon ! )
 
 https://larsdoku.netlify.app/
 
@@ -33,7 +34,7 @@ bench_h11_full_48765_stalls_3_4_8.txt # 75 stalls in the 48k.
 
 ```
 
-A research guide for joining the party.
+A research guide for joining the party. *mith* puzzles next !
 
 larsdoku 3.6.2 is a pure-logic sudoku solver with 44 pattern detectors. It is
 also a research instrument: when you give it a hard puzzle and it stalls, the
