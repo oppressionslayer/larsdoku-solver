@@ -1,6 +1,6 @@
 # Hunting New Sudoku Techniques with larsdoku + AI and/or with Your own Brain!
 
-# MAJOR RELEASE WITH ALL FEATURES BELOW 4.0.0 10k SIG 400K UNIQE MASKS
+# MAJOR RELEASE NOW AVAILABLE WITH ALL FEATURES BELOW 4.0.0 10k SIG 400K UNIQE MASKS
 
 
 ```
