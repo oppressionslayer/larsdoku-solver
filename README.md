@@ -1,5 +1,8 @@
 # Hunting New Sudoku Techniques with larsdoku + AI and/or with Your own Brain!
 
+# MAJOR RELEASE WITH ALL FEATURES BELOW 4.0.0 10k SIG 400K UNIQE MASKS
+
+
 ```
 # 99.846% on the 48k hardest (we just achieved 100% we are redesigining solves to not contradict each other now as seen
 in  mith  puzzles -- update to come soon ! )
