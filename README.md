@@ -2,11 +2,10 @@
 
 # MAJOR RELEASE NOW AVAILABLE WITH ALL FEATURES BELOW 4.0.0 10k SIG 400K UNIQE MASKS
 
-# CREATED WITH AI ASSISTANCE AI CAN MAKE MISTAKES!
-
 ```
 # 99.846% on the 48k hardest (we just achieved 100% we are redesigining solves to not contradict each other now as seen
 in  mith  puzzles -- update to come soon ! )
+
 # MAJOR UPDATE LARSDOKU CAN FORGE PUZZZLES AND UNSOLVABLES VIA TECHNIQUE SIGNATURES AND WE ARE
 # IN THE PROGRESS OF MAKING LARSDOKU VIA TECHNIQUE ZONE SIGNATURES TO BETTER SUIT ITS USE AS A
 # REESEARCH APPLICATIOM FOR FINDING NEW TECHINQUES VIA TECHNIQUES SIGNATURES. UPDATE ARRIVING
@@ -1637,6 +1636,9 @@ larsdoku <puzzle> --gf2x                       # probing + conjugates + band/sta
 
 # Web UI
 larsdoku --serve                               # full-featured web solver at localhost:8765
+
+# CREATED WITH AI ASSISTANCE AI CAN MAKE MISTAKES!
+
 ```
 
 ### Puzzle Format
