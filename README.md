@@ -53,7 +53,7 @@ Get the hardest puzzles ever found on enjoysudoku forums here! https://raw.githu
 
   To retrieve seeds matching this signature for further research:
 
-    larsdoku --tech-sigquery "ALS_XYWing,ALS_XZ,D2B,FPC,SimpleColoring,Swordfish,XWing" --query-count 10
+    larsdoku --tech-sigquery "D2B,FPC,ALS_XZ,ALS_XYWing,LZWing,SimpleColoring,Swordfish,XWing" --sigquery-exact 
 
   Increase --query-count to pull more; techniques are dropped if not
   tracked in the catalog (e.g. LZWing) so the query uses only catalog techs.
