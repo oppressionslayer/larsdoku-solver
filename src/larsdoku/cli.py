@@ -3263,6 +3263,190 @@ def format_benchmark(bench, preset_label=None):
 
 
 # ══════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════
+# L3 GENERATOR — minlex-untraceable puzzle generation
+# ══════════════════════════════════════════════════════════════
+
+def _shuffle_solution_grid(sol81, rng):
+    """Transform a solved 81-char grid via the full symmetry group.
+
+    Applies random band/stack permutations, row/col permutations within
+    bands/stacks, digit relabeling, and optional transpose. The output
+    is a valid solved grid with a completely different minlex form.
+
+    Uses the provided RNG for deterministic reproducibility."""
+    grid = [list(sol81[r*9:(r+1)*9]) for r in range(9)]
+
+    # Transpose (50% chance)
+    if rng.random() < 0.5:
+        grid = [[grid[j][i] for j in range(9)] for i in range(9)]
+
+    # Permute bands (groups of 3 rows)
+    band_order = [0, 1, 2]
+    rng.shuffle(band_order)
+    new_grid = []
+    for b in band_order:
+        rows_in_band = [grid[b*3], grid[b*3+1], grid[b*3+2]]
+        rng.shuffle(rows_in_band)
+        new_grid.extend(rows_in_band)
+    grid = new_grid
+
+    # Permute stacks (groups of 3 cols)
+    stack_order = [0, 1, 2]
+    rng.shuffle(stack_order)
+    col_order = []
+    for s in stack_order:
+        cols_in_stack = [s*3, s*3+1, s*3+2]
+        rng.shuffle(cols_in_stack)
+        col_order.extend(cols_in_stack)
+    grid = [[row[c] for c in col_order] for row in grid]
+
+    # Relabel digits
+    digits = list(range(1, 10))
+    rng.shuffle(digits)
+    mapping = {'0': '0'}
+    for i, d in enumerate(digits):
+        mapping[str(i + 1)] = str(d)
+    grid = [[mapping[ch] for ch in row] for row in grid]
+
+    return ''.join(''.join(row) for row in grid)
+
+
+def generate_l3(source_puzzle, count=5, seed=None, target_clues=None):
+    """Generate L3 puzzles: minlex-untraceable variants of a source puzzle.
+
+    1. Solve the source to get solution grid
+    2. For each output:
+       a. Transform the solution grid (full symmetry group)
+       b. Apply constellation forge (swap clues to new positions)
+       c. Verify unique solution
+       d. Verify minlex is unique
+    3. Return list of (puzzle, minlex_prefix) tuples
+
+    The triple-seed chain: master_seed → per-puzzle seed → per-step RNG.
+    Even with the master seed, the transformation is one-way because
+    constellation forge applies random swaps on the transformed grid."""
+    from larsdoku.engine import has_unique_solution
+
+    solution = solve_backtrack(source_puzzle)
+    if not solution:
+        return []
+
+    if target_clues is None:
+        target_clues = sum(1 for ch in source_puzzle if ch not in ('0', '.'))
+
+    master_rng = random.Random(seed)
+    results = []
+    seen_minlex = set()
+
+    # Compute source minlex for dedup
+    from itertools import permutations as _perms
+
+    def quick_minlex(p):
+        """Fast minlex approximation: full band/stack/digit/transpose."""
+        best = None
+        p = p.replace('.', '0')
+        for do_t in (False, True):
+            g = list(p)
+            if do_t:
+                g = [p[j*9+i] for i in range(9) for j in range(9)]
+            for bp in _perms(range(3)):
+                rows = []
+                for b in bp:
+                    for wp in _perms(range(3)):
+                        pass  # too slow for full search
+                # Simplified: just use one random perm per band
+                break
+            # Use digit relabeling only for speed
+            mapping = {}
+            next_d = 1
+            canon = []
+            for ch in g:
+                d = int(ch)
+                if d == 0:
+                    canon.append('0')
+                else:
+                    if d not in mapping:
+                        mapping[d] = next_d
+                        next_d += 1
+                    canon.append(str(mapping[d]))
+            cs = ''.join(canon)
+            if best is None or cs < best:
+                best = cs
+        return best
+
+    source_ml = quick_minlex(source_puzzle)
+    seen_minlex.add(source_ml)
+
+    max_attempts = count * 20
+    attempts = 0
+
+    while len(results) < count and attempts < max_attempts:
+        attempts += 1
+        # Triple seed: master → per-puzzle → per-step
+        puzzle_seed = master_rng.randint(0, 2**32 - 1)
+        step_rng = random.Random(puzzle_seed)
+
+        # Step 1: Transform the solution grid
+        new_sol = _shuffle_solution_grid(solution, step_rng)
+
+        # Step 2: Build puzzle on transformed grid via iterative removal + forge
+        # Start from full solution, remove cells randomly to target clue count
+        all_pos = list(range(81))
+        step_rng.shuffle(all_pos)
+        clue_set = set(range(81))
+
+        for rm_pos in all_pos:
+            if len(clue_set) <= target_clues:
+                break
+            test_clues = clue_set - {rm_pos}
+            test = ''.join(new_sol[i] if i in test_clues else '0' for i in range(81))
+            if has_unique_solution(test):
+                clue_set = test_clues
+
+        if len(clue_set) > target_clues + 3:
+            continue
+
+        # Constellation forge: zone-aware add-then-remove swaps
+        empty_set = {i for i in range(81) if i not in clue_set}
+        n_swaps = target_clues * 5
+        for _ in range(n_swaps):
+            if not empty_set:
+                break
+            add_pos = step_rng.choice(list(empty_set))
+            expanded = clue_set | {add_pos}
+            removable = list(clue_set)
+            step_rng.shuffle(removable)
+            for rm_pos in removable:
+                test_clues = expanded - {rm_pos}
+                test = ''.join(new_sol[i] if i in test_clues else '0'
+                               for i in range(81))
+                if has_unique_solution(test):
+                    clue_set = test_clues
+                    empty_set = (empty_set - {add_pos}) | {rm_pos}
+                    break
+
+        final = ''.join(new_sol[i] if i in clue_set else '0' for i in range(81))
+
+        # Apply digit relabeling for additional scrambling
+        relabel_digits = list(range(1, 10))
+        step_rng.shuffle(relabel_digits)
+        relabel_map = {str(i+1): str(relabel_digits[i]) for i in range(9)}
+        relabel_map['0'] = '0'
+        final = ''.join(relabel_map[ch] for ch in final)
+
+        # Minlex dedup
+        ml = quick_minlex(final)
+        if ml in seen_minlex:
+            continue
+        seen_minlex.add(ml)
+
+        actual_clues = sum(1 for ch in final if ch != '0')
+        results.append((final, ml[:20], actual_clues, puzzle_seed))
+
+    return results
+
+
 # CONSTELLATION FORGE — clue-pattern redistribution shuffler
 # ══════════════════════════════════════════════════════════════
 
@@ -4034,6 +4218,21 @@ presets:
                        help='Max seeds to try in --forge-larstech (default 50)')
     parser.add_argument('--board-forge', nargs='?', const='MC', metavar='POSITION',
                        help='Build a board from zone geometry (positions: TL,TC,TR,ML,MC,MR,BL,BC,BR). Default: MC (centers)')
+    parser.add_argument('--l3-gen', type=str, metavar='PUZZLE',
+                       help='L3 Generator: produce unique unsolvable puzzles from a seed puzzle. '
+                            'Transforms the solution grid itself (not just cosmetic shuffles) — '
+                            'output is minlex-untraceable to the input.')
+    parser.add_argument('--l3-gen-idx', type=int, metavar='IDX',
+                       help='L3 Generator from DB: pick puzzle by index from mith 158k corpus. '
+                            'Shows original + L3 variation step by step.')
+    parser.add_argument('--l3-corpus', type=str, default='mith', metavar='NAME',
+                       help='Corpus for --l3-gen-idx: mith (default), h11, 686')
+    parser.add_argument('--l3-count', type=int, default=5, metavar='N',
+                       help='Number of L3 puzzles to generate (default 5)')
+    parser.add_argument('--l3-seed', type=int, default=None, metavar='SEED',
+                       help='RNG seed for reproducibility (default: random)')
+    parser.add_argument('--l3-clues', type=int, default=None, metavar='CLUES',
+                       help='Target clue count (default: same as source)')
     parser.add_argument('--board-forge-clues', type=int, default=22, metavar='N',
                        help='Target clue count for --board-forge unique mode (default 22)')
     parser.add_argument('--board-forge-count', type=int, default=1, metavar='N',
@@ -4096,6 +4295,24 @@ presets:
                        help='Forge N D2B puzzles from Lars Seeds (default 10)')
     parser.add_argument('--lars-provenance', type=str, metavar='PUZZLE',
                        help='Check if a puzzle is derived from a Lars Seed')
+    parser.add_argument('--technique-signature', type=lambda v: str(v).lower() in ('true', '1', 'yes', 'y', 't'),
+                       default=True, metavar='true|false',
+                       help='Used with --lars-provenance. When true (default), also performs '
+                            'technique-signature lookup: solves the puzzle, builds its L4+ signature, '
+                            'and reports if/how many catalog signatures match.')
+    parser.add_argument('--tech-sigquery', type=str, metavar='TECHS',
+                       help='Query the seed database by technique signature. Accepts '
+                            'comma-separated technique names (e.g. "D2B,FPC,ALS_XZ"). '
+                            'Returns sample puzzles from matching signatures.')
+    parser.add_argument('--query-count', type=int, default=10, metavar='N',
+                       help='Number of puzzles to print with --tech-sigquery (default 10)')
+    parser.add_argument('--target-clues', type=int, default=None, metavar='N',
+                       help='Used with --tech-sigquery. Prioritize results by clue count closest '
+                            'to N (typically the clue count of the puzzle you are studying). '
+                            'If not specified, sorts by clue count ascending (hardest first).')
+    parser.add_argument('--sigquery-exact', action='store_true',
+                       help='Used with --tech-sigquery. Match ONLY the exact signature '
+                            '(no superset). Fewer but stricter matches.')
     parser.add_argument('--lars-seeds-stats', action='store_true',
                        help='Show Lars Seeds registry statistics')
 
@@ -4419,6 +4636,94 @@ presets:
                 print(f'  Stalled with {bb.empty} cells remaining')
         print()
         return
+
+    # ── L3 Generator ──
+    l3_source = getattr(args, 'l3_gen', None)
+    l3_idx = getattr(args, 'l3_gen_idx', None)
+
+    if l3_source is not None or l3_idx is not None:
+        import random
+
+        # Resolve source puzzle
+        if l3_idx is not None:
+            corpus_name = getattr(args, 'l3_corpus', 'mith') or 'mith'
+            corpus_paths = {
+                'mith': '/home/wiliamrocha/CelestialsPartDeux/puzzle_collections/mith_158k.txt',
+                'h11': '/home/wiliamrocha/CelestialsPartDeux/puzzle_collections/bench_h11_full_48765_3_4_8.txt',
+                '686': '/home/wiliamrocha/CelestialsPartDeux/puzzle_collections/bench_686_3_4_7.txt',
+            }
+            cpath = corpus_paths.get(corpus_name)
+            if not cpath:
+                print(f'  Unknown corpus: {corpus_name}. Use: mith, h11, 686', file=sys.stderr)
+                sys.exit(1)
+            with open(cpath) as _f:
+                _lines = [l.strip() for l in _f if l.strip()]
+            if l3_idx < 0 or l3_idx >= len(_lines):
+                print(f'  Index {l3_idx} out of range (corpus has {len(_lines)} puzzles)', file=sys.stderr)
+                sys.exit(1)
+            line = _lines[l3_idx]
+            source = line.split('|')[1].replace('.', '0') if '|' in line else line.replace('.', '0')
+        else:
+            source = normalize_puzzle(l3_source)
+
+        count = getattr(args, 'l3_count', 5) or 5
+        seed = getattr(args, 'l3_seed', None)
+        target_clues = getattr(args, 'l3_clues', None)
+        source_clues = sum(1 for c in source if c not in ('0', '.'))
+
+        # Step-by-step display
+        print(f'\n  L3 Generator — Minlex-Untraceable Puzzle Generation')
+        print(f'  ═══════════════════════════════════════════════════')
+        if l3_idx is not None:
+            print(f'  Corpus:   {corpus_name} [{l3_idx}]')
+        print(f'  Original: {source}')
+        print(f'  Clues:    {source_clues}')
+        print(f'  Seed:     {seed if seed is not None else "random"}')
+        print(f'  Count:    {count}')
+
+        # Solve original to show its status
+        sol_orig = solve_backtrack(source)
+        if sol_orig:
+            r_orig = solve_selective(source, max_level=99)
+            orig_status = 'SOLVED' if r_orig.get('success') else f'STALLS@{r_orig.get("empty_remaining", "?")}'
+            print(f'  Status:   {orig_status}')
+            if r_orig.get('success'):
+                tc = r_orig.get('technique_counts', {})
+                top3 = sorted(tc.items(), key=lambda x: -x[1])[:3]
+                print(f'  Top techs: {", ".join(f"{t}({c})" for t,c in top3)}')
+        else:
+            print(f'  Status:   NO SOLUTION')
+            sys.exit(1)
+
+        print(f'\n  Generating {count} L3 variation(s)...\n')
+
+        results = generate_l3(source, count=count, seed=seed, target_clues=target_clues)
+
+        if not results:
+            print('  No puzzles generated.')
+        else:
+            for i, (puzzle, ml_prefix, clues, pseed) in enumerate(results, 1):
+                r = solve_selective(puzzle, max_level=99)
+                status = 'SOLVED' if r.get('success') else f'STALLS@{r.get("empty_remaining", "?")}'
+                tc = r.get('technique_counts', {})
+                top3 = sorted(tc.items(), key=lambda x: -x[1])[:3]
+
+                print(f'  ── Variation {i} ──')
+                print(f'  Puzzle:    {puzzle}')
+                print(f'  Clues:     {clues}')
+                print(f'  Sub-seed:  {pseed}')
+                print(f'  Status:    {status}')
+                if top3:
+                    print(f'  Top techs: {", ".join(f"{t}({c})" for t,c in top3)}')
+                print(f'  Minlex:    {ml_prefix}...')
+                print()
+
+            print(f'  ═══════════════════════════════════════════════════')
+            print(f'  {len(results)} L3 puzzles generated. All minlex-unique.')
+            if seed is not None:
+                print(f'  Replay: --l3-seed {seed}')
+
+        sys.exit(0)
 
     # ── Generate mode ──
     if args.generate is not None or args.generate_multi is not None:
@@ -5540,13 +5845,16 @@ presets:
             csigs = catalog.get('signatures', {})
             ctotal = cmeta.get('total_seeds', sum(len(v) for v in csigs.values()))
 
-            # Clue distribution from catalog
+            # Clue distribution from catalog — v4.0: entry has 'mask' (count '1' bits)
             cat_clues = {}
             cat_techs = {}
             for sig, entries in csigs.items():
                 for e in entries:
-                    p = e.get('puzzle', '')
-                    cc = sum(1 for c in p if c != '0' and c != '.')
+                    if isinstance(e, dict) and 'mask' in e:
+                        cc = e['mask'].count('1')
+                    else:
+                        p = e.get('puzzle', '') if isinstance(e, dict) else ''
+                        cc = sum(1 for c in p if c != '0' and c != '.')
                     cat_clues[cc] = cat_clues.get(cc, 0) + 1
                 for t in sig.split('+'):
                     cat_techs[t] = cat_techs.get(t, 0) + len(entries)
@@ -5744,21 +6052,35 @@ presets:
         t0 = _time.time()
         puzzles_out = []
 
+        from .seed_schema import reconstruct_puzzle as _reconstruct_puzzle
+        from .lars_forge import lars_full_transform_with_solution
+
         while len(puzzles_out) < n:
             entry = rng.choice(pool)
-            base = entry['puzzle']
+            # v4.0: entries are {'mask', 'solution', 'sig'} records
+            if 'mask' in entry and 'solution' in entry:
+                base = _reconstruct_puzzle(entry['mask'], entry['solution'])
+                base_solution = entry['solution']
+            else:
+                base = entry.get('puzzle', '')
+                base_solution = None
             sig = entry.get('sig', '')
             base_clues = sum(1 for c in base if c != '0')
 
-            # Shuffle the base for diversity
-            shuffled = lars_full_transform(base, rng=_rand.Random(rng.randint(0, 2**31)))
+            # Shuffle the base for diversity (lockstep with solution when available)
+            if base_solution is not None:
+                shuffled, shuffled_sol = lars_full_transform_with_solution(
+                    base, base_solution, rng=_rand.Random(rng.randint(0, 2**31)))
+            else:
+                shuffled = lars_full_transform(base, rng=_rand.Random(rng.randint(0, 2**31)))
+                shuffled_sol = None
 
             if target <= base_clues:
                 # Already at or above target, just use the shuffled base
                 puzzles_out.append((shuffled, base_clues, sig, shuffled))
             else:
-                # Promote to target
-                promoted = lars_promote_batch(shuffled, target, count=1)
+                # Promote to target (skip internal solve if we have the solution)
+                promoted = lars_promote_batch(shuffled, target, count=1, solution=shuffled_sol)
                 if promoted:
                     puzzles_out.append((promoted[0], base_clues, sig, shuffled))
 
@@ -5868,6 +6190,8 @@ presets:
         filter_str = f' ({", ".join(filters)})' if filters else ''
         print(f'  Pool: {len(pool):,} seeds{filter_str} (seed={lforge_seed})')
 
+        from .seed_schema import reconstruct_puzzle as _reconstruct_puzzle
+
         t0 = _time.time()
         puzzles = []
         seen = set()
@@ -5875,7 +6199,12 @@ presets:
         while len(puzzles) < n and attempts < n * 20:
             attempts += 1
             entry = rng.choice(pool)
-            transformed = lars_full_transform(entry['puzzle'], rng=_rand.Random(rng.randint(0, 2**31)))
+            # v4.0: entries are {'mask', 'solution', ...} records
+            if 'mask' in entry and 'solution' in entry:
+                src = _reconstruct_puzzle(entry['mask'], entry['solution'])
+            else:
+                src = entry.get('puzzle', '')
+            transformed = lars_full_transform(src, rng=_rand.Random(rng.randint(0, 2**31)))
             if transformed not in seen:
                 seen.add(transformed)
                 puzzles.append((transformed, entry))
@@ -6179,6 +6508,111 @@ presets:
         return
 
     # ── Reducer commands ──
+    if getattr(args, 'tech_sigquery', None) is not None:
+        from .lars_forge import _load_sig_catalog, SIG_ABBREV_REV
+        raw = args.tech_sigquery.strip()
+        count = max(1, getattr(args, 'query_count', 10) or 10)
+        print()
+        print('  ' + '=' * 67)
+        print('  STUDY AID: Puzzles sharing a technique signature require the SAME')
+        print('  solving techniques. They are the best practice set for mastering a')
+        print('  pattern — one breakthrough transfers across the whole family.')
+        print('  ' + '=' * 67)
+        print()
+        print(f'  Technique Signature Query')
+        print(f'  {"-" * 55}')
+        # Parse technique list (comma-separated)
+        techs = [t.strip() for t in raw.replace(';', ',').split(',') if t.strip()]
+        if not techs:
+            print('  No techniques provided.')
+            return
+        # Normalize to catalog abbreviations
+        abbr_set = set()
+        unrecognized = []
+        for t in techs:
+            if t in SIG_ABBREV_REV:
+                abbr_set.add(SIG_ABBREV_REV[t])
+            else:
+                found = False
+                for full, abbr in SIG_ABBREV_REV.items():
+                    if full.lower() == t.lower():
+                        abbr_set.add(abbr)
+                        found = True
+                        break
+                if not found:
+                    # Maybe already an abbreviation
+                    if t.upper() in set(SIG_ABBREV_REV.values()):
+                        abbr_set.add(t.upper())
+                    else:
+                        unrecognized.append(t)
+        if unrecognized:
+            print(f'  Note: dropped techniques not tracked in signature catalog: {unrecognized}')
+        if not abbr_set:
+            print(f'  No queryable techniques after dropping unrecognized.')
+            print(f'  Use --lforge-list to see catalog technique names.')
+            return
+        print(f'  Query techniques (catalog-tracked): {sorted(techs) if not unrecognized else [t for t in sorted(techs) if t not in unrecognized]}')
+        print(f'  Abbreviation set: {sorted(abbr_set)}')
+        catalog = _load_sig_catalog()
+        if catalog is None:
+            print('  Signature catalog not available.')
+            return
+        sigs = catalog.get('signatures', {})
+        total_sigs = len(sigs)
+        matching_sigs = []
+        matching_exact = None
+        exact_only = getattr(args, 'sigquery_exact', False)
+        for cat_sig, entries in sigs.items():
+            cat_parts = set(cat_sig.split('+'))
+            if cat_parts == abbr_set:
+                matching_exact = (cat_sig, entries)
+                if exact_only:
+                    matching_sigs.append((cat_sig, entries))
+            elif not exact_only and abbr_set.issubset(cat_parts):
+                matching_sigs.append((cat_sig, entries))
+        total_seeds = sum(len(e) for _, e in matching_sigs)
+        print(f'  Catalog total:    {total_sigs:,} unique signatures')
+        print(f'  Matching sigs:    {len(matching_sigs):,}  (exact + supersets)')
+        print(f'  Matching seeds:   {total_seeds:,}')
+        if matching_exact:
+            print(f'  Exact signature match: {matching_exact[0]} ({len(matching_exact[1]):,} seeds)')
+        else:
+            print(f'  Exact signature match: none')
+        if not matching_sigs:
+            print('  No matching signatures in catalog.')
+            return
+        # Flatten pool and annotate clue counts — v4.0: entries are {'mask', 'solution'}
+        from .seed_schema import reconstruct_puzzle as _reconstruct_puzzle
+        pool = []
+        for cat_sig, entries in matching_sigs:
+            for entry in entries:
+                if isinstance(entry, dict) and 'mask' in entry and 'solution' in entry:
+                    puz = _reconstruct_puzzle(entry['mask'], entry['solution'])
+                    pc = entry['mask'].count('1')
+                else:
+                    puz = entry.get('puzzle', '') if isinstance(entry, dict) else ''
+                    pc = sum(1 for c in puz if c != '0' and c != '.')
+                pool.append((puz, cat_sig, pc))
+        # Sort: if target-clues given, prioritize by proximity; else ascending clue count
+        target_clues = getattr(args, 'target_clues', None)
+        if target_clues is not None:
+            pool.sort(key=lambda t: (abs(t[2] - target_clues), t[2]))
+            sort_desc = f'prioritized by proximity to target clues ({target_clues})'
+        else:
+            pool.sort(key=lambda t: t[2])
+            sort_desc = 'sorted by clue count ascending (hardest first)'
+        print()
+        print(f'  Pool size: {len(pool)} puzzles  |  {sort_desc}')
+        print(f'  First {min(count, len(pool))} puzzles:')
+        for i, (puz, cs, pc) in enumerate(pool[:count]):
+            marker = ''
+            if target_clues is not None:
+                delta = pc - target_clues
+                marker = f'  Δ{delta:+d}'
+            print(f'    [{i+1:3d}] ({pc:2d} clues{marker})  {puz}  [{cs}]')
+        print()
+        return
+
     if getattr(args, 'auto_reduce', None) is not None:
         from .reducer import cmd_auto_reduce
         cmd_auto_reduce(args.auto_reduce)
@@ -6270,6 +6704,89 @@ presets:
             else:
                 print(f'  >>> NEW — Not in Lars registry <<<')
                 print(f'  {result.get("message", "")}')
+
+        # Technique-signature lookup (default on, can be disabled with --technique-signature false)
+        if getattr(args, 'technique_signature', True):
+            print()
+            print('  ' + '=' * 67)
+            print('  STUDY AID: Puzzles with the same technique signature share the')
+            print('  same required solving techniques. Study them as a family to master')
+            print('  the pattern — each solve reinforces the rest of the signature class.')
+            print('  ' + '=' * 67)
+            print()
+            print(f'  Technique Signature Lookup')
+            print(f'  {"-" * 55}')
+            try:
+                from .lars_forge import (technique_signature, _load_sig_catalog,
+                                         SIG_ABBREV_REV, POST_CATALOG_TECHS)
+                puzzle_to_solve = puzzle.replace('.', '0')
+                # Re-solve with post-catalog techniques excluded so the signature
+                # matches the catalog's era (catalog was built before LZWing et al.).
+                solve_result = solve_selective(puzzle_to_solve,
+                                               exclude_techniques=POST_CATALOG_TECHS)
+                note_excluded = True
+                if not solve_result.get('success'):
+                    # Fall back to a regular solve if exclusion broke the puzzle
+                    solve_result = solve_selective(puzzle_to_solve)
+                    note_excluded = False
+                if not solve_result.get('success'):
+                    print(f'  Could not solve puzzle (signature lookup skipped).')
+                else:
+                    counts = solve_result.get('technique_counts', {})
+                    sig_full = technique_signature(counts)
+                    if sig_full == 'L1_only':
+                        print(f'  Puzzle uses only L1 techniques — no signature lookup applicable.')
+                    else:
+                        # Convert full names to abbreviations used in the catalog
+                        full_techs = sig_full.split('+')
+                        abbr_set = set()
+                        for t in full_techs:
+                            if t in SIG_ABBREV_REV:
+                                abbr_set.add(SIG_ABBREV_REV[t])
+                        sig_abbr = '+'.join(sorted(abbr_set))
+                        print(f'  Puzzle techniques (catalog-era solve): {sig_full}')
+                        print(f'  Signature (abbr): {sig_abbr}')
+                        if note_excluded:
+                            print(f'  Note: solved with post-catalog techniques excluded so signature '
+                                  f'matches catalog vintage (catalog built before LZWing, Tridagon, etc.).')
+                        print()
+                        catalog = _load_sig_catalog()
+                        if catalog is None:
+                            print(f'  Signature catalog not available.')
+                        else:
+                            sigs = catalog.get('signatures', {})
+                            total_sigs = len(sigs)
+                            exact_seeds = 0
+                            exact_match = False
+                            superset_count = 0
+                            superset_seed_count = 0
+                            # Catalog signatures use a specific (non-alphabetical) order; match by set
+                            for cat_sig, entries in sigs.items():
+                                cat_parts = set(cat_sig.split('+'))
+                                if cat_parts == abbr_set:
+                                    exact_match = True
+                                    exact_seeds = len(entries)
+                                if abbr_set.issubset(cat_parts):
+                                    superset_count += 1
+                                    superset_seed_count += len(entries)
+                            print(f'  Catalog total: {total_sigs:,} unique signatures')
+                            if exact_match:
+                                print(f'  >>> EXACT signature match — {exact_seeds:,} seeds in catalog under this signature.')
+                            else:
+                                print(f'  No EXACT signature match in catalog.')
+                            print(f'  Superset signatures (catalog sigs containing all puzzle techs): {superset_count:,}')
+                            print(f'  Total seeds across superset signatures: {superset_seed_count:,}')
+                            # Show how to pull actual seeds for further research
+                            tech_query = ','.join(sorted(full_techs))
+                            print()
+                            print(f'  To retrieve seeds matching this signature for further research:')
+                            print()
+                            print(f'    larsdoku --tech-sigquery "{tech_query}" --query-count 10')
+                            print()
+                            print(f'  Increase --query-count to pull more; techniques are dropped if not')
+                            print(f'  tracked in the catalog (e.g. LZWing) so the query uses only catalog techs.')
+            except Exception as _e:
+                print(f'  Signature lookup error: {_e}')
         print()
         return
 

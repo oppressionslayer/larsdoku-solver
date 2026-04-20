@@ -68,13 +68,29 @@ import json as _json
 
 _SEED_BANK_PATH_128 = _os.path.join(_os.path.dirname(__file__), 'seed_bank_128.json')
 _SEED_BANK_PATH_64 = _os.path.join(_os.path.dirname(__file__), 'seed_bank_64.json')
-LARS_EXTENDED_BANK = {}  # clue_count (int) -> list of puzzle strings
+LARS_EXTENDED_BANK = {}  # clue_count (int) -> list of puzzle strings (reconstructed from v4.0 records)
 
 # Prefer 128-seed bank, fall back to 64
 for _path in [_SEED_BANK_PATH_128, _SEED_BANK_PATH_64]:
     if _os.path.exists(_path):
         with open(_path) as _f:
             _raw = _json.load(_f)
+        # v4.0 schema: {meta, banks: {cc: [{mask, solution}]}}
+        if 'banks' in _raw:
+            _meta = _raw.get('meta', {})
+            if _meta.get('schema_version') != 2:
+                raise RuntimeError(
+                    f"{_path}: unexpected schema_version (expected 2). "
+                    "Run scripts/migrate_seeds_to_v2.py."
+                )
+            # Reconstruct puzzle strings for backward-compat consumer access
+            from .seed_schema import reconstruct_puzzle as _rp
+            LARS_EXTENDED_BANK = {
+                int(cc): [_rp(e['mask'], e['solution']) for e in entries]
+                for cc, entries in _raw['banks'].items()
+            }
+        else:
+            # Legacy v1 shape — direct list of puzzle strings
             LARS_EXTENDED_BANK = {int(k): v for k, v in _raw.items()}
         break
 
@@ -349,6 +365,120 @@ def lars_full_transform(puzzle, rng=None):
     mapping['0'] = '0'
 
     return ''.join(mapping[c] for c in shuffled)
+
+
+def lars_shuffle_with_solution(puzzle, solution, rng=None):
+    """Shuffle puzzle + solution in lockstep. Same geometric transforms
+    applied to both — so the transformed solution is still the unique
+    solution of the transformed puzzle.
+
+    Args:
+        puzzle: 81-char puzzle string
+        solution: 81-char fully-filled solution string
+        rng: random.Random instance
+
+    Returns:
+        (shuffled_puzzle, shuffled_solution) tuple
+    """
+    import random
+    if rng is None:
+        rng = random.Random()
+
+    # Parallel 9x9 grids for puzzle and solution
+    p_grid = [[int(puzzle[r * 9 + c]) for c in range(9)] for r in range(9)]
+    s_grid = [[int(solution[r * 9 + c]) for c in range(9)] for r in range(9)]
+
+    def _apply_row_shuffle(row_order_per_band):
+        nonlocal p_grid, s_grid
+        new_p, new_s = [None] * 9, [None] * 9
+        for band in range(3):
+            for i, old_r in enumerate(row_order_per_band[band]):
+                new_p[band * 3 + i] = p_grid[old_r]
+                new_s[band * 3 + i] = s_grid[old_r]
+        p_grid = new_p
+        s_grid = new_s
+
+    # 1. Shuffle rows within each band
+    band_row_orders = []
+    for band in range(3):
+        rows = [band * 3, band * 3 + 1, band * 3 + 2]
+        rng.shuffle(rows)
+        band_row_orders.append(rows)
+    _apply_row_shuffle(band_row_orders)
+
+    # 2. Shuffle columns within each stack
+    for stack in range(3):
+        cols = [stack * 3, stack * 3 + 1, stack * 3 + 2]
+        rng.shuffle(cols)
+        for r in range(9):
+            p_new = [p_grid[r][c] for c in cols]
+            s_new = [s_grid[r][c] for c in cols]
+            for i, c in enumerate(range(stack * 3, stack * 3 + 3)):
+                p_grid[r][c] = p_new[i]
+                s_grid[r][c] = s_new[i]
+
+    # 3. Shuffle bands
+    bands = [0, 1, 2]
+    rng.shuffle(bands)
+    p_new, s_new = [], []
+    for b in bands:
+        for r in range(b * 3, b * 3 + 3):
+            p_new.append(p_grid[r])
+            s_new.append(s_grid[r])
+    p_grid, s_grid = p_new, s_new
+
+    # 4. Shuffle stacks
+    stacks = [0, 1, 2]
+    rng.shuffle(stacks)
+    for r in range(9):
+        p_new_row, s_new_row = [], []
+        for s in stacks:
+            p_new_row.extend(p_grid[r][s * 3:s * 3 + 3])
+            s_new_row.extend(s_grid[r][s * 3:s * 3 + 3])
+        p_grid[r] = p_new_row
+        s_grid[r] = s_new_row
+
+    # 5. Transpose (50% chance)
+    if rng.random() < 0.5:
+        p_grid = [[p_grid[r][c] for r in range(9)] for c in range(9)]
+        s_grid = [[s_grid[r][c] for r in range(9)] for c in range(9)]
+
+    p_out = ''.join(str(p_grid[r][c]) for r in range(9) for c in range(9))
+    s_out = ''.join(str(s_grid[r][c]) for r in range(9) for c in range(9))
+    return p_out, s_out
+
+
+def lars_full_transform_with_solution(puzzle, solution, rng=None):
+    """Shuffle + digit permutation on puzzle AND solution in lockstep.
+
+    Returns (new_puzzle, new_solution) where new_solution is the (transformed)
+    unique solution of new_puzzle. Digit-permutation preserves solution
+    validity because it's an isomorphism on 1-9.
+
+    Args:
+        puzzle: 81-char puzzle string
+        solution: 81-char solution string
+        rng: random.Random instance
+
+    Returns:
+        (new_puzzle, new_solution) tuple
+    """
+    import random
+    if rng is None:
+        rng = random.Random()
+
+    # Step 1: Lockstep shuffle
+    s_puzzle, s_solution = lars_shuffle_with_solution(puzzle, solution, rng)
+
+    # Step 2: Same digit permutation applied to both
+    digits = list(range(1, 10))
+    rng.shuffle(digits)
+    mapping = {str(i + 1): str(digits[i]) for i in range(9)}
+    mapping['0'] = '0'
+
+    new_puzzle = ''.join(mapping[c] for c in s_puzzle)
+    new_solution = ''.join(mapping[c] for c in s_solution)
+    return new_puzzle, new_solution
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1178,7 +1308,7 @@ def lars_promote(puzzle, target_clues, rng=None):
     return ''.join(result)
 
 
-def lars_promote_batch(puzzle, target_clues, count=10, rng=None):
+def lars_promote_batch(puzzle, target_clues, count=10, rng=None, solution=None):
     """Generate multiple promoted puzzles from a single seed.
 
     Each promotion picks a DIFFERENT random subset of solution digits,
@@ -1189,6 +1319,9 @@ def lars_promote_batch(puzzle, target_clues, count=10, rng=None):
         target_clues: target clue count
         count: how many to generate
         rng: random.Random instance
+        solution: 81-char solution string. If provided, skips internal
+            solve_backtrack (free speedup when caller already has it,
+            e.g. from a v4.0 seed record).
 
     Returns:
         list of promoted puzzle strings (all guaranteed unique)
@@ -1200,12 +1333,16 @@ def lars_promote_batch(puzzle, target_clues, count=10, rng=None):
     puzzle = puzzle.replace('.', '0')
     current = sum(1 for c in puzzle if c != '0')
 
-    from .engine import solve_backtrack
-    solution = solve_backtrack(puzzle)
     if solution is None:
-        raise ValueError("Puzzle has no solution")
-    if isinstance(solution, (list, np.ndarray)):
-        solution = ''.join(str(d) for d in solution)
+        from .engine import solve_backtrack
+        solution = solve_backtrack(puzzle)
+        if solution is None:
+            raise ValueError("Puzzle has no solution")
+        if isinstance(solution, (list, np.ndarray)):
+            solution = ''.join(str(d) for d in solution)
+    else:
+        if isinstance(solution, (list, np.ndarray)):
+            solution = ''.join(str(d) for d in solution)
 
     empty = [i for i in range(81) if puzzle[i] == '0']
     n_add = min(target_clues - current, len(empty))
@@ -1264,6 +1401,25 @@ class LarsForge:
         # Clue mask: which positions have clues
         self.mask = [self.seed_puzzle[i] != '0' for i in range(81)]
         self.n_clues = sum(self.mask)
+
+    @classmethod
+    def from_record(cls, rec):
+        """Construct from a v4.0 seed record dict with 'mask' and 'solution' keys.
+
+        Skips the solve_backtrack step since solution is pre-stored.
+        """
+        from .seed_schema import reconstruct_puzzle
+        puzzle = reconstruct_puzzle(rec['mask'], rec['solution'])
+        return cls(puzzle, seed_solution=rec['solution'])
+
+    @classmethod
+    def from_mask_solution(cls, mask, solution):
+        """Construct from (mask, solution) pair directly.
+
+        Both args are 81-char strings; mask is '0'/'1', solution is '1'-'9'.
+        """
+        from .seed_schema import reconstruct_puzzle
+        return cls(reconstruct_puzzle(mask, solution), seed_solution=solution)
 
     def lars_permute(self, perm):
         """Apply a digit permutation to the seed puzzle. O(81).
@@ -1838,7 +1994,8 @@ def lars_technique_seeds(techniques, clues=None, tier=None):
     if not matching_sigs:
         return []
 
-    # Collect seeds
+    # Collect seeds — v4.0 entries are {'mask', 'solution'}; reconstruct for string API
+    from .seed_schema import reconstruct_puzzle as _rp
     seeds = []
     for sig in matching_sigs:
         data = LARS_TECHNIQUE_SIGS.get(sig, {})
@@ -1847,7 +2004,11 @@ def lars_technique_seeds(techniques, clues=None, tier=None):
         for cc_str, puzzles in data.get('seeds', {}).items():
             if clues and int(cc_str) != clues:
                 continue
-            seeds.extend(puzzles)
+            for p in puzzles:
+                if isinstance(p, dict) and 'mask' in p and 'solution' in p:
+                    seeds.append(_rp(p['mask'], p['solution']))
+                elif isinstance(p, str):
+                    seeds.append(p)
 
     return seeds
 
@@ -1959,38 +2120,57 @@ def lars_technique_list():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# LARS SEEDS — DeepRes/D2B/LS Provenance Registry
+# LARS SEEDS — DeepRes/D2B/LS Provenance Registry (v4.0 schema)
 # 463K seeds (438K + 25K LS), 565 quadrillion forgeable puzzles
+# v4.0: stores (mask, solution) records instead of puzzle strings.
 # ══════════════════════════════════════════════════════════════════════
 
-# Load Lars Seeds from split files (part1 + part2)
+from .seed_schema import (SCHEMA_VERSION as _SEED_SCHEMA_VERSION,
+                          reconstruct_puzzle as _reconstruct_puzzle)
+
+# Load Lars Seeds from split files (part1 + part2).
+# v4.0: each entry is {'mask': str, 'solution': str} not a puzzle string.
 LARS_SEEDS = {'seeds': {'deepres': [], 'd2b': []}, 'meta': {}}
-LARS_SEEDS_HASHES = {}       # hash -> puzzle (core seeds, 100% confidence)
-LARS_SEEDS_L1_HASHES = {}    # hash -> puzzle (L1 variants, separate confidence)
+LARS_SEEDS_HASHES = {}       # hash -> {'mask', 'solution'} (core seeds)
+LARS_SEEDS_L1_HASHES = {}    # hash -> {'mask', 'solution'} (L1 variants)
+LARS_SEEDS_LS_HEX_HASHES = {}  # opaque-hex-id -> {'mask', 'solution'} (LS)
+
+# Mask-indexed caches (built lazily) for fast technique lookup.
+_LARS_MASK_TECH_INDEX = None   # mask_str -> set of tech labels ('DeepResonance', 'D2B', 'LS')
+
+
+def _assert_v2(part, path):
+    v = (part.get('meta') or {}).get('schema_version')
+    if v != _SEED_SCHEMA_VERSION:
+        raise RuntimeError(
+            f"{path}: unexpected schema_version={v!r} (expected {_SEED_SCHEMA_VERSION}). "
+            "Run scripts/migrate_seeds_to_v2.py to migrate legacy seed files."
+        )
+
 
 def _load_lars_seeds():
     global LARS_SEEDS, LARS_SEEDS_HASHES, LARS_SEEDS_L1_HASHES
+    global LARS_SEEDS_LS_HEX_HASHES, _LARS_MASK_TECH_INDEX
     _pkg_dir = _os.path.dirname(__file__)
     _lars_dir = _os.path.join(_pkg_dir, '..', '..', 'lars')
 
     # Core seeds (100% confidence)
     for _part_name in ['lars_seeds_part1.json', 'lars_seeds_part2.json']:
-        _loaded = False
         for _base in [_pkg_dir, _lars_dir]:
             _path = _os.path.join(_base, _part_name)
             if _os.path.exists(_path):
-                try:
-                    with open(_path) as _f:
-                        _part = _json.load(_f)
-                    if 'meta' in _part:
-                        LARS_SEEDS['meta'] = _part['meta']
-                    for _tech in ['deepres', 'd2b']:
-                        if _tech in _part.get('seeds', {}):
-                            LARS_SEEDS['seeds'][_tech].extend(_part['seeds'][_tech])
-                    LARS_SEEDS_HASHES.update(_part.get('mask_hashes', {}))
-                    _loaded = True
-                except Exception:
-                    pass
+                with open(_path) as _f:
+                    _part = _json.load(_f)
+                _assert_v2(_part, _path)
+                if 'meta' in _part and not LARS_SEEDS['meta']:
+                    LARS_SEEDS['meta'] = _part['meta']
+                for _tech in ['deepres', 'd2b']:
+                    if _tech in _part.get('seeds', {}):
+                        _vals = _part['seeds'][_tech]
+                        # seeds[_tech] is now a list of records; preserve only list entries
+                        if isinstance(_vals, list):
+                            LARS_SEEDS['seeds'][_tech].extend(_vals)
+                LARS_SEEDS_HASHES.update(_part.get('mask_hashes', {}))
                 break
 
     # Variant hashes for provenance matching
@@ -2002,41 +2182,61 @@ def _load_lars_seeds():
         for _base in [_pkg_dir, _lars_dir]:
             _path = _os.path.join(_base, _part_name)
             if _os.path.exists(_path):
-                try:
-                    with open(_path) as _f:
-                        _part = _json.load(_f)
-                    LARS_SEEDS_L1_HASHES.update(_part.get('mask_hashes', {}))
-                except Exception:
-                    pass
-                break
-
-    # Also try single-file fallback
-    if not LARS_SEEDS_HASHES:
-        for _path in [_os.path.join(_pkg_dir, 'lars_deepres_seeds.json'),
-                      _os.path.join(_lars_dir, 'lars_deepres_seeds.json')]:
-            if _os.path.exists(_path):
-                try:
-                    with open(_path) as _f:
-                        _data = _json.load(_f)
-                    LARS_SEEDS.update(_data)
-                    LARS_SEEDS_HASHES.update(_data.get('mask_hashes', {}))
-                except Exception:
-                    pass
+                with open(_path) as _f:
+                    _part = _json.load(_f)
+                _assert_v2(_part, _path)
+                LARS_SEEDS_L1_HASHES.update(_part.get('mask_hashes', {}))
                 break
 
     # LS seeds (Loki's Scalpel — mith T&E(3))
+    # Note: ls_seeds entries have an opaque hex 'hash' field that differs from
+    # the canonical lars_mask_hash tuple key. We populate BOTH indexes so:
+    #   - provenance via lars_mask_hash(mask) hits LARS_SEEDS_HASHES
+    #   - legacy lookups by hex id hit LARS_SEEDS_LS_HEX_HASHES
     _ls_path = _os.path.join(_pkg_dir, 'ls_seeds.json.gz')
     if _os.path.exists(_ls_path):
-        try:
-            import gzip as _gzip
-            with _gzip.open(_ls_path, 'rt') as _f:
-                _ls_data = _json.load(_f)
-            _ls_seeds = _ls_data.get('seeds', [])
-            LARS_SEEDS['seeds']['ls'] = [s['puzzle'] for s in _ls_seeds]
-            for s in _ls_seeds:
-                LARS_SEEDS_HASHES[s['hash']] = s['puzzle']
-        except Exception:
-            pass
+        import gzip as _gzip
+        with _gzip.open(_ls_path, 'rt') as _f:
+            _ls_data = _json.load(_f)
+        _assert_v2(_ls_data, _ls_path)
+        _ls_seeds = _ls_data.get('seeds', [])
+        LARS_SEEDS['seeds']['ls'] = _ls_seeds
+        for s in _ls_seeds:
+            if 'mask' not in s or 'solution' not in s:
+                continue
+            rec = {'mask': s['mask'], 'solution': s['solution']}
+            # Canonical mask-hash key (fixes latent bug where hex id was used)
+            try:
+                _mask_int_list = [1 if c == '1' else 0 for c in s['mask']]
+                _canonical_key = str(lars_mask_hash(_mask_int_list))
+                LARS_SEEDS_HASHES[_canonical_key] = rec
+            except Exception:
+                pass
+            # Legacy hex-id index (in case any consumer relies on it)
+            if 'hash' in s:
+                LARS_SEEDS_LS_HEX_HASHES[s['hash']] = rec
+
+    # Invalidate lazy caches
+    _LARS_MASK_TECH_INDEX = None
+
+
+def _get_mask_tech_index():
+    """Build {mask: set(techs)} on first access. Used by reducer/provenance
+    to answer 'which technique classes does this mask belong to?' quickly.
+    """
+    global _LARS_MASK_TECH_INDEX
+    if _LARS_MASK_TECH_INDEX is not None:
+        return _LARS_MASK_TECH_INDEX
+    idx = {}
+    for _tech, _label in (('deepres', 'DeepResonance'),
+                          ('d2b',    'D2B'),
+                          ('ls',     'LS')):
+        for rec in LARS_SEEDS['seeds'].get(_tech, []):
+            if isinstance(rec, dict) and 'mask' in rec:
+                idx.setdefault(rec['mask'], set()).add(_label)
+    _LARS_MASK_TECH_INDEX = idx
+    return idx
+
 
 _load_lars_seeds()
 
@@ -2139,29 +2339,26 @@ def lars_provenance(puzzle_or_mask):
 
     # Check core seeds first (100% confidence)
     if h in LARS_SEEDS_HASHES:
-        matched_seed = LARS_SEEDS_HASHES[h]
-        seeds_data = LARS_SEEDS.get('seeds', {})
-        is_dr = matched_seed in seeds_data.get('deepres', [])
-        is_d2b = matched_seed in seeds_data.get('d2b', [])
-        technique = []
-        if is_dr:
-            technique.append('DeepResonance')
-        if is_d2b:
-            technique.append('D2B')
+        rec = LARS_SEEDS_HASHES[h]
+        # v4.0: rec is a dict {'mask', 'solution'}; reconstruct puzzle for display
+        matched_seed = _reconstruct_puzzle(rec['mask'], rec['solution'])
+        tech_labels = _get_mask_tech_index().get(rec['mask'], set())
+        technique = sorted(tech_labels) if tech_labels else ['DeepResonance or D2B']
 
         return {
             'matched': True,
             'confidence': 'exact',
             'confidence_pct': 100,
             'seed': matched_seed,
-            'technique': technique or ['DeepResonance or D2B'],
+            'technique': technique,
             'hash': h,
             'n_clues': sum(mask),
         }
 
     # Check L1 variant hashes (high probability)
     if h in LARS_SEEDS_L1_HASHES:
-        matched_seed = LARS_SEEDS_L1_HASHES[h]
+        rec = LARS_SEEDS_L1_HASHES[h]
+        matched_seed = _reconstruct_puzzle(rec['mask'], rec['solution'])
         return {
             'matched': True,
             'confidence': 'l1_variant',
@@ -2251,6 +2448,18 @@ SIG_ABBREV = {
 }
 SIG_ABBREV_REV = {v: k for k, v in SIG_ABBREV.items()}
 
+# Post-catalog techniques: in the current engine but NOT tracked by the
+# catalog's signature system. When doing signature lookups for catalog
+# matching, exclude these so the solve produces a catalog-vintage signature
+# (catalog was built before these techniques existed — pre-LZWing, pre-Tridagon, etc.).
+POST_CATALOG_TECHS = {
+    '3DMedusa', 'AlmostLockedPair', 'AvoidableRect', 'BUG+1',
+    'ChuteRemotePair', 'EmptyRectangle', 'FNv2', 'Fireworks',
+    'GroupedXCycle', 'HiddenUR', 'JETest', 'LS', 'LZWing',
+    'SKLoop', 'Tridagon', 'URType2d', 'WWing', 'WXYZWing',
+    'XYChain', 'XYZWing',
+}
+
 
 def lars_sig_forge(techniques, count=10, seed=None, exact=False, clues=None):
     """Forge puzzles from seeds matching a technique signature.
@@ -2311,15 +2520,20 @@ def lars_sig_forge(techniques, count=10, seed=None, exact=False, clues=None):
         }
 
     # Collect all matching seeds, optionally filter by clue count
+    # v4.0: entries are {'mask', 'solution', ...} records
+    from .seed_schema import reconstruct_puzzle as _rp
     pool = []
     for sig_str, entries in matched_sigs:
         for entry in entries:
-            puzzle = entry.get('puzzle', '')
-            if clues is not None:
+            if isinstance(entry, dict) and 'mask' in entry and 'solution' in entry:
+                puzzle = _rp(entry['mask'], entry['solution'])
+                pc = entry['mask'].count('1')
+            else:
+                puzzle = entry.get('puzzle', '') if isinstance(entry, dict) else ''
                 pc = sum(1 for c in puzzle if c != '0' and c != '.')
-                if pc != clues:
-                    continue
-            pool.append((puzzle, sig_str, entry.get('source', '')))
+            if clues is not None and pc != clues:
+                continue
+            pool.append((puzzle, sig_str, entry.get('source', '') if isinstance(entry, dict) else ''))
 
     if not pool:
         return {
