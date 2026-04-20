@@ -50,7 +50,7 @@ bench_h11_full_48765_stalls_3_4_8.txt # 75 stalls in the 48k.
 
 A research guide for joining the party. *mith* puzzles next !
 
-larsdoku 3.6.2 is a pure-logic sudoku solver with 44 pattern detectors. It is
+larsdoku 4.0.0 is a pure-logic sudoku solver with 44 pattern detectors. It is
 also a research instrument: when you give it a hard puzzle and it stalls, the
 stall is a **fingerprint of a technique nobody has named yet**. This guide
 shows you how to install it, run it in research mode, and use any AI assistant
@@ -92,7 +92,7 @@ many puzzles.
 ## Install
 
 ```bash
-pip install larsdoku==3.6.2
+pip install larsdoku==4.0.0
 
 # Don't forget this step after every upgrade, because it increses speed by 1000%!!!
 
@@ -112,7 +112,7 @@ Verify:
 
 ```bash
 larsdoku --version
-# larsdoku 3.6.2
+# larsdoku 4.0.0
 ```
 
 ---
@@ -131,7 +131,7 @@ techniques.
 
 ## Solve a puzzle in research mode
 
-This is the new flag in 3.6.2:
+This is the new flag in 4.0.0:
 
 ```bash
 larsdoku '12..56.89.5...92.6......15.2.1...96..65....2889....5.1....7..........81..1283....' --with-zoneded --level 7 --verbose
@@ -503,7 +503,7 @@ larsdoku --warmup
 
 If you want to dive in right now:
 
-1. Install larsdoku 3.6.2
+1. Install larsdoku 4.0.0
 2. Run `larsdoku '<any hard puzzle>' --with-zoneded --level 7 --verbose`
 3. When you see a `Zone Deduction Points` line, that is a missing
    technique. Pick a zone slot you find interesting, gather 20-50
@@ -522,7 +522,7 @@ Larsdoku
 ```
 # Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
 
-pip install larsdoku==3.6.2
+pip install larsdoku==4.0.0
 
 # Run this for JIT speedups 10x-100x faster!
 larsdoku --warmup
@@ -1220,7 +1220,7 @@ $ larsdoku --lars-certify "00000001040000000002000000000005040700800030000109000
 
 ```
 # Run --warmup to save JIT conmpilations for 109-1000x speedups!! Seriously, run once, it compiles and saves, and it's fast for every run thereafter without the nee for --warmup
-pip insta64291 core + 129828 variant hashes.     larsdoku==3.6.2
+pip insta64291 core + 129828 variant hashes.     larsdoku==4.0.0
 larsdoku --warmup 
 ```
 
