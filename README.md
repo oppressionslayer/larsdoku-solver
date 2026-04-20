@@ -2,6 +2,7 @@
 
 # MAJOR RELEASE NOW AVAILABLE WITH ALL FEATURES BELOW 4.0.0 10k SIG 400K UNIQE MASKS
 
+# CREATED WITH AI ASSISTANCE AI CAN MAKE MISTAKES!
 
 ```
 # 99.846% on the 48k hardest (we just achieved 100% we are redesigining solves to not contradict each other now as seen
