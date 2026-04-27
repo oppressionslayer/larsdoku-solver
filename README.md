@@ -71,8 +71,6 @@ bench_h11_full_48765_stalls_3_4_8.txt # 75 stalls in the 48k.
 
 # --> https://suno.com/s/usI0HWjGrshlMRmd <-- #
 
-# --> https://dcubed.space/success-stories/ <-- #
-
 ```
 
 A research guide for joining the party. *mith* puzzles next !
